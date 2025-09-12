@@ -1,17 +1,15 @@
-package tests
+package keypair
 
 import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
 	"testing"
-
-	"github.com/jasoet/gopki/pkg/keypair"
 )
 
 func TestGenericPublicKeyParsing(t *testing.T) {
 	t.Run("RSA public key parsing", func(t *testing.T) {
-		keyPair, err := keypair.GenerateRSAKeyPair(2048)
+		keyPair, err := GenerateRSAKeyPair(2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA key pair: %v", err)
 		}
@@ -21,7 +19,7 @@ func TestGenericPublicKeyParsing(t *testing.T) {
 			t.Fatalf("Failed to convert to PEM: %v", err)
 		}
 
-		parsedKey, err := keypair.ParsePublicKeyFromPEM[*rsa.PublicKey](publicPEM)
+		parsedKey, err := ParsePublicKeyFromPEM[*rsa.PublicKey](publicPEM)
 		if err != nil {
 			t.Fatalf("Failed to parse RSA public key: %v", err)
 		}
@@ -36,7 +34,7 @@ func TestGenericPublicKeyParsing(t *testing.T) {
 	})
 
 	t.Run("ECDSA public key parsing", func(t *testing.T) {
-		keyPair, err := keypair.GenerateECDSAKeyPair(keypair.P256)
+		keyPair, err := GenerateECDSAKeyPair(P256)
 		if err != nil {
 			t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 		}
@@ -46,7 +44,7 @@ func TestGenericPublicKeyParsing(t *testing.T) {
 			t.Fatalf("Failed to convert to PEM: %v", err)
 		}
 
-		parsedKey, err := keypair.ParsePublicKeyFromPEM[*ecdsa.PublicKey](publicPEM)
+		parsedKey, err := ParsePublicKeyFromPEM[*ecdsa.PublicKey](publicPEM)
 		if err != nil {
 			t.Fatalf("Failed to parse ECDSA public key: %v", err)
 		}
@@ -61,7 +59,7 @@ func TestGenericPublicKeyParsing(t *testing.T) {
 	})
 
 	t.Run("Ed25519 public key parsing", func(t *testing.T) {
-		keyPair, err := keypair.GenerateEd25519KeyPair()
+		keyPair, err := GenerateEd25519KeyPair()
 		if err != nil {
 			t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 		}
@@ -71,7 +69,7 @@ func TestGenericPublicKeyParsing(t *testing.T) {
 			t.Fatalf("Failed to convert to PEM: %v", err)
 		}
 
-		parsedKey, err := keypair.ParsePublicKeyFromPEM[ed25519.PublicKey](publicPEM)
+		parsedKey, err := ParsePublicKeyFromPEM[ed25519.PublicKey](publicPEM)
 		if err != nil {
 			t.Fatalf("Failed to parse Ed25519 public key: %v", err)
 		}
@@ -84,7 +82,7 @@ func TestGenericPublicKeyParsing(t *testing.T) {
 
 func TestGenericPrivateKeyParsing(t *testing.T) {
 	t.Run("RSA private key parsing", func(t *testing.T) {
-		keyPair, err := keypair.GenerateRSAKeyPair(2048)
+		keyPair, err := GenerateRSAKeyPair(2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA key pair: %v", err)
 		}
@@ -94,7 +92,7 @@ func TestGenericPrivateKeyParsing(t *testing.T) {
 			t.Fatalf("Failed to convert to PEM: %v", err)
 		}
 
-		parsedKey, err := keypair.ParsePrivateKeyFromPEM[*rsa.PrivateKey](privatePEM)
+		parsedKey, err := ParsePrivateKeyFromPEM[*rsa.PrivateKey](privatePEM)
 		if err != nil {
 			t.Fatalf("Failed to parse RSA private key: %v", err)
 		}
@@ -109,7 +107,7 @@ func TestGenericPrivateKeyParsing(t *testing.T) {
 	})
 
 	t.Run("ECDSA private key parsing", func(t *testing.T) {
-		keyPair, err := keypair.GenerateECDSAKeyPair(keypair.P256)
+		keyPair, err := GenerateECDSAKeyPair(P256)
 		if err != nil {
 			t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 		}
@@ -119,7 +117,7 @@ func TestGenericPrivateKeyParsing(t *testing.T) {
 			t.Fatalf("Failed to convert to PEM: %v", err)
 		}
 
-		parsedKey, err := keypair.ParsePrivateKeyFromPEM[*ecdsa.PrivateKey](privatePEM)
+		parsedKey, err := ParsePrivateKeyFromPEM[*ecdsa.PrivateKey](privatePEM)
 		if err != nil {
 			t.Fatalf("Failed to parse ECDSA private key: %v", err)
 		}
@@ -134,7 +132,7 @@ func TestGenericPrivateKeyParsing(t *testing.T) {
 	})
 
 	t.Run("Ed25519 private key parsing", func(t *testing.T) {
-		keyPair, err := keypair.GenerateEd25519KeyPair()
+		keyPair, err := GenerateEd25519KeyPair()
 		if err != nil {
 			t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 		}
@@ -144,7 +142,7 @@ func TestGenericPrivateKeyParsing(t *testing.T) {
 			t.Fatalf("Failed to convert to PEM: %v", err)
 		}
 
-		parsedKey, err := keypair.ParsePrivateKeyFromPEM[ed25519.PrivateKey](privatePEM)
+		parsedKey, err := ParsePrivateKeyFromPEM[ed25519.PrivateKey](privatePEM)
 		if err != nil {
 			t.Fatalf("Failed to parse Ed25519 private key: %v", err)
 		}
@@ -156,9 +154,9 @@ func TestGenericPrivateKeyParsing(t *testing.T) {
 }
 
 func TestGenericParsingTypeErrors(t *testing.T) {
-	rsaKeyPair, _ := keypair.GenerateRSAKeyPair(2048)
-	ecdsaKeyPair, _ := keypair.GenerateECDSAKeyPair(keypair.P256)
-	ed25519KeyPair, _ := keypair.GenerateEd25519KeyPair()
+	rsaKeyPair, _ := GenerateRSAKeyPair(2048)
+	ecdsaKeyPair, _ := GenerateECDSAKeyPair(P256)
+	ed25519KeyPair, _ := GenerateEd25519KeyPair()
 
 	rsaPublicPEM, _ := rsaKeyPair.PublicKeyToPEM()
 	ecdsaPublicPEM, _ := ecdsaKeyPair.PublicKeyToPEM()
@@ -169,64 +167,64 @@ func TestGenericParsingTypeErrors(t *testing.T) {
 	ed25519PrivatePEM, _ := ed25519KeyPair.PrivateKeyToPEM()
 
 	t.Run("Wrong public key type expectations", func(t *testing.T) {
-		_, err := keypair.ParsePublicKeyFromPEM[*ecdsa.PublicKey](rsaPublicPEM)
+		_, err := ParsePublicKeyFromPEM[*ecdsa.PublicKey](rsaPublicPEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing RSA key as ECDSA")
 		}
 
-		_, err = keypair.ParsePublicKeyFromPEM[ed25519.PublicKey](rsaPublicPEM)
+		_, err = ParsePublicKeyFromPEM[ed25519.PublicKey](rsaPublicPEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing RSA key as Ed25519")
 		}
 
-		_, err = keypair.ParsePublicKeyFromPEM[*rsa.PublicKey](ecdsaPublicPEM)
+		_, err = ParsePublicKeyFromPEM[*rsa.PublicKey](ecdsaPublicPEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing ECDSA key as RSA")
 		}
 
-		_, err = keypair.ParsePublicKeyFromPEM[ed25519.PublicKey](ecdsaPublicPEM)
+		_, err = ParsePublicKeyFromPEM[ed25519.PublicKey](ecdsaPublicPEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing ECDSA key as Ed25519")
 		}
 
-		_, err = keypair.ParsePublicKeyFromPEM[*rsa.PublicKey](ed25519PublicPEM)
+		_, err = ParsePublicKeyFromPEM[*rsa.PublicKey](ed25519PublicPEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing Ed25519 key as RSA")
 		}
 
-		_, err = keypair.ParsePublicKeyFromPEM[*ecdsa.PublicKey](ed25519PublicPEM)
+		_, err = ParsePublicKeyFromPEM[*ecdsa.PublicKey](ed25519PublicPEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing Ed25519 key as ECDSA")
 		}
 	})
 
 	t.Run("Wrong private key type expectations", func(t *testing.T) {
-		_, err := keypair.ParsePrivateKeyFromPEM[*ecdsa.PrivateKey](rsaPrivatePEM)
+		_, err := ParsePrivateKeyFromPEM[*ecdsa.PrivateKey](rsaPrivatePEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing RSA key as ECDSA")
 		}
 
-		_, err = keypair.ParsePrivateKeyFromPEM[ed25519.PrivateKey](rsaPrivatePEM)
+		_, err = ParsePrivateKeyFromPEM[ed25519.PrivateKey](rsaPrivatePEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing RSA key as Ed25519")
 		}
 
-		_, err = keypair.ParsePrivateKeyFromPEM[*rsa.PrivateKey](ecdsaPrivatePEM)
+		_, err = ParsePrivateKeyFromPEM[*rsa.PrivateKey](ecdsaPrivatePEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing ECDSA key as RSA")
 		}
 
-		_, err = keypair.ParsePrivateKeyFromPEM[ed25519.PrivateKey](ecdsaPrivatePEM)
+		_, err = ParsePrivateKeyFromPEM[ed25519.PrivateKey](ecdsaPrivatePEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing ECDSA key as Ed25519")
 		}
 
-		_, err = keypair.ParsePrivateKeyFromPEM[*rsa.PrivateKey](ed25519PrivatePEM)
+		_, err = ParsePrivateKeyFromPEM[*rsa.PrivateKey](ed25519PrivatePEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing Ed25519 key as RSA")
 		}
 
-		_, err = keypair.ParsePrivateKeyFromPEM[*ecdsa.PrivateKey](ed25519PrivatePEM)
+		_, err = ParsePrivateKeyFromPEM[*ecdsa.PrivateKey](ed25519PrivatePEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing Ed25519 key as ECDSA")
 		}
@@ -237,34 +235,34 @@ func TestGenericParsingWithInvalidPEM(t *testing.T) {
 	invalidPEM := []byte("invalid pem data")
 
 	t.Run("Invalid PEM for public key", func(t *testing.T) {
-		_, err := keypair.ParsePublicKeyFromPEM[*rsa.PublicKey](invalidPEM)
+		_, err := ParsePublicKeyFromPEM[*rsa.PublicKey](invalidPEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing invalid PEM as RSA public key")
 		}
 
-		_, err = keypair.ParsePublicKeyFromPEM[*ecdsa.PublicKey](invalidPEM)
+		_, err = ParsePublicKeyFromPEM[*ecdsa.PublicKey](invalidPEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing invalid PEM as ECDSA public key")
 		}
 
-		_, err = keypair.ParsePublicKeyFromPEM[ed25519.PublicKey](invalidPEM)
+		_, err = ParsePublicKeyFromPEM[ed25519.PublicKey](invalidPEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing invalid PEM as Ed25519 public key")
 		}
 	})
 
 	t.Run("Invalid PEM for private key", func(t *testing.T) {
-		_, err := keypair.ParsePrivateKeyFromPEM[*rsa.PrivateKey](invalidPEM)
+		_, err := ParsePrivateKeyFromPEM[*rsa.PrivateKey](invalidPEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing invalid PEM as RSA private key")
 		}
 
-		_, err = keypair.ParsePrivateKeyFromPEM[*ecdsa.PrivateKey](invalidPEM)
+		_, err = ParsePrivateKeyFromPEM[*ecdsa.PrivateKey](invalidPEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing invalid PEM as ECDSA private key")
 		}
 
-		_, err = keypair.ParsePrivateKeyFromPEM[ed25519.PrivateKey](invalidPEM)
+		_, err = ParsePrivateKeyFromPEM[ed25519.PrivateKey](invalidPEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing invalid PEM as Ed25519 private key")
 		}
@@ -273,7 +271,7 @@ func TestGenericParsingWithInvalidPEM(t *testing.T) {
 
 func TestGenericParsingRoundTrip(t *testing.T) {
 	t.Run("RSA round trip test", func(t *testing.T) {
-		originalKeyPair, err := keypair.GenerateRSAKeyPair(2048)
+		originalKeyPair, err := GenerateRSAKeyPair(2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA key pair: %v", err)
 		}
@@ -288,12 +286,12 @@ func TestGenericParsingRoundTrip(t *testing.T) {
 			t.Fatalf("Failed to convert public key to PEM: %v", err)
 		}
 
-		parsedPrivateKey, err := keypair.ParsePrivateKeyFromPEM[*rsa.PrivateKey](privatePEM)
+		parsedPrivateKey, err := ParsePrivateKeyFromPEM[*rsa.PrivateKey](privatePEM)
 		if err != nil {
 			t.Fatalf("Failed to parse private key: %v", err)
 		}
 
-		parsedPublicKey, err := keypair.ParsePublicKeyFromPEM[*rsa.PublicKey](publicPEM)
+		parsedPublicKey, err := ParsePublicKeyFromPEM[*rsa.PublicKey](publicPEM)
 		if err != nil {
 			t.Fatalf("Failed to parse public key: %v", err)
 		}
@@ -308,7 +306,7 @@ func TestGenericParsingRoundTrip(t *testing.T) {
 	})
 
 	t.Run("ECDSA round trip test", func(t *testing.T) {
-		originalKeyPair, err := keypair.GenerateECDSAKeyPair(keypair.P256)
+		originalKeyPair, err := GenerateECDSAKeyPair(P256)
 		if err != nil {
 			t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 		}
@@ -318,7 +316,7 @@ func TestGenericParsingRoundTrip(t *testing.T) {
 			t.Fatalf("Failed to convert private key to PEM: %v", err)
 		}
 
-		parsedPrivateKey, err := keypair.ParsePrivateKeyFromPEM[*ecdsa.PrivateKey](privatePEM)
+		parsedPrivateKey, err := ParsePrivateKeyFromPEM[*ecdsa.PrivateKey](privatePEM)
 		if err != nil {
 			t.Fatalf("Failed to parse private key: %v", err)
 		}
@@ -329,7 +327,7 @@ func TestGenericParsingRoundTrip(t *testing.T) {
 	})
 
 	t.Run("Ed25519 round trip test", func(t *testing.T) {
-		originalKeyPair, err := keypair.GenerateEd25519KeyPair()
+		originalKeyPair, err := GenerateEd25519KeyPair()
 		if err != nil {
 			t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 		}
@@ -339,7 +337,7 @@ func TestGenericParsingRoundTrip(t *testing.T) {
 			t.Fatalf("Failed to convert private key to PEM: %v", err)
 		}
 
-		parsedPrivateKey, err := keypair.ParsePrivateKeyFromPEM[ed25519.PrivateKey](privatePEM)
+		parsedPrivateKey, err := ParsePrivateKeyFromPEM[ed25519.PrivateKey](privatePEM)
 		if err != nil {
 			t.Fatalf("Failed to parse private key: %v", err)
 		}

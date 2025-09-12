@@ -1,13 +1,11 @@
-package tests
+package keypair
 
 import (
 	"testing"
-
-	"github.com/jasoet/gopki/pkg/keypair"
 )
 
 func TestGenerateRSAKeyPair(t *testing.T) {
-	keyPair, err := keypair.GenerateRSAKeyPair(2048)
+	keyPair, err := GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key pair: %v", err)
 	}
@@ -26,7 +24,7 @@ func TestGenerateRSAKeyPair(t *testing.T) {
 }
 
 func TestRSAKeyPairPEMConversion(t *testing.T) {
-	keyPair, err := keypair.GenerateRSAKeyPair(2048)
+	keyPair, err := GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key pair: %v", err)
 	}
@@ -41,7 +39,7 @@ func TestRSAKeyPairPEMConversion(t *testing.T) {
 		t.Fatalf("Failed to convert public key to PEM: %v", err)
 	}
 
-	loadedKeyPair, err := keypair.RSAKeyPairFromPEM(privatePEM)
+	loadedKeyPair, err := RSAKeyPairFromPEM(privatePEM)
 	if err != nil {
 		t.Fatalf("Failed to load key pair from PEM: %v", err)
 	}
@@ -56,7 +54,7 @@ func TestRSAKeyPairPEMConversion(t *testing.T) {
 }
 
 func TestGenerateECDSAKeyPair(t *testing.T) {
-	keyPair, err := keypair.GenerateECDSAKeyPair(keypair.P256)
+	keyPair, err := GenerateECDSAKeyPair(P256)
 	if err != nil {
 		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
@@ -71,7 +69,7 @@ func TestGenerateECDSAKeyPair(t *testing.T) {
 }
 
 func TestECDSAKeyPairPEMConversion(t *testing.T) {
-	keyPair, err := keypair.GenerateECDSAKeyPair(keypair.P256)
+	keyPair, err := GenerateECDSAKeyPair(P256)
 	if err != nil {
 		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
@@ -86,7 +84,7 @@ func TestECDSAKeyPairPEMConversion(t *testing.T) {
 		t.Fatalf("Failed to convert public key to PEM: %v", err)
 	}
 
-	loadedKeyPair, err := keypair.ECDSAKeyPairFromPEM(privatePEM)
+	loadedKeyPair, err := ECDSAKeyPairFromPEM(privatePEM)
 	if err != nil {
 		t.Fatalf("Failed to load key pair from PEM: %v", err)
 	}
@@ -101,7 +99,7 @@ func TestECDSAKeyPairPEMConversion(t *testing.T) {
 }
 
 func TestGenerateEd25519KeyPair(t *testing.T) {
-	keyPair, err := keypair.GenerateEd25519KeyPair()
+	keyPair, err := GenerateEd25519KeyPair()
 	if err != nil {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
@@ -124,7 +122,7 @@ func TestGenerateEd25519KeyPair(t *testing.T) {
 }
 
 func TestEd25519KeyPairPEMConversion(t *testing.T) {
-	keyPair, err := keypair.GenerateEd25519KeyPair()
+	keyPair, err := GenerateEd25519KeyPair()
 	if err != nil {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
@@ -139,7 +137,7 @@ func TestEd25519KeyPairPEMConversion(t *testing.T) {
 		t.Fatalf("Failed to convert public key to PEM: %v", err)
 	}
 
-	loadedKeyPair, err := keypair.Ed25519KeyPairFromPEM(privatePEM)
+	loadedKeyPair, err := Ed25519KeyPairFromPEM(privatePEM)
 	if err != nil {
 		t.Fatalf("Failed to load key pair from PEM: %v", err)
 	}
@@ -154,7 +152,7 @@ func TestEd25519KeyPairPEMConversion(t *testing.T) {
 }
 
 func TestRSAKeySizeValidation(t *testing.T) {
-	_, err := keypair.GenerateRSAKeyPair(1024)
+	_, err := GenerateRSAKeyPair(1024)
 	if err == nil {
 		t.Fatal("Expected error for RSA key size less than 2048")
 	}

@@ -1,4 +1,4 @@
-package tests
+package keypair
 
 import (
 	"crypto/x509"
@@ -8,18 +8,16 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
-
-	"github.com/jasoet/gopki/pkg/keypair"
 )
 
 func TestCreateSelfSignedCertificate(t *testing.T) {
 	t.Run("RSA self-signed certificate", func(t *testing.T) {
-		keyPair, err := keypair.GenerateRSAKeyPair(2048)
+		keyPair, err := GenerateRSAKeyPair(2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA key pair: %v", err)
 		}
 
-		request := keypair.CertificateRequest{
+		request := CertificateRequest{
 			Subject: pkix.Name{
 				Country:      []string{"US"},
 				Organization: []string{"Test Organization"},
@@ -30,7 +28,7 @@ func TestCreateSelfSignedCertificate(t *testing.T) {
 			ValidFor:  365 * 24 * time.Hour,
 		}
 
-		cert, err := keypair.CreateSelfSignedCertificate(keyPair, request)
+		cert, err := CreateSelfSignedCertificate(keyPair, request)
 		if err != nil {
 			t.Fatalf("Failed to create self-signed certificate: %v", err)
 		}
@@ -53,19 +51,19 @@ func TestCreateSelfSignedCertificate(t *testing.T) {
 	})
 
 	t.Run("ECDSA self-signed certificate", func(t *testing.T) {
-		keyPair, err := keypair.GenerateECDSAKeyPair(keypair.P256)
+		keyPair, err := GenerateECDSAKeyPair(P256)
 		if err != nil {
 			t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 		}
 
-		request := keypair.CertificateRequest{
+		request := CertificateRequest{
 			Subject: pkix.Name{
 				CommonName: "ecdsa.example.com",
 			},
 			ValidFor: 30 * 24 * time.Hour,
 		}
 
-		cert, err := keypair.CreateSelfSignedCertificate(keyPair, request)
+		cert, err := CreateSelfSignedCertificate(keyPair, request)
 		if err != nil {
 			t.Fatalf("Failed to create ECDSA self-signed certificate: %v", err)
 		}
@@ -76,12 +74,12 @@ func TestCreateSelfSignedCertificate(t *testing.T) {
 	})
 
 	t.Run("Ed25519 self-signed certificate", func(t *testing.T) {
-		keyPair, err := keypair.GenerateEd25519KeyPair()
+		keyPair, err := GenerateEd25519KeyPair()
 		if err != nil {
 			t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 		}
 
-		request := keypair.CertificateRequest{
+		request := CertificateRequest{
 			Subject: pkix.Name{
 				CommonName: "ed25519.example.com",
 			},
@@ -89,7 +87,7 @@ func TestCreateSelfSignedCertificate(t *testing.T) {
 			ValidFor:    24 * time.Hour,
 		}
 
-		cert, err := keypair.CreateSelfSignedCertificate(keyPair, request)
+		cert, err := CreateSelfSignedCertificate(keyPair, request)
 		if err != nil {
 			t.Fatalf("Failed to create Ed25519 self-signed certificate: %v", err)
 		}
@@ -101,12 +99,12 @@ func TestCreateSelfSignedCertificate(t *testing.T) {
 }
 
 func TestCreateCACertificate(t *testing.T) {
-	keyPair, err := keypair.GenerateRSAKeyPair(2048)
+	keyPair, err := GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key pair: %v", err)
 	}
 
-	request := keypair.CertificateRequest{
+	request := CertificateRequest{
 		Subject: pkix.Name{
 			Country:      []string{"US"},
 			Organization: []string{"Test CA"},
@@ -115,7 +113,7 @@ func TestCreateCACertificate(t *testing.T) {
 		ValidFor: 10 * 365 * 24 * time.Hour,
 	}
 
-	caCert, err := keypair.CreateCACertificate(keyPair, request)
+	caCert, err := CreateCACertificate(keyPair, request)
 	if err != nil {
 		t.Fatalf("Failed to create CA certificate: %v", err)
 	}
@@ -140,30 +138,30 @@ func TestCreateCACertificate(t *testing.T) {
 
 func TestSignCertificate(t *testing.T) {
 	// Create CA
-	caKeyPair, err := keypair.GenerateRSAKeyPair(2048)
+	caKeyPair, err := GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate CA key pair: %v", err)
 	}
 
-	caRequest := keypair.CertificateRequest{
+	caRequest := CertificateRequest{
 		Subject: pkix.Name{
 			CommonName: "Test CA",
 		},
 		ValidFor: 10 * 365 * 24 * time.Hour,
 	}
 
-	caCert, err := keypair.CreateCACertificate(caKeyPair, caRequest)
+	caCert, err := CreateCACertificate(caKeyPair, caRequest)
 	if err != nil {
 		t.Fatalf("Failed to create CA certificate: %v", err)
 	}
 
 	// Create server key pair
-	serverKeyPair, err := keypair.GenerateRSAKeyPair(2048)
+	serverKeyPair, err := GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate server key pair: %v", err)
 	}
 
-	serverRequest := keypair.CertificateRequest{
+	serverRequest := CertificateRequest{
 		Subject: pkix.Name{
 			CommonName: "server.example.com",
 		},
@@ -173,7 +171,7 @@ func TestSignCertificate(t *testing.T) {
 	}
 
 	// Sign server certificate
-	serverCert, err := keypair.SignCertificate(caCert, caKeyPair, serverRequest, serverKeyPair.PublicKey)
+	serverCert, err := SignCertificate(caCert, caKeyPair, serverRequest, serverKeyPair.PublicKey)
 	if err != nil {
 		t.Fatalf("Failed to sign server certificate: %v", err)
 	}
@@ -197,62 +195,62 @@ func TestSignCertificate(t *testing.T) {
 
 func TestVerifyCertificate(t *testing.T) {
 	// Create CA
-	caKeyPair, err := keypair.GenerateRSAKeyPair(2048)
+	caKeyPair, err := GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate CA key pair: %v", err)
 	}
 
-	caRequest := keypair.CertificateRequest{
+	caRequest := CertificateRequest{
 		Subject: pkix.Name{
 			CommonName: "Test CA",
 		},
 		ValidFor: 10 * 365 * 24 * time.Hour,
 	}
 
-	caCert, err := keypair.CreateCACertificate(caKeyPair, caRequest)
+	caCert, err := CreateCACertificate(caKeyPair, caRequest)
 	if err != nil {
 		t.Fatalf("Failed to create CA certificate: %v", err)
 	}
 
 	// Create and sign a certificate
-	serverKeyPair, err := keypair.GenerateRSAKeyPair(2048)
+	serverKeyPair, err := GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate server key pair: %v", err)
 	}
 
-	serverRequest := keypair.CertificateRequest{
+	serverRequest := CertificateRequest{
 		Subject: pkix.Name{
 			CommonName: "server.example.com",
 		},
 		ValidFor: 365 * 24 * time.Hour,
 	}
 
-	serverCert, err := keypair.SignCertificate(caCert, caKeyPair, serverRequest, serverKeyPair.PublicKey)
+	serverCert, err := SignCertificate(caCert, caKeyPair, serverRequest, serverKeyPair.PublicKey)
 	if err != nil {
 		t.Fatalf("Failed to sign server certificate: %v", err)
 	}
 
 	// Verify the certificate
-	err = keypair.VerifyCertificate(serverCert, caCert)
+	err = VerifyCertificate(serverCert, caCert)
 	if err != nil {
 		t.Fatalf("Certificate verification failed: %v", err)
 	}
 
 	// Test verification with wrong CA
-	wrongCaKeyPair, _ := keypair.GenerateRSAKeyPair(2048)
-	wrongCaRequest := keypair.CertificateRequest{
+	wrongCaKeyPair, _ := GenerateRSAKeyPair(2048)
+	wrongCaRequest := CertificateRequest{
 		Subject: pkix.Name{
 			CommonName: "Wrong CA",
 		},
 		ValidFor: 10 * 365 * 24 * time.Hour,
 	}
 
-	wrongCaCert, err := keypair.CreateCACertificate(wrongCaKeyPair, wrongCaRequest)
+	wrongCaCert, err := CreateCACertificate(wrongCaKeyPair, wrongCaRequest)
 	if err != nil {
 		t.Fatalf("Failed to create wrong CA certificate: %v", err)
 	}
 
-	err = keypair.VerifyCertificate(serverCert, wrongCaCert)
+	err = VerifyCertificate(serverCert, wrongCaCert)
 	if err == nil {
 		t.Fatal("Expected verification to fail with wrong CA")
 	}
@@ -262,19 +260,19 @@ func TestCertificateFileOperations(t *testing.T) {
 	tempDir := t.TempDir()
 	certFile := filepath.Join(tempDir, "test.pem")
 
-	keyPair, err := keypair.GenerateRSAKeyPair(2048)
+	keyPair, err := GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
 
-	request := keypair.CertificateRequest{
+	request := CertificateRequest{
 		Subject: pkix.Name{
 			CommonName: "file-test.example.com",
 		},
 		ValidFor: 365 * 24 * time.Hour,
 	}
 
-	cert, err := keypair.CreateSelfSignedCertificate(keyPair, request)
+	cert, err := CreateSelfSignedCertificate(keyPair, request)
 	if err != nil {
 		t.Fatalf("Failed to create certificate: %v", err)
 	}
@@ -291,7 +289,7 @@ func TestCertificateFileOperations(t *testing.T) {
 	}
 
 	// Load certificate from file
-	loadedCert, err := keypair.LoadCertificateFromFile(certFile)
+	loadedCert, err := LoadCertificateFromFile(certFile)
 	if err != nil {
 		t.Fatalf("Failed to load certificate from file: %v", err)
 	}
@@ -306,25 +304,25 @@ func TestCertificateFileOperations(t *testing.T) {
 }
 
 func TestParseCertificateFromPEM(t *testing.T) {
-	keyPair, err := keypair.GenerateRSAKeyPair(2048)
+	keyPair, err := GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
 
-	request := keypair.CertificateRequest{
+	request := CertificateRequest{
 		Subject: pkix.Name{
 			CommonName: "parse-test.example.com",
 		},
 		ValidFor: 365 * 24 * time.Hour,
 	}
 
-	originalCert, err := keypair.CreateSelfSignedCertificate(keyPair, request)
+	originalCert, err := CreateSelfSignedCertificate(keyPair, request)
 	if err != nil {
 		t.Fatalf("Failed to create certificate: %v", err)
 	}
 
 	// Parse from PEM data
-	parsedCert, err := keypair.ParseCertificateFromPEM(originalCert.PEMData)
+	parsedCert, err := ParseCertificateFromPEM(originalCert.PEMData)
 	if err != nil {
 		t.Fatalf("Failed to parse certificate from PEM: %v", err)
 	}
@@ -335,7 +333,7 @@ func TestParseCertificateFromPEM(t *testing.T) {
 
 	// Test with invalid PEM data
 	invalidPEM := []byte("invalid pem data")
-	_, err = keypair.ParseCertificateFromPEM(invalidPEM)
+	_, err = ParseCertificateFromPEM(invalidPEM)
 	if err == nil {
 		t.Fatal("Expected error when parsing invalid PEM data")
 	}
@@ -344,26 +342,26 @@ func TestParseCertificateFromPEM(t *testing.T) {
 	wrongTypePEM := []byte(`-----BEGIN PRIVATE KEY-----
 MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7
 -----END PRIVATE KEY-----`)
-	_, err = keypair.ParseCertificateFromPEM(wrongTypePEM)
+	_, err = ParseCertificateFromPEM(wrongTypePEM)
 	if err == nil {
 		t.Fatal("Expected error when parsing wrong PEM type")
 	}
 }
 
 func TestCertificateDefaultValues(t *testing.T) {
-	keyPair, err := keypair.GenerateRSAKeyPair(2048)
+	keyPair, err := GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
 
 	// Test with minimal request (should use defaults)
-	request := keypair.CertificateRequest{
+	request := CertificateRequest{
 		Subject: pkix.Name{
 			CommonName: "default-test.example.com",
 		},
 	}
 
-	cert, err := keypair.CreateSelfSignedCertificate(keyPair, request)
+	cert, err := CreateSelfSignedCertificate(keyPair, request)
 	if err != nil {
 		t.Fatalf("Failed to create certificate with defaults: %v", err)
 	}
@@ -386,14 +384,14 @@ func TestCertificateDefaultValues(t *testing.T) {
 }
 
 func TestUnsupportedKeyPairType(t *testing.T) {
-	request := keypair.CertificateRequest{
+	request := CertificateRequest{
 		Subject: pkix.Name{
 			CommonName: "test.example.com",
 		},
 	}
 
 	// Test with unsupported key pair type (string in this case)
-	_, err := keypair.CreateSelfSignedCertificate("invalid-key-pair", request)
+	_, err := CreateSelfSignedCertificate("invalid-key-pair", request)
 	if err == nil {
 		t.Fatal("Expected error with unsupported key pair type")
 	}

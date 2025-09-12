@@ -1,11 +1,10 @@
-package tests
+package keypair
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/jasoet/gopki/pkg/keypair"
 	"github.com/jasoet/gopki/pkg/utils"
 )
 
@@ -24,7 +23,7 @@ func TestRSAKeySizeEdgeCases(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			_, err := keypair.GenerateRSAKeyPair(tc.keySize)
+			_, err := GenerateRSAKeyPair(tc.keySize)
 			if tc.expectError && err == nil {
 				t.Fatalf("Expected error for %s but got none", tc.description)
 			}
@@ -36,16 +35,16 @@ func TestRSAKeySizeEdgeCases(t *testing.T) {
 }
 
 func TestECDSACurveTypes(t *testing.T) {
-	curves := []keypair.ECDSACurve{
-		keypair.P224,
-		keypair.P256,
-		keypair.P384,
-		keypair.P521,
+	curves := []ECDSACurve{
+		P224,
+		P256,
+		P384,
+		P521,
 	}
 
 	for _, curve := range curves {
 		t.Run(curve.Curve().Params().Name, func(t *testing.T) {
-			keyPair, err := keypair.GenerateECDSAKeyPair(curve)
+			keyPair, err := GenerateECDSAKeyPair(curve)
 			if err != nil {
 				t.Fatalf("Failed to generate ECDSA key pair with curve %s: %v", curve.Curve().Params().Name, err)
 			}
@@ -86,17 +85,17 @@ InvalidBase64DataThatCannotBeParsed!@#$%^&*()
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := keypair.RSAKeyPairFromPEM(tc.pemData)
+			_, err := RSAKeyPairFromPEM(tc.pemData)
 			if err == nil {
 				t.Fatalf("Expected error for %s but got none", tc.name)
 			}
 
-			_, err = keypair.ECDSAKeyPairFromPEM(tc.pemData)
+			_, err = ECDSAKeyPairFromPEM(tc.pemData)
 			if err == nil {
 				t.Fatalf("Expected error for %s but got none", tc.name)
 			}
 
-			_, err = keypair.Ed25519KeyPairFromPEM(tc.pemData)
+			_, err = Ed25519KeyPairFromPEM(tc.pemData)
 			if err == nil {
 				t.Fatalf("Expected error for %s but got none", tc.name)
 			}
@@ -113,7 +112,7 @@ func TestFileOperationErrors(t *testing.T) {
 	})
 
 	t.Run("Save to invalid directory", func(t *testing.T) {
-		keyPair, _ := keypair.GenerateRSAKeyPair(2048)
+		keyPair, _ := GenerateRSAKeyPair(2048)
 		pemData, _ := keyPair.PrivateKeyToPEM()
 		
 		err := utils.SavePEMToFile(pemData, "/invalid/directory/file.pem")
@@ -138,7 +137,7 @@ func TestFileOperationErrors(t *testing.T) {
 		
 		defer os.Chmod(readOnlyDir, 0755)
 		
-		keyPair, _ := keypair.GenerateRSAKeyPair(2048)
+		keyPair, _ := GenerateRSAKeyPair(2048)
 		pemData, _ := keyPair.PrivateKeyToPEM()
 		
 		err = utils.SavePEMToFile(pemData, filepath.Join(readOnlyDir, "test.pem"))
@@ -156,7 +155,7 @@ func TestNilKeyHandling(t *testing.T) {
 			}
 		}()
 		
-		keyPair := &keypair.RSAKeyPair{}
+		keyPair := &RSAKeyPair{}
 		keyPair.PrivateKeyToPEM()
 	})
 
@@ -167,7 +166,7 @@ func TestNilKeyHandling(t *testing.T) {
 			}
 		}()
 		
-		keyPair := &keypair.ECDSAKeyPair{}
+		keyPair := &ECDSAKeyPair{}
 		keyPair.PrivateKeyToPEM()
 	})
 
@@ -178,57 +177,57 @@ func TestNilKeyHandling(t *testing.T) {
 			}
 		}()
 		
-		keyPair := &keypair.Ed25519KeyPair{}
+		keyPair := &Ed25519KeyPair{}
 		keyPair.PrivateKeyToPEM()
 	})
 }
 
 func TestCrossAlgorithmKeyMisuse(t *testing.T) {
-	rsaKeyPair, _ := keypair.GenerateRSAKeyPair(2048)
-	ecdsaKeyPair, _ := keypair.GenerateECDSAKeyPair(keypair.P256)
-	ed25519KeyPair, _ := keypair.GenerateEd25519KeyPair()
+	rsaKeyPair, _ := GenerateRSAKeyPair(2048)
+	ecdsaKeyPair, _ := GenerateECDSAKeyPair(P256)
+	ed25519KeyPair, _ := GenerateEd25519KeyPair()
 
 	rsaPEM, _ := rsaKeyPair.PrivateKeyToPEM()
 	ecdsaPEM, _ := ecdsaKeyPair.PrivateKeyToPEM()
 	ed25519PEM, _ := ed25519KeyPair.PrivateKeyToPEM()
 
 	t.Run("Use RSA PEM with ECDSA parser", func(t *testing.T) {
-		_, err := keypair.ECDSAKeyPairFromPEM(rsaPEM)
+		_, err := ECDSAKeyPairFromPEM(rsaPEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing RSA key as ECDSA")
 		}
 	})
 
 	t.Run("Use RSA PEM with Ed25519 parser", func(t *testing.T) {
-		_, err := keypair.Ed25519KeyPairFromPEM(rsaPEM)
+		_, err := Ed25519KeyPairFromPEM(rsaPEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing RSA key as Ed25519")
 		}
 	})
 
 	t.Run("Use ECDSA PEM with RSA parser", func(t *testing.T) {
-		_, err := keypair.RSAKeyPairFromPEM(ecdsaPEM)
+		_, err := RSAKeyPairFromPEM(ecdsaPEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing ECDSA key as RSA")
 		}
 	})
 
 	t.Run("Use ECDSA PEM with Ed25519 parser", func(t *testing.T) {
-		_, err := keypair.Ed25519KeyPairFromPEM(ecdsaPEM)
+		_, err := Ed25519KeyPairFromPEM(ecdsaPEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing ECDSA key as Ed25519")
 		}
 	})
 
 	t.Run("Use Ed25519 PEM with RSA parser", func(t *testing.T) {
-		_, err := keypair.RSAKeyPairFromPEM(ed25519PEM)
+		_, err := RSAKeyPairFromPEM(ed25519PEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing Ed25519 key as RSA")
 		}
 	})
 
 	t.Run("Use Ed25519 PEM with ECDSA parser", func(t *testing.T) {
-		_, err := keypair.ECDSAKeyPairFromPEM(ed25519PEM)
+		_, err := ECDSAKeyPairFromPEM(ed25519PEM)
 		if err == nil {
 			t.Fatal("Expected error when parsing Ed25519 key as ECDSA")
 		}
