@@ -217,3 +217,4 @@ aof/
 examples/output/
 examples/certificates/certs/
 *.pem
+format_output/
