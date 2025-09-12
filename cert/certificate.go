@@ -1,4 +1,4 @@
-package keypair
+package cert
 
 import (
 	"crypto"
@@ -7,6 +7,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
 	"math/big"
 	"net"
@@ -26,13 +27,18 @@ type CertificateRequest struct {
 	EmailAddress []string
 	ValidFrom    time.Time
 	ValidFor     time.Duration
+	
+	// CA-specific fields (optional)
+	IsCA           bool  // Set to true to create a CA certificate
+	MaxPathLen     int   // Maximum depth of intermediate CAs (0 = can only sign end-entity certs, -1 = no limit)
+	MaxPathLenZero bool  // Set to true to explicitly set MaxPathLen to 0
 }
 
-func CreateSelfSignedCertificate(keyPair interface{}, request CertificateRequest) (*Certificate, error) {
+func CreateSelfSignedCertificate[T keypair.KeyPair](keyPair T, request CertificateRequest) (*Certificate, error) {
 	var privateKey crypto.PrivateKey
 	var publicKey crypto.PublicKey
 
-	switch kp := keyPair.(type) {
+	switch kp := any(keyPair).(type) {
 	case *algo.RSAKeyPair:
 		privateKey = kp.PrivateKey
 		publicKey = kp.PublicKey
@@ -93,11 +99,11 @@ func CreateSelfSignedCertificate(keyPair interface{}, request CertificateRequest
 	}, nil
 }
 
-func CreateCACertificate(keyPair interface{}, request CertificateRequest) (*Certificate, error) {
+func CreateCACertificate[T keypair.KeyPair](keyPair T, request CertificateRequest) (*Certificate, error) {
 	var privateKey crypto.PrivateKey
 	var publicKey crypto.PublicKey
 
-	switch kp := keyPair.(type) {
+	switch kp := any(keyPair).(type) {
 	case *algo.RSAKeyPair:
 		privateKey = kp.PrivateKey
 		publicKey = kp.PublicKey
@@ -124,6 +130,18 @@ func CreateCACertificate(keyPair interface{}, request CertificateRequest) (*Cert
 		request.ValidFor = 10 * 365 * 24 * time.Hour // Default 10 years for CA
 	}
 
+	// Set MaxPathLen based on request or use default
+	maxPathLen := 0
+	maxPathLenZero := true
+	
+	if request.MaxPathLen > 0 {
+		maxPathLen = request.MaxPathLen
+		maxPathLenZero = false
+	} else if request.MaxPathLen == -1 {
+		// -1 means no limit, don't set MaxPathLen
+		maxPathLenZero = false
+	}
+	
 	template := x509.Certificate{
 		SerialNumber:          serialNumber,
 		Subject:               request.Subject,
@@ -132,8 +150,8 @@ func CreateCACertificate(keyPair interface{}, request CertificateRequest) (*Cert
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature,
 		BasicConstraintsValid: true,
 		IsCA:                  true,
-		MaxPathLen:            0,
-		MaxPathLenZero:        true,
+		MaxPathLen:            maxPathLen,
+		MaxPathLenZero:        maxPathLenZero,
 	}
 
 	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, publicKey, privateKey)
@@ -157,10 +175,10 @@ func CreateCACertificate(keyPair interface{}, request CertificateRequest) (*Cert
 	}, nil
 }
 
-func SignCertificate(caCert *Certificate, caKeyPair interface{}, request CertificateRequest, subjectPublicKey crypto.PublicKey) (*Certificate, error) {
+func SignCertificate[T keypair.KeyPair](caCert *Certificate, caKeyPair T, request CertificateRequest, subjectPublicKey crypto.PublicKey) (*Certificate, error) {
 	var caPrivateKey crypto.PrivateKey
 
-	switch kp := caKeyPair.(type) {
+	switch kp := any(caKeyPair).(type) {
 	case *algo.RSAKeyPair:
 		caPrivateKey = kp.PrivateKey
 	case *algo.ECDSAKeyPair:
@@ -181,20 +199,51 @@ func SignCertificate(caCert *Certificate, caKeyPair interface{}, request Certifi
 	}
 
 	if request.ValidFor == 0 {
-		request.ValidFor = 365 * 24 * time.Hour // Default 1 year
+		if request.IsCA {
+			request.ValidFor = 5 * 365 * 24 * time.Hour // Default 5 years for intermediate CA
+		} else {
+			request.ValidFor = 365 * 24 * time.Hour // Default 1 year for end-entity
+		}
 	}
 
+	// Determine key usage based on whether this is a CA certificate
+	var keyUsage x509.KeyUsage
+	var extKeyUsage []x509.ExtKeyUsage
+	
+	if request.IsCA {
+		// CA certificate - can sign other certificates
+		keyUsage = x509.KeyUsageCertSign | x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature
+		// CAs typically don't need extended key usage
+		extKeyUsage = nil
+	} else {
+		// End-entity certificate - for TLS/authentication
+		keyUsage = x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature
+		extKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}
+	}
+	
 	template := x509.Certificate{
 		SerialNumber:          serialNumber,
 		Subject:               request.Subject,
 		NotBefore:             request.ValidFrom,
 		NotAfter:              request.ValidFrom.Add(request.ValidFor),
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		KeyUsage:              keyUsage,
+		ExtKeyUsage:           extKeyUsage,
 		BasicConstraintsValid: true,
+		IsCA:                  request.IsCA,
 		DNSNames:              request.DNSNames,
 		IPAddresses:           request.IPAddresses,
 		EmailAddresses:        request.EmailAddress,
+	}
+	
+	// Set MaxPathLen for CA certificates
+	if request.IsCA {
+		if request.MaxPathLenZero {
+			template.MaxPathLen = 0
+			template.MaxPathLenZero = true
+		} else if request.MaxPathLen >= 0 {
+			template.MaxPathLen = request.MaxPathLen
+		}
+		// If MaxPathLen is -1, we don't set it (no limit)
 	}
 
 	certDER, err := x509.CreateCertificate(rand.Reader, &template, caCert.Certificate, subjectPublicKey, caPrivateKey)

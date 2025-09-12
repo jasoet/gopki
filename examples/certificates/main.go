@@ -3,7 +3,7 @@ package main
 import (
 	"crypto/x509/pkix"
 	"fmt"
-	keypair2 "github.com/jasoet/gopki/keypair"
+	keypair2 "github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/keypair/algo"
 	"log"
 	"net"

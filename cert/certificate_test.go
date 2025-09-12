@@ -1,4 +1,4 @@
-package keypair
+package cert
 
 import (
 	"crypto/x509"
@@ -384,20 +384,9 @@ func TestCertificateDefaultValues(t *testing.T) {
 	}
 }
 
-func TestUnsupportedKeyPairType(t *testing.T) {
-	request := CertificateRequest{
-		Subject: pkix.Name{
-			CommonName: "test.example.com",
-		},
-	}
-
-	// Test with unsupported key pair type (string in this case)
-	_, err := CreateSelfSignedCertificate("invalid-key-pair", request)
-	if err == nil {
-		t.Fatal("Expected error with unsupported key pair type")
-	}
-
-	if err.Error() != "unsupported key pair type" {
-		t.Fatalf("Expected 'unsupported key pair type' error, got: %v", err)
-	}
-}
+// TestUnsupportedKeyPairType is no longer needed because the generic constraint
+// [T keypair.KeyPair] ensures type safety at compile time. Invalid types cannot
+// be passed to CreateSelfSignedCertificate or CreateCACertificate anymore.
+//
+// The previous test tried to pass a string which is now a compile-time error:
+// string does not satisfy keypair.KeyPair constraint
