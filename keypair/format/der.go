@@ -11,7 +11,6 @@ import (
 	"github.com/jasoet/gopki/keypair"
 )
 
-// PrivateKeyToDER converts a private key to DER format
 func PrivateKeyToDER[T keypair.PrivateKey](privateKey T) ([]byte, error) {
 	derBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
 	if err != nil {
@@ -20,7 +19,6 @@ func PrivateKeyToDER[T keypair.PrivateKey](privateKey T) ([]byte, error) {
 	return derBytes, nil
 }
 
-// PublicKeyToDER converts a public key to DER format
 func PublicKeyToDER[T keypair.PublicKey](publicKey T) ([]byte, error) {
 	derBytes, err := x509.MarshalPKIXPublicKey(publicKey)
 	if err != nil {
@@ -29,7 +27,6 @@ func PublicKeyToDER[T keypair.PublicKey](publicKey T) ([]byte, error) {
 	return derBytes, nil
 }
 
-// ParsePrivateKeyFromDER parses a private key from DER format
 func ParsePrivateKeyFromDER[T keypair.PrivateKey](derData []byte) (T, error) {
 	var zero T
 
@@ -46,7 +43,6 @@ func ParsePrivateKeyFromDER[T keypair.PrivateKey](derData []byte) (T, error) {
 	return typedKey, nil
 }
 
-// ParsePublicKeyFromDER parses a public key from DER format
 func ParsePublicKeyFromDER[T keypair.PublicKey](derData []byte) (T, error) {
 	var zero T
 
@@ -63,23 +59,18 @@ func ParsePublicKeyFromDER[T keypair.PublicKey](derData []byte) (T, error) {
 	return typedKey, nil
 }
 
-// ConvertPEMToDER converts PEM format to DER format
 func ConvertPEMToDER(pemData keypair.PEM) ([]byte, error) {
 	block, _ := pem.Decode(pemData)
 	if block == nil {
 		return nil, NewFormatError(FormatDER, "failed to decode PEM block", nil)
 	}
 
-	// PEM contains DER data in the Bytes field
 	return block.Bytes, nil
 }
 
-// ConvertDERToPEM converts DER format to PEM format
 func ConvertDERToPEM(derData []byte, keyType string) (keypair.PEM, error) {
 	var blockType string
 
-	// Determine PEM block type based on key type
-	// We need to detect if it's a private or public key
 	if isPrivateKeyDER(derData) {
 		blockType = "PRIVATE KEY"
 	} else {
@@ -99,21 +90,16 @@ func ConvertDERToPEM(derData []byte, keyType string) (keypair.PEM, error) {
 	return pemData, nil
 }
 
-// isPrivateKeyDER attempts to detect if DER data contains a private key
 func isPrivateKeyDER(derData []byte) bool {
-	// Try to parse as private key first
 	_, err := x509.ParsePKCS8PrivateKey(derData)
 	return err == nil
 }
 
-// GetKeyTypeFromDER determines the key algorithm from DER data
 func GetKeyTypeFromDER(derData []byte) (string, error) {
-	// Try parsing as private key first
 	if privateKey, err := x509.ParsePKCS8PrivateKey(derData); err == nil {
 		return getKeyTypeFromInterface(privateKey), nil
 	}
 
-	// Try parsing as public key
 	if publicKey, err := x509.ParsePKIXPublicKey(derData); err == nil {
 		return getKeyTypeFromInterface(publicKey), nil
 	}
@@ -121,7 +107,6 @@ func GetKeyTypeFromDER(derData []byte) (string, error) {
 	return "", NewFormatError(FormatDER, "unable to determine key type from DER data", nil)
 }
 
-// getKeyTypeFromInterface determines the algorithm type from a key interface
 func getKeyTypeFromInterface(key interface{}) string {
 	switch key.(type) {
 	case *rsa.PrivateKey, *rsa.PublicKey:
@@ -135,10 +120,8 @@ func getKeyTypeFromInterface(key interface{}) string {
 	}
 }
 
-// EncodedKeyToDER converts an EncodedKey to DER format
 func EncodedKeyToDER(encodedKey *EncodedKey) (*EncodedKey, error) {
 	if encodedKey.Format == FormatDER {
-		// Already in DER format
 		return &EncodedKey{
 			Data:    encodedKey.Data,
 			Format:  FormatDER,

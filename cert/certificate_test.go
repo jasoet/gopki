@@ -383,10 +383,3 @@ func TestCertificateDefaultValues(t *testing.T) {
 		t.Fatalf("Expected ValidFor ~%v, got %v", expectedValidFor, actualValidFor)
 	}
 }
-
-// TestUnsupportedKeyPairType is no longer needed because the generic constraint
-// [T keypair.KeyPair] ensures type safety at compile time. Invalid types cannot
-// be passed to CreateSelfSignedCertificate or CreateCACertificate anymore.
-//
-// The previous test tried to pass a string which is now a compile-time error:
-// string does not satisfy keypair.KeyPair constraint

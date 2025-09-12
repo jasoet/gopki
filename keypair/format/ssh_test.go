@@ -159,10 +159,17 @@ func TestPrivateKeyToSSH_WithPassphrase(t *testing.T) {
 	// Note: We skip round-trip testing due to Go crypto/ssh package limitations
 	t.Log("SSH encrypted private key generation successful")
 
-	// Test that parsing fails as expected (due to limitations)
-	_, err = ParsePrivateKeyFromSSH[*ecdsa.PrivateKey](sshData, passphrase)
-	if err == nil {
-		t.Error("Expected ParsePrivateKeyFromSSH to fail due to known limitations")
+	// Test that parsing now works with passphrase
+	parsedKey, err := ParsePrivateKeyFromSSH[*ecdsa.PrivateKey](sshData, passphrase)
+	if err != nil {
+		t.Error("ParsePrivateKeyFromSSH should now work with passphrase:", err)
+	} else {
+		t.Log("SSH private key parsing with passphrase successful!")
+		
+		// Verify the parsed key is valid
+		if parsedKey.Curve.Params().Name != "P-256" {
+			t.Error("Parsed key should be P-256 ECDSA")
+		}
 	}
 }
 
@@ -436,8 +443,8 @@ func TestFullFormatConversionMatrix(t *testing.T) {
 		}
 	})
 
-	// Test that private key conversions fail appropriately
-	t.Run("Private Key Conversion Limitations", func(t *testing.T) {
+	// Test private key round-trip conversions
+	t.Run("Private Key Round-trip Conversion", func(t *testing.T) {
 		// SSH private key generation works
 		sshPrivateData, err := PrivateKeyToSSH(rsaKeyPair.PrivateKey, "test-private@example.com", "")
 		if err != nil {
@@ -448,10 +455,17 @@ func TestFullFormatConversionMatrix(t *testing.T) {
 			t.Error("SSH private key should be generated correctly")
 		}
 
-		// But parsing back should fail (known limitation)
-		_, err = ParsePrivateKeyFromSSH[*rsa.PrivateKey](sshPrivateData, "")
-		if err == nil {
-			t.Error("SSH private key parsing should fail due to Go crypto/ssh limitations")
+		// SSH private key parsing should now work
+		parsedPrivateKey, err := ParsePrivateKeyFromSSH[*rsa.PrivateKey](sshPrivateData, "")
+		if err != nil {
+			t.Error("SSH private key parsing should now work:", err)
+		} else {
+			t.Log("SSH private key round-trip conversion successful!")
+			
+			// Verify the parsed key matches original
+			if parsedPrivateKey.Size() != rsaKeyPair.PrivateKey.Size() {
+				t.Error("Parsed private key size should match original")
+			}
 		}
 	})
 }
