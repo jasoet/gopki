@@ -12,7 +12,7 @@ import (
 )
 
 func TestGenerateRSAKeyPairGeneric(t *testing.T) {
-	// Test the new generic function 
+	// Test the new generic function
 	rsaKeyPair, err := GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key pair: %v", err)
@@ -118,7 +118,7 @@ func TestPublicKeyToPEMGeneric(t *testing.T) {
 		t.Error("RSA public PEM does not contain expected header")
 	}
 
-	// Test ECDSA  
+	// Test ECDSA
 	ecdsaKeyPair, _ := GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
 	ecdsaPEM, err := PublicKeyToPEM(ecdsaKeyPair.PublicKey)
 	if err != nil {
@@ -244,7 +244,7 @@ func TestKeyPairToFiles(t *testing.T) {
 	privateFile := filepath.Join(tempDir, "test_rsa_private.pem")
 	publicFile := filepath.Join(tempDir, "test_rsa_public.pem")
 
-	err := KeyPairToFiles(rsaKeyPair, privateFile, publicFile)
+	err := ToFiles(rsaKeyPair, privateFile, publicFile)
 	if err != nil {
 		t.Fatalf("Failed to save RSA key pair to files: %v", err)
 	}
@@ -307,5 +307,109 @@ MIIBkTCB+wIJAMlyFqk69v+9MA0GCSqGSIb3DQEBBQUAMBUxEzARBgNVBAoTCkFj
 	err = ValidatePEMFormat(wrongTypePEM)
 	if err == nil {
 		t.Error("Wrong PEM type should have failed validation")
+	}
+}
+
+func TestGetPublicKeyRSA(t *testing.T) {
+	rsaKeyPair, err := GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA key pair: %v", err)
+	}
+
+	publicKey, err := GetPublicKey[*rsa.PrivateKey, *rsa.PublicKey](rsaKeyPair.PrivateKey)
+	if err != nil {
+		t.Fatalf("Failed to get public key from RSA private key: %v", err)
+	}
+
+	if publicKey.N.Cmp(rsaKeyPair.PrivateKey.PublicKey.N) != 0 {
+		t.Error("Public key modulus doesn't match private key's public key")
+	}
+
+	if publicKey.E != rsaKeyPair.PrivateKey.PublicKey.E {
+		t.Error("Public key exponent doesn't match private key's public key")
+	}
+}
+
+func TestGetPublicKeyECDSA(t *testing.T) {
+	ecdsaKeyPair, err := GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
+	if err != nil {
+		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
+	}
+
+	publicKey, err := GetPublicKey[*ecdsa.PrivateKey, *ecdsa.PublicKey](ecdsaKeyPair.PrivateKey)
+	if err != nil {
+		t.Fatalf("Failed to get public key from ECDSA private key: %v", err)
+	}
+
+	if publicKey.X.Cmp(ecdsaKeyPair.PrivateKey.PublicKey.X) != 0 {
+		t.Error("Public key X coordinate doesn't match private key's public key")
+	}
+
+	if publicKey.Y.Cmp(ecdsaKeyPair.PrivateKey.PublicKey.Y) != 0 {
+		t.Error("Public key Y coordinate doesn't match private key's public key")
+	}
+
+	if publicKey.Curve.Params().Name != ecdsaKeyPair.PrivateKey.Curve.Params().Name {
+		t.Error("Public key curve doesn't match private key's curve")
+	}
+}
+
+func TestGetPublicKeyEd25519(t *testing.T) {
+	ed25519KeyPair, err := GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
+	}
+
+	publicKey, err := GetPublicKey[ed25519.PrivateKey, ed25519.PublicKey](ed25519KeyPair.PrivateKey)
+	if err != nil {
+		t.Fatalf("Failed to get public key from Ed25519 private key: %v", err)
+	}
+
+	expectedPublicKey := ed25519KeyPair.PrivateKey.Public().(ed25519.PublicKey)
+	if string(publicKey) != string(expectedPublicKey) {
+		t.Error("Public key doesn't match private key's public key")
+	}
+
+	if string(publicKey) != string(ed25519KeyPair.PublicKey) {
+		t.Error("Extracted public key doesn't match key pair's public key")
+	}
+}
+
+func TestGetPublicKeyTypeMismatch(t *testing.T) {
+	rsaKeyPair, err := GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA key pair: %v", err)
+	}
+
+	_, err = GetPublicKey[*rsa.PrivateKey, *ecdsa.PublicKey](rsaKeyPair.PrivateKey)
+	if err == nil {
+		t.Error("Expected error when trying to extract ECDSA public key from RSA private key")
+	}
+
+	expectedError := "unsupported key type or type mismatch"
+	if err.Error() != expectedError {
+		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
+	}
+}
+
+func TestGetPublicKeyCrossAlgorithm(t *testing.T) {
+	ecdsaKeyPair, err := GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
+	if err != nil {
+		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
+	}
+
+	_, err = GetPublicKey[*ecdsa.PrivateKey, ed25519.PublicKey](ecdsaKeyPair.PrivateKey)
+	if err == nil {
+		t.Error("Expected error when trying to extract Ed25519 public key from ECDSA private key")
+	}
+
+	ed25519KeyPair, err := GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
+	}
+
+	_, err = GetPublicKey[ed25519.PrivateKey, *rsa.PublicKey](ed25519KeyPair.PrivateKey)
+	if err == nil {
+		t.Error("Expected error when trying to extract RSA public key from Ed25519 private key")
 	}
 }

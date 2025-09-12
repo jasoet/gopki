@@ -90,62 +90,107 @@ func main() {
 
 ```
 GoPKI
-├── keypair/           # Key pair generation and management
-│   ├── keypair.go     # Generic interfaces and core functions
-│   └── algo/          # Algorithm-specific implementations
-│       ├── rsa.go     # RSA key pair operations
-│       ├── ecdsa.go   # ECDSA key pair operations
-│       └── ed25519.go # Ed25519 key pair operations
-├── cert/              # Certificate operations
-│   ├── certificate.go # Certificate creation and management
-│   └── certificate_test.go
-├── examples/          # Working examples
-└── docs/              # Documentation
-    ├── KeyPair.md     # KeyPair module documentation
-    ├── Certificate.md # Certificate module documentation
-    └── README.md      # This file
+├── keypair/                    # Key pair generation and management
+│   ├── keypair.go             # Generic interfaces and core functions
+│   ├── keypair_test.go        # KeyPair module tests
+│   ├── certificate.go         # Certificate wrapper functions
+│   ├── certificate_test.go    # Certificate tests
+│   ├── compatibility_test.go  # Cross-compatibility tests
+│   ├── error_handling_test.go # Error handling tests
+│   ├── file_io_test.go        # File I/O operation tests
+│   ├── generic_parsing_test.go # Generic parsing tests
+│   └── algo/                  # Algorithm-specific implementations
+│       ├── rsa.go            # RSA key pair operations
+│       ├── ecdsa.go          # ECDSA key pair operations
+│       └── ed25519.go        # Ed25519 key pair operations
+├── cert/                      # Certificate operations
+│   ├── certificate.go        # Certificate creation and management
+│   └── certificate_test.go   # Certificate module tests
+├── utils/                     # Utility functions
+│   ├── pem.go                # PEM encoding/decoding utilities
+│   └── file_ops_test.go      # File operations tests
+├── examples/                  # Working examples
+│   ├── main.go               # Basic usage example
+│   ├── certificates/         # Certificate-specific examples
+│   │   └── main.go
+│   └── generic_parsing_example.go # Generic parsing demonstration
+├── docs/                      # Documentation
+│   ├── KeyPair.md            # KeyPair module documentation
+│   └── Certificate.md        # Certificate module documentation
+├── go.mod                     # Go module definition
+└── README.md                  # This file
 ```
 
 ## Common Use Cases
 
-### 🌐 TLS/SSL Certificates
+### 🔑 **1. Multi-Algorithm Key Generation**
+Generate keys with compile-time type safety:
+```go
+// RSA key pair
+rsaKeys, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+
+// ECDSA key pair  
+ecdsaKeys, _ := keypair.GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
+
+// Ed25519 key pair
+ed25519Keys, _ := keypair.GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
+
+// Save all to files with proper permissions
+keypair.ToFiles(rsaKeys, "rsa_private.pem", "rsa_public.pem")
+```
+
+### 🌐 **2. TLS/SSL Certificates** 
+Create production-ready certificates:
 ```go
 // Generate key pair
 keyPair, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
 
-// Create server certificate
-cert, _ := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
+// Create server certificate with SAN
+certificate, _ := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
     Subject: pkix.Name{CommonName: "www.example.com"},
-    DNSNames: []string{"www.example.com", "example.com"},
+    DNSNames: []string{"www.example.com", "example.com", "api.example.com"},
     IPAddresses: []net.IP{net.ParseIP("192.168.1.100")},
+    ValidFor: 365 * 24 * time.Hour, // 1 year
 })
+
+// Save certificate and keys
+certificate.SaveToFile("server.pem")
+keypair.ToFiles(keyPair, "server-key.pem", "server-pub.pem")
 ```
 
-### 🏛️ Certificate Authority
+### 🏛️ **3. Certificate Authority Setup**
+Build complete PKI infrastructure:
 ```go
-// Create root CA
+// Root CA with path length constraints
 rootCA, _ := cert.CreateCACertificate(caKeyPair, cert.CertificateRequest{
     Subject: pkix.Name{
         Organization: []string{"Example Corp"},
         CommonName:   "Example Root CA",
     },
-    MaxPathLen: 2, // Can create 2 levels of intermediate CAs
+    MaxPathLen: 2, // Allow 2 levels of intermediate CAs
+    ValidFor: 10 * 365 * 24 * time.Hour, // 10 years
 })
 
-// Sign server certificate
-serverCert, _ := cert.SignCertificate(rootCA, caKeyPair, request, serverPublicKey)
+// Sign intermediate CA
+intermediateCA, _ := cert.SignCertificate(rootCA, caKeyPair, intermediateRequest, intermediatePubKey)
+
+// Sign end-entity certificate
+serverCert, _ := cert.SignCertificate(intermediateCA, intermediateKeyPair, serverRequest, serverPubKey)
 ```
 
-### 🔗 Certificate Chains
+### 🔍 **4. Algorithm Detection & Parsing**
+Parse keys without knowing the algorithm:
 ```go
-// Root CA → Intermediate CA → Server Certificate
-rootCA := createRootCA()
-intermediateCA := signIntermediateCA(rootCA, intermediateRequest)
-serverCert := signServerCert(intermediateCA, serverRequest)
+pemData, _ := os.ReadFile("unknown-key.pem")
 
-// Verify the complete chain
-cert.VerifyCertificate(serverCert, intermediateCA)
-cert.VerifyCertificate(intermediateCA, rootCA)
+// Auto-detect and parse
+if key, algorithm, err := keypair.PrivateKeyFromPEM[*rsa.PrivateKey](pemData); err == nil {
+    fmt.Printf("Detected %s key, size: %d bits\n", algorithm, key.Size()*8)
+} else if key, algorithm, err := keypair.PrivateKeyFromPEM[*ecdsa.PrivateKey](pemData); err == nil {
+    fmt.Printf("Detected %s key, curve: %s\n", algorithm, key.Curve.Params().Name)
+} else if key, algorithm, err := keypair.PrivateKeyFromPEM[ed25519.PrivateKey](pemData); err == nil {
+    fmt.Printf("Detected %s key, length: %d bytes\n", algorithm, len(key))
+}
 ```
 
 ## Algorithm Comparison
@@ -176,17 +221,41 @@ cert.VerifyCertificate(intermediateCA, rootCA)
 
 ## Examples Directory
 
-The `examples/` directory contains working demonstrations:
+The `examples/` directory contains focused working demonstrations:
 
-- **basic_unified/**: Simple key generation and certificate creation
-- **generic_wrapper/**: Advanced generic usage patterns  
-- **certificates/**: Certificate-specific examples
+### 🔑 **main.go** - Basic Key Operations
+Demonstrates all three cryptographic algorithms and basic certificate creation:
+- RSA key generation (2048-bit)
+- ECDSA key generation (P-256 curve)  
+- Ed25519 key generation
+- Self-signed certificate creation
+- Algorithm detection from PEM files
 
-Run any example:
+**Generated files**: `output/*.pem` (keys and certificates)
+
+### 📜 **certificates/** - Advanced Certificate Operations
+Complete PKI examples with CA hierarchies:
+- Root CA certificate creation
+- Server certificate signing with CA
+- Self-signed certificate generation
+- Certificate chain verification
+- Multiple algorithm usage (RSA for CA, ECDSA for end-entity)
+
+**Generated files**: `certificates/certs/*.pem` (complete PKI setup)
+
+### 🚀 **Running Examples**
+
 ```bash
-cd examples/basic_unified
+# Basic key operations and certificate creation
+cd examples
+go run main.go
+
+# Advanced PKI and certificate operations
+cd examples/certificates
 go run main.go
 ```
+
+Both examples generate working PEM files that you can use with standard tools like OpenSSL.
 
 ## Contributing
 

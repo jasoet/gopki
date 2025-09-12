@@ -213,3 +213,7 @@ sim_output
 *.db-wal
 
 aof/
+# Generated PEM files from examples
+examples/output/
+examples/certificates/certs/
+*.pem

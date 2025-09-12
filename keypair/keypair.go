@@ -192,7 +192,7 @@ func PrivateKeyFromPEM[T PrivateKey](pemData PEM) (T, string, error) {
 	return zero, "", fmt.Errorf("unable to parse private key: unsupported algorithm or invalid format")
 }
 
-func KeyPairToFiles[T KeyPair](keyPair T, privateFile, publicFile string) error {
+func ToFiles[T KeyPair](keyPair T, privateFile, publicFile string) error {
 	var privateKeyPEM, publicKeyPEM PEM
 	var err error
 
