@@ -28,7 +28,9 @@ type PrivateKey interface {
 	*rsa.PrivateKey | *ecdsa.PrivateKey | ed25519.PrivateKey
 }
 
-func ValidatePEMFormat(pemData []byte) error {
+type PEM []byte
+
+func ValidatePEMFormat(pemData PEM) error {
 	block, _ := pem.Decode(pemData)
 	if block == nil {
 		return fmt.Errorf("invalid PEM format")
@@ -67,7 +69,7 @@ func GenerateKeyPair[T Param, K KeyPair](param T) (K, error) {
 	}
 }
 
-func ParsePublicKeyFromPEM[T PublicKey](pemData []byte) (T, error) {
+func ParsePublicKeyFromPEM[T PublicKey](pemData PEM) (T, error) {
 	var zero T
 
 	block, _ := pem.Decode(pemData)
@@ -92,7 +94,7 @@ func ParsePublicKeyFromPEM[T PublicKey](pemData []byte) (T, error) {
 	return typedKey, nil
 }
 
-func ParsePrivateKeyFromPEM[T PrivateKey](pemData []byte) (T, error) {
+func ParsePrivateKeyFromPEM[T PrivateKey](pemData PEM) (T, error) {
 	var zero T
 
 	block, _ := pem.Decode(pemData)
@@ -117,7 +119,7 @@ func ParsePrivateKeyFromPEM[T PrivateKey](pemData []byte) (T, error) {
 	return typedKey, nil
 }
 
-func PrivateKeyToPEM[T PrivateKey](privateKey T) ([]byte, error) {
+func PrivateKeyToPEM[T PrivateKey](privateKey T) (PEM, error) {
 	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal private key: %w", err)
@@ -131,7 +133,7 @@ func PrivateKeyToPEM[T PrivateKey](privateKey T) ([]byte, error) {
 	return privateKeyPEM, nil
 }
 
-func PublicKeyToPEM[T PublicKey](publicKey T) ([]byte, error) {
+func PublicKeyToPEM[T PublicKey](publicKey T) (PEM, error) {
 	publicKeyBytes, err := x509.MarshalPKIXPublicKey(publicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal public key: %w", err)
@@ -166,7 +168,7 @@ func GetPublicKey[TPriv PrivateKey, TPub PublicKey](privateKey TPriv) (TPub, err
 	return zero, fmt.Errorf("unsupported key type or type mismatch")
 }
 
-func PrivateKeyFromPEM[T PrivateKey](pemData []byte) (T, string, error) {
+func PrivateKeyFromPEM[T PrivateKey](pemData PEM) (T, string, error) {
 	var zero T
 
 	if rsaKey, err := ParsePrivateKeyFromPEM[*rsa.PrivateKey](pemData); err == nil {
@@ -191,7 +193,7 @@ func PrivateKeyFromPEM[T PrivateKey](pemData []byte) (T, string, error) {
 }
 
 func KeyPairToFiles[T KeyPair](keyPair T, privateFile, publicFile string) error {
-	var privateKeyPEM, publicKeyPEM []byte
+	var privateKeyPEM, publicKeyPEM PEM
 	var err error
 
 	switch kp := any(keyPair).(type) {
@@ -237,7 +239,7 @@ func KeyPairToFiles[T KeyPair](keyPair T, privateFile, publicFile string) error 
 	return nil
 }
 
-func savePEMToFile(pemData []byte, filename string) error {
+func savePEMToFile(pemData PEM, filename string) error {
 	dir := filepath.Dir(filename)
 
 	if err := os.MkdirAll(dir, 0700); err != nil {
