@@ -1,4 +1,4 @@
-package keypair
+package algo
 
 import (
 	"crypto/ecdsa"

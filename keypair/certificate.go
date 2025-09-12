@@ -7,11 +7,11 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"github.com/jasoet/gopki/keypair/algo"
+	"github.com/jasoet/gopki/utils"
 	"math/big"
 	"net"
 	"time"
-
-	"github.com/jasoet/gopki/pkg/utils"
 )
 
 type Certificate struct {
@@ -33,13 +33,13 @@ func CreateSelfSignedCertificate(keyPair interface{}, request CertificateRequest
 	var publicKey crypto.PublicKey
 
 	switch kp := keyPair.(type) {
-	case *RSAKeyPair:
+	case *algo.RSAKeyPair:
 		privateKey = kp.PrivateKey
 		publicKey = kp.PublicKey
-	case *ECDSAKeyPair:
+	case *algo.ECDSAKeyPair:
 		privateKey = kp.PrivateKey
 		publicKey = kp.PublicKey
-	case *Ed25519KeyPair:
+	case *algo.Ed25519KeyPair:
 		privateKey = kp.PrivateKey
 		publicKey = kp.PublicKey
 	default:
@@ -98,13 +98,13 @@ func CreateCACertificate(keyPair interface{}, request CertificateRequest) (*Cert
 	var publicKey crypto.PublicKey
 
 	switch kp := keyPair.(type) {
-	case *RSAKeyPair:
+	case *algo.RSAKeyPair:
 		privateKey = kp.PrivateKey
 		publicKey = kp.PublicKey
-	case *ECDSAKeyPair:
+	case *algo.ECDSAKeyPair:
 		privateKey = kp.PrivateKey
 		publicKey = kp.PublicKey
-	case *Ed25519KeyPair:
+	case *algo.Ed25519KeyPair:
 		privateKey = kp.PrivateKey
 		publicKey = kp.PublicKey
 	default:
@@ -161,11 +161,11 @@ func SignCertificate(caCert *Certificate, caKeyPair interface{}, request Certifi
 	var caPrivateKey crypto.PrivateKey
 
 	switch kp := caKeyPair.(type) {
-	case *RSAKeyPair:
+	case *algo.RSAKeyPair:
 		caPrivateKey = kp.PrivateKey
-	case *ECDSAKeyPair:
+	case *algo.ECDSAKeyPair:
 		caPrivateKey = kp.PrivateKey
-	case *Ed25519KeyPair:
+	case *algo.Ed25519KeyPair:
 		caPrivateKey = kp.PrivateKey
 	default:
 		return nil, fmt.Errorf("unsupported CA key pair type")

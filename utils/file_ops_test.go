@@ -51,7 +51,7 @@ VGVzdCBkYXRhIGZvciByb3VuZHRyaXAgdGVzdA==
 
 func TestSaveToInvalidDirectory(t *testing.T) {
 	testData := []byte("test data")
-	
+
 	err := SavePEMToFile(testData, "/invalid/directory/file.pem")
 	if err == nil {
 		t.Fatal("Expected error when saving to invalid directory")
@@ -70,7 +70,7 @@ func TestFilePermissions(t *testing.T) {
 	testFile := filepath.Join(tempDir, "permissions.pem")
 
 	testData := []byte("test data with specific permissions")
-	
+
 	err := SavePEMToFile(testData, testFile)
 	if err != nil {
 		t.Fatalf("Failed to save PEM: %v", err)

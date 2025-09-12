@@ -4,15 +4,169 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
+	"github.com/jasoet/gopki/keypair/algo"
+	"github.com/jasoet/gopki/utils"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/jasoet/gopki/pkg/utils"
 )
 
+func TestGenerateRSAKeyPair(t *testing.T) {
+	keyPair, err := algo.GenerateRSAKeyPair(2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA key pair: %v", err)
+	}
+
+	if keyPair.PrivateKey == nil {
+		t.Fatal("Private key is nil")
+	}
+
+	if keyPair.PublicKey == nil {
+		t.Fatal("Public key is nil")
+	}
+
+	if keyPair.PrivateKey.Size() != 256 {
+		t.Fatalf("Expected key size 256 bytes, got %d", keyPair.PrivateKey.Size())
+	}
+}
+
+func TestRSAKeyPairPEMConversion(t *testing.T) {
+	keyPair, err := algo.GenerateRSAKeyPair(2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA key pair: %v", err)
+	}
+
+	privatePEM, err := keyPair.PrivateKeyToPEM()
+	if err != nil {
+		t.Fatalf("Failed to convert private key to PEM: %v", err)
+	}
+
+	publicPEM, err := keyPair.PublicKeyToPEM()
+	if err != nil {
+		t.Fatalf("Failed to convert public key to PEM: %v", err)
+	}
+
+	loadedKeyPair, err := algo.RSAKeyPairFromPEM(privatePEM)
+	if err != nil {
+		t.Fatalf("Failed to load key pair from PEM: %v", err)
+	}
+
+	if loadedKeyPair.PrivateKey.Size() != keyPair.PrivateKey.Size() {
+		t.Fatal("Loaded key pair does not match original")
+	}
+
+	if len(privatePEM) == 0 || len(publicPEM) == 0 {
+		t.Fatal("PEM data is empty")
+	}
+}
+
+func TestGenerateECDSAKeyPair(t *testing.T) {
+	keyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
+	if err != nil {
+		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
+	}
+
+	if keyPair.PrivateKey == nil {
+		t.Fatal("Private key is nil")
+	}
+
+	if keyPair.PublicKey == nil {
+		t.Fatal("Public key is nil")
+	}
+}
+
+func TestECDSAKeyPairPEMConversion(t *testing.T) {
+	keyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
+	if err != nil {
+		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
+	}
+
+	privatePEM, err := keyPair.PrivateKeyToPEM()
+	if err != nil {
+		t.Fatalf("Failed to convert private key to PEM: %v", err)
+	}
+
+	publicPEM, err := keyPair.PublicKeyToPEM()
+	if err != nil {
+		t.Fatalf("Failed to convert public key to PEM: %v", err)
+	}
+
+	loadedKeyPair, err := algo.ECDSAKeyPairFromPEM(privatePEM)
+	if err != nil {
+		t.Fatalf("Failed to load key pair from PEM: %v", err)
+	}
+
+	if loadedKeyPair.PrivateKey.Curve != keyPair.PrivateKey.Curve {
+		t.Fatal("Loaded key pair does not match original")
+	}
+
+	if len(privatePEM) == 0 || len(publicPEM) == 0 {
+		t.Fatal("PEM data is empty")
+	}
+}
+
+func TestGenerateEd25519KeyPair(t *testing.T) {
+	keyPair, err := algo.GenerateEd25519KeyPair()
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
+	}
+
+	if keyPair.PrivateKey == nil {
+		t.Fatal("Private key is nil")
+	}
+
+	if keyPair.PublicKey == nil {
+		t.Fatal("Public key is nil")
+	}
+
+	if len(keyPair.PrivateKey) != 64 {
+		t.Fatalf("Expected Ed25519 private key length 64, got %d", len(keyPair.PrivateKey))
+	}
+
+	if len(keyPair.PublicKey) != 32 {
+		t.Fatalf("Expected Ed25519 public key length 32, got %d", len(keyPair.PublicKey))
+	}
+}
+
+func TestEd25519KeyPairPEMConversion(t *testing.T) {
+	keyPair, err := algo.GenerateEd25519KeyPair()
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
+	}
+
+	privatePEM, err := keyPair.PrivateKeyToPEM()
+	if err != nil {
+		t.Fatalf("Failed to convert private key to PEM: %v", err)
+	}
+
+	publicPEM, err := keyPair.PublicKeyToPEM()
+	if err != nil {
+		t.Fatalf("Failed to convert public key to PEM: %v", err)
+	}
+
+	loadedKeyPair, err := algo.Ed25519KeyPairFromPEM(privatePEM)
+	if err != nil {
+		t.Fatalf("Failed to load key pair from PEM: %v", err)
+	}
+
+	if len(loadedKeyPair.PrivateKey) != len(keyPair.PrivateKey) {
+		t.Fatal("Loaded key pair does not match original")
+	}
+
+	if len(privatePEM) == 0 || len(publicPEM) == 0 {
+		t.Fatal("PEM data is empty")
+	}
+}
+
+func TestRSAKeySizeValidation(t *testing.T) {
+	_, err := algo.GenerateRSAKeyPair(1024)
+	if err == nil {
+		t.Fatal("Expected error for RSA key size less than 2048")
+	}
+}
+
 func TestPEMValidation(t *testing.T) {
-	keyPair, err := GenerateRSAKeyPair(2048)
+	keyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
@@ -46,9 +200,9 @@ MIIDXTCCAkWgAwIBAgIJAKoK/heBjcOuMA0GCSqGSIb3DQEBBQUAMEUxCzAJBgNV
 }
 
 func TestParsePublicKeyFromPEM(t *testing.T) {
-	rsaKeyPair, _ := GenerateRSAKeyPair(2048)
-	ecdsaKeyPair, _ := GenerateECDSAKeyPair(P256)
-	ed25519KeyPair, _ := GenerateEd25519KeyPair()
+	rsaKeyPair, _ := algo.GenerateRSAKeyPair(2048)
+	ecdsaKeyPair, _ := algo.GenerateECDSAKeyPair(algo.P256)
+	ed25519KeyPair, _ := algo.GenerateEd25519KeyPair()
 
 	rsaPublicPEM, _ := rsaKeyPair.PublicKeyToPEM()
 	ecdsaPublicPEM, _ := ecdsaKeyPair.PublicKeyToPEM()
@@ -80,9 +234,9 @@ func TestParsePublicKeyFromPEM(t *testing.T) {
 }
 
 func TestParsePrivateKeyFromPEM(t *testing.T) {
-	rsaKeyPair, _ := GenerateRSAKeyPair(2048)
-	ecdsaKeyPair, _ := GenerateECDSAKeyPair(P256)
-	ed25519KeyPair, _ := GenerateEd25519KeyPair()
+	rsaKeyPair, _ := algo.GenerateRSAKeyPair(2048)
+	ecdsaKeyPair, _ := algo.GenerateECDSAKeyPair(algo.P256)
+	ed25519KeyPair, _ := algo.GenerateEd25519KeyPair()
 
 	rsaPrivatePEM, _ := rsaKeyPair.PrivateKeyToPEM()
 	ecdsaPrivatePEM, _ := ecdsaKeyPair.PrivateKeyToPEM()
@@ -137,7 +291,7 @@ func TestSaveAndLoadPEMRoundtrip(t *testing.T) {
 	tempDir := t.TempDir()
 	testFile := filepath.Join(tempDir, "roundtrip.pem")
 
-	keyPair, err := GenerateRSAKeyPair(2048)
+	keyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
@@ -164,7 +318,7 @@ func TestSaveAndLoadPEMRoundtrip(t *testing.T) {
 
 func TestPEMParsingWithInvalidData(t *testing.T) {
 	invalidPEMData := []byte("invalid pem data")
-	
+
 	_, err := ParsePublicKeyFromPEM[*rsa.PublicKey](invalidPEMData)
 	if err == nil {
 		t.Fatal("Expected error when parsing invalid PEM as public key")
@@ -178,7 +332,7 @@ func TestPEMParsingWithInvalidData(t *testing.T) {
 	privatePEMAsPublic := []byte(`-----BEGIN PUBLIC KEY-----
 MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7
 -----END PUBLIC KEY-----`)
-	
+
 	_, err = ParsePublicKeyFromPEM[*rsa.PublicKey](privatePEMAsPublic)
 	if err == nil {
 		t.Fatal("Expected error when parsing malformed public key PEM")

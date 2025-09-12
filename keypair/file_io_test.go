@@ -1,11 +1,11 @@
 package keypair
 
 import (
+	"github.com/jasoet/gopki/keypair/algo"
+	"github.com/jasoet/gopki/utils"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/jasoet/gopki/pkg/utils"
 )
 
 func TestRSAKeyPairFileOperations(t *testing.T) {
@@ -13,7 +13,7 @@ func TestRSAKeyPairFileOperations(t *testing.T) {
 	privateKeyFile := filepath.Join(tempDir, "test_rsa_private.pem")
 	publicKeyFile := filepath.Join(tempDir, "test_rsa_public.pem")
 
-	keyPair, err := GenerateRSAKeyPair(2048)
+	keyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key pair: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestRSAKeyPairFileOperations(t *testing.T) {
 		t.Fatalf("Failed to load private key from file: %v", err)
 	}
 
-	loadedKeyPair, err := RSAKeyPairFromPEM(loadedPrivatePEM)
+	loadedKeyPair, err := algo.RSAKeyPairFromPEM(loadedPrivatePEM)
 	if err != nil {
 		t.Fatalf("Failed to parse loaded private key: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestECDSAKeyPairFileOperations(t *testing.T) {
 	privateKeyFile := filepath.Join(tempDir, "test_ecdsa_private.pem")
 	publicKeyFile := filepath.Join(tempDir, "test_ecdsa_public.pem")
 
-	keyPair, err := GenerateECDSAKeyPair(P256)
+	keyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
 	if err != nil {
 		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestECDSAKeyPairFileOperations(t *testing.T) {
 		t.Fatalf("Failed to load private key from file: %v", err)
 	}
 
-	loadedKeyPair, err := ECDSAKeyPairFromPEM(loadedPrivatePEM)
+	loadedKeyPair, err := algo.ECDSAKeyPairFromPEM(loadedPrivatePEM)
 	if err != nil {
 		t.Fatalf("Failed to parse loaded private key: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestEd25519KeyPairFileOperations(t *testing.T) {
 	privateKeyFile := filepath.Join(tempDir, "test_ed25519_private.pem")
 	publicKeyFile := filepath.Join(tempDir, "test_ed25519_public.pem")
 
-	keyPair, err := GenerateEd25519KeyPair()
+	keyPair, err := algo.GenerateEd25519KeyPair()
 	if err != nil {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestEd25519KeyPairFileOperations(t *testing.T) {
 		t.Fatalf("Failed to load private key from file: %v", err)
 	}
 
-	loadedKeyPair, err := Ed25519KeyPairFromPEM(loadedPrivatePEM)
+	loadedKeyPair, err := algo.Ed25519KeyPairFromPEM(loadedPrivatePEM)
 	if err != nil {
 		t.Fatalf("Failed to parse loaded private key: %v", err)
 	}
@@ -163,17 +163,17 @@ func TestEd25519KeyPairFileOperations(t *testing.T) {
 func TestMultipleKeyPairFiles(t *testing.T) {
 	tempDir := t.TempDir()
 
-	rsaKeyPair, err := GenerateRSAKeyPair(2048)
+	rsaKeyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key pair: %v", err)
 	}
 
-	ecdsaKeyPair, err := GenerateECDSAKeyPair(P256)
+	ecdsaKeyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
 	if err != nil {
 		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
 
-	ed25519KeyPair, err := GenerateEd25519KeyPair()
+	ed25519KeyPair, err := algo.GenerateEd25519KeyPair()
 	if err != nil {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
@@ -205,17 +205,17 @@ func TestMultipleKeyPairFiles(t *testing.T) {
 		t.Fatalf("Failed to load Ed25519 key: %v", err)
 	}
 
-	_, err = RSAKeyPairFromPEM(loadedRSA)
+	_, err = algo.RSAKeyPairFromPEM(loadedRSA)
 	if err != nil {
 		t.Fatalf("Failed to parse RSA key: %v", err)
 	}
 
-	_, err = ECDSAKeyPairFromPEM(loadedECDSA)
+	_, err = algo.ECDSAKeyPairFromPEM(loadedECDSA)
 	if err != nil {
 		t.Fatalf("Failed to parse ECDSA key: %v", err)
 	}
 
-	_, err = Ed25519KeyPairFromPEM(loadedEd25519)
+	_, err = algo.Ed25519KeyPairFromPEM(loadedEd25519)
 	if err != nil {
 		t.Fatalf("Failed to parse Ed25519 key: %v", err)
 	}

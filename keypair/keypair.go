@@ -23,7 +23,7 @@ type PrivateKey interface {
 // It returns the key as the specified type T or an error if parsing fails or the type is incorrect.
 func ParsePublicKeyFromPEM[T PublicKey](pemData []byte) (T, error) {
 	var zero T
-	
+
 	block, _ := pem.Decode(pemData)
 	if block == nil {
 		return zero, fmt.Errorf("failed to decode PEM block")
@@ -50,7 +50,7 @@ func ParsePublicKeyFromPEM[T PublicKey](pemData []byte) (T, error) {
 // It returns the key as the specified type T or an error if parsing fails or the type is incorrect.
 func ParsePrivateKeyFromPEM[T PrivateKey](pemData []byte) (T, error) {
 	var zero T
-	
+
 	block, _ := pem.Decode(pemData)
 	if block == nil {
 		return zero, fmt.Errorf("failed to decode PEM block")

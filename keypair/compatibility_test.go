@@ -4,21 +4,22 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
+	"github.com/jasoet/gopki/keypair/algo"
 	"testing"
 )
 
 func TestAlgorithmCompatibilityMatrix(t *testing.T) {
-	rsaKeyPair, err := GenerateRSAKeyPair(2048)
+	rsaKeyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key: %v", err)
 	}
 
-	ecdsaKeyPair, err := GenerateECDSAKeyPair(P256)
+	ecdsaKeyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
 	if err != nil {
 		t.Fatalf("Failed to generate ECDSA key: %v", err)
 	}
 
-	ed25519KeyPair, err := GenerateEd25519KeyPair()
+	ed25519KeyPair, err := algo.GenerateEd25519KeyPair()
 	if err != nil {
 		t.Fatalf("Failed to generate Ed25519 key: %v", err)
 	}
@@ -35,7 +36,7 @@ func TestAlgorithmCompatibilityMatrix(t *testing.T) {
 			var err error
 
 			switch v := kp.(type) {
-			case *RSAKeyPair:
+			case *algo.RSAKeyPair:
 				privatePEM, err = v.PrivateKeyToPEM()
 				if err != nil {
 					t.Fatalf("Failed to convert %s private key to PEM: %v", name, err)
@@ -44,7 +45,7 @@ func TestAlgorithmCompatibilityMatrix(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to convert %s public key to PEM: %v", name, err)
 				}
-			case *ECDSAKeyPair:
+			case *algo.ECDSAKeyPair:
 				privatePEM, err = v.PrivateKeyToPEM()
 				if err != nil {
 					t.Fatalf("Failed to convert %s private key to PEM: %v", name, err)
@@ -53,7 +54,7 @@ func TestAlgorithmCompatibilityMatrix(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to convert %s public key to PEM: %v", name, err)
 				}
-			case *Ed25519KeyPair:
+			case *algo.Ed25519KeyPair:
 				privatePEM, err = v.PrivateKeyToPEM()
 				if err != nil {
 					t.Fatalf("Failed to convert %s private key to PEM: %v", name, err)
@@ -119,23 +120,23 @@ func TestAlgorithmCompatibilityMatrix(t *testing.T) {
 }
 
 func TestMultipleCurveGeneration(t *testing.T) {
-	curves := []ECDSACurve{
-		P224,
-		P256,
-		P384,
-		P521,
+	curves := []algo.ECDSACurve{
+		algo.P224,
+		algo.P256,
+		algo.P384,
+		algo.P521,
 	}
 
 	curveNames := []string{"P-224", "P-256", "P-384", "P-521"}
 
 	for i, curve := range curves {
 		t.Run(curveNames[i], func(t *testing.T) {
-			keyPair1, err := GenerateECDSAKeyPair(curve)
+			keyPair1, err := algo.GenerateECDSAKeyPair(curve)
 			if err != nil {
 				t.Fatalf("Failed to generate first %s key pair: %v", curveNames[i], err)
 			}
 
-			keyPair2, err := GenerateECDSAKeyPair(curve)
+			keyPair2, err := algo.GenerateECDSAKeyPair(curve)
 			if err != nil {
 				t.Fatalf("Failed to generate second %s key pair: %v", curveNames[i], err)
 			}
@@ -166,12 +167,12 @@ func TestMultipleCurveGeneration(t *testing.T) {
 				t.Fatalf("Generated identical %s PEM data", curveNames[i])
 			}
 
-			_, err = ECDSAKeyPairFromPEM(pem1)
+			_, err = algo.ECDSAKeyPairFromPEM(pem1)
 			if err != nil {
 				t.Fatalf("Failed to parse first %s PEM: %v", curveNames[i], err)
 			}
 
-			_, err = ECDSAKeyPairFromPEM(pem2)
+			_, err = algo.ECDSAKeyPairFromPEM(pem2)
 			if err != nil {
 				t.Fatalf("Failed to parse second %s PEM: %v", curveNames[i], err)
 			}
@@ -183,9 +184,9 @@ func TestKeyUniqueness(t *testing.T) {
 	const numKeys = 10
 
 	t.Run("RSA key uniqueness", func(t *testing.T) {
-		keys := make([]*RSAKeyPair, numKeys)
+		keys := make([]*algo.RSAKeyPair, numKeys)
 		for i := 0; i < numKeys; i++ {
-			key, err := GenerateRSAKeyPair(2048)
+			key, err := algo.GenerateRSAKeyPair(2048)
 			if err != nil {
 				t.Fatalf("Failed to generate RSA key %d: %v", i, err)
 			}
@@ -202,9 +203,9 @@ func TestKeyUniqueness(t *testing.T) {
 	})
 
 	t.Run("ECDSA key uniqueness", func(t *testing.T) {
-		keys := make([]*ECDSAKeyPair, numKeys)
+		keys := make([]*algo.ECDSAKeyPair, numKeys)
 		for i := 0; i < numKeys; i++ {
-			key, err := GenerateECDSAKeyPair(P256)
+			key, err := algo.GenerateECDSAKeyPair(algo.P256)
 			if err != nil {
 				t.Fatalf("Failed to generate ECDSA key %d: %v", i, err)
 			}
@@ -221,9 +222,9 @@ func TestKeyUniqueness(t *testing.T) {
 	})
 
 	t.Run("Ed25519 key uniqueness", func(t *testing.T) {
-		keys := make([]*Ed25519KeyPair, numKeys)
+		keys := make([]*algo.Ed25519KeyPair, numKeys)
 		for i := 0; i < numKeys; i++ {
-			key, err := GenerateEd25519KeyPair()
+			key, err := algo.GenerateEd25519KeyPair()
 			if err != nil {
 				t.Fatalf("Failed to generate Ed25519 key %d: %v", i, err)
 			}
@@ -246,7 +247,7 @@ func TestLargeKeyGeneration(t *testing.T) {
 	}
 
 	t.Run("RSA 4096-bit", func(t *testing.T) {
-		keyPair, err := GenerateRSAKeyPair(4096)
+		keyPair, err := algo.GenerateRSAKeyPair(4096)
 		if err != nil {
 			t.Fatalf("Failed to generate 4096-bit RSA key: %v", err)
 		}
@@ -260,7 +261,7 @@ func TestLargeKeyGeneration(t *testing.T) {
 			t.Fatalf("Failed to convert 4096-bit key to PEM: %v", err)
 		}
 
-		loadedKeyPair, err := RSAKeyPairFromPEM(privatePEM)
+		loadedKeyPair, err := algo.RSAKeyPairFromPEM(privatePEM)
 		if err != nil {
 			t.Fatalf("Failed to load 4096-bit key from PEM: %v", err)
 		}
@@ -271,7 +272,7 @@ func TestLargeKeyGeneration(t *testing.T) {
 	})
 
 	t.Run("ECDSA P-521", func(t *testing.T) {
-		keyPair, err := GenerateECDSAKeyPair(P521)
+		keyPair, err := algo.GenerateECDSAKeyPair(algo.P521)
 		if err != nil {
 			t.Fatalf("Failed to generate P-521 ECDSA key: %v", err)
 		}
@@ -285,7 +286,7 @@ func TestLargeKeyGeneration(t *testing.T) {
 			t.Fatalf("Failed to convert P-521 key to PEM: %v", err)
 		}
 
-		loadedKeyPair, err := ECDSAKeyPairFromPEM(privatePEM)
+		loadedKeyPair, err := algo.ECDSAKeyPairFromPEM(privatePEM)
 		if err != nil {
 			t.Fatalf("Failed to load P-521 key from PEM: %v", err)
 		}

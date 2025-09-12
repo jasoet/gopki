@@ -3,6 +3,7 @@ package keypair
 import (
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"github.com/jasoet/gopki/keypair/algo"
 	"net"
 	"os"
 	"path/filepath"
@@ -12,7 +13,7 @@ import (
 
 func TestCreateSelfSignedCertificate(t *testing.T) {
 	t.Run("RSA self-signed certificate", func(t *testing.T) {
-		keyPair, err := GenerateRSAKeyPair(2048)
+		keyPair, err := algo.GenerateRSAKeyPair(2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA key pair: %v", err)
 		}
@@ -51,7 +52,7 @@ func TestCreateSelfSignedCertificate(t *testing.T) {
 	})
 
 	t.Run("ECDSA self-signed certificate", func(t *testing.T) {
-		keyPair, err := GenerateECDSAKeyPair(P256)
+		keyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
 		if err != nil {
 			t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 		}
@@ -74,7 +75,7 @@ func TestCreateSelfSignedCertificate(t *testing.T) {
 	})
 
 	t.Run("Ed25519 self-signed certificate", func(t *testing.T) {
-		keyPair, err := GenerateEd25519KeyPair()
+		keyPair, err := algo.GenerateEd25519KeyPair()
 		if err != nil {
 			t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 		}
@@ -99,7 +100,7 @@ func TestCreateSelfSignedCertificate(t *testing.T) {
 }
 
 func TestCreateCACertificate(t *testing.T) {
-	keyPair, err := GenerateRSAKeyPair(2048)
+	keyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key pair: %v", err)
 	}
@@ -138,7 +139,7 @@ func TestCreateCACertificate(t *testing.T) {
 
 func TestSignCertificate(t *testing.T) {
 	// Create CA
-	caKeyPair, err := GenerateRSAKeyPair(2048)
+	caKeyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate CA key pair: %v", err)
 	}
@@ -156,7 +157,7 @@ func TestSignCertificate(t *testing.T) {
 	}
 
 	// Create server key pair
-	serverKeyPair, err := GenerateRSAKeyPair(2048)
+	serverKeyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate server key pair: %v", err)
 	}
@@ -195,7 +196,7 @@ func TestSignCertificate(t *testing.T) {
 
 func TestVerifyCertificate(t *testing.T) {
 	// Create CA
-	caKeyPair, err := GenerateRSAKeyPair(2048)
+	caKeyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate CA key pair: %v", err)
 	}
@@ -213,7 +214,7 @@ func TestVerifyCertificate(t *testing.T) {
 	}
 
 	// Create and sign a certificate
-	serverKeyPair, err := GenerateRSAKeyPair(2048)
+	serverKeyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate server key pair: %v", err)
 	}
@@ -237,7 +238,7 @@ func TestVerifyCertificate(t *testing.T) {
 	}
 
 	// Test verification with wrong CA
-	wrongCaKeyPair, _ := GenerateRSAKeyPair(2048)
+	wrongCaKeyPair, _ := algo.GenerateRSAKeyPair(2048)
 	wrongCaRequest := CertificateRequest{
 		Subject: pkix.Name{
 			CommonName: "Wrong CA",
@@ -260,7 +261,7 @@ func TestCertificateFileOperations(t *testing.T) {
 	tempDir := t.TempDir()
 	certFile := filepath.Join(tempDir, "test.pem")
 
-	keyPair, err := GenerateRSAKeyPair(2048)
+	keyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
@@ -304,7 +305,7 @@ func TestCertificateFileOperations(t *testing.T) {
 }
 
 func TestParseCertificateFromPEM(t *testing.T) {
-	keyPair, err := GenerateRSAKeyPair(2048)
+	keyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
@@ -349,7 +350,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7
 }
 
 func TestCertificateDefaultValues(t *testing.T) {
-	keyPair, err := GenerateRSAKeyPair(2048)
+	keyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
@@ -375,7 +376,7 @@ func TestCertificateDefaultValues(t *testing.T) {
 	// Check that ValidFor was set to 1 year (default)
 	expectedValidFor := 365 * 24 * time.Hour
 	actualValidFor := cert.Certificate.NotAfter.Sub(cert.Certificate.NotBefore)
-	
+
 	// Allow some tolerance for time differences
 	tolerance := time.Minute
 	if actualValidFor > expectedValidFor+tolerance || actualValidFor < expectedValidFor-tolerance {

@@ -4,12 +4,13 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
+	"github.com/jasoet/gopki/keypair/algo"
 	"testing"
 )
 
 func TestGenericPublicKeyParsing(t *testing.T) {
 	t.Run("RSA public key parsing", func(t *testing.T) {
-		keyPair, err := GenerateRSAKeyPair(2048)
+		keyPair, err := algo.GenerateRSAKeyPair(2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA key pair: %v", err)
 		}
@@ -34,7 +35,7 @@ func TestGenericPublicKeyParsing(t *testing.T) {
 	})
 
 	t.Run("ECDSA public key parsing", func(t *testing.T) {
-		keyPair, err := GenerateECDSAKeyPair(P256)
+		keyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
 		if err != nil {
 			t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 		}
@@ -59,7 +60,7 @@ func TestGenericPublicKeyParsing(t *testing.T) {
 	})
 
 	t.Run("Ed25519 public key parsing", func(t *testing.T) {
-		keyPair, err := GenerateEd25519KeyPair()
+		keyPair, err := algo.GenerateEd25519KeyPair()
 		if err != nil {
 			t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 		}
@@ -82,7 +83,7 @@ func TestGenericPublicKeyParsing(t *testing.T) {
 
 func TestGenericPrivateKeyParsing(t *testing.T) {
 	t.Run("RSA private key parsing", func(t *testing.T) {
-		keyPair, err := GenerateRSAKeyPair(2048)
+		keyPair, err := algo.GenerateRSAKeyPair(2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA key pair: %v", err)
 		}
@@ -107,7 +108,7 @@ func TestGenericPrivateKeyParsing(t *testing.T) {
 	})
 
 	t.Run("ECDSA private key parsing", func(t *testing.T) {
-		keyPair, err := GenerateECDSAKeyPair(P256)
+		keyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
 		if err != nil {
 			t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 		}
@@ -132,7 +133,7 @@ func TestGenericPrivateKeyParsing(t *testing.T) {
 	})
 
 	t.Run("Ed25519 private key parsing", func(t *testing.T) {
-		keyPair, err := GenerateEd25519KeyPair()
+		keyPair, err := algo.GenerateEd25519KeyPair()
 		if err != nil {
 			t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 		}
@@ -154,9 +155,9 @@ func TestGenericPrivateKeyParsing(t *testing.T) {
 }
 
 func TestGenericParsingTypeErrors(t *testing.T) {
-	rsaKeyPair, _ := GenerateRSAKeyPair(2048)
-	ecdsaKeyPair, _ := GenerateECDSAKeyPair(P256)
-	ed25519KeyPair, _ := GenerateEd25519KeyPair()
+	rsaKeyPair, _ := algo.GenerateRSAKeyPair(2048)
+	ecdsaKeyPair, _ := algo.GenerateECDSAKeyPair(algo.P256)
+	ed25519KeyPair, _ := algo.GenerateEd25519KeyPair()
 
 	rsaPublicPEM, _ := rsaKeyPair.PublicKeyToPEM()
 	ecdsaPublicPEM, _ := ecdsaKeyPair.PublicKeyToPEM()
@@ -271,7 +272,7 @@ func TestGenericParsingWithInvalidPEM(t *testing.T) {
 
 func TestGenericParsingRoundTrip(t *testing.T) {
 	t.Run("RSA round trip test", func(t *testing.T) {
-		originalKeyPair, err := GenerateRSAKeyPair(2048)
+		originalKeyPair, err := algo.GenerateRSAKeyPair(2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA key pair: %v", err)
 		}
@@ -306,7 +307,7 @@ func TestGenericParsingRoundTrip(t *testing.T) {
 	})
 
 	t.Run("ECDSA round trip test", func(t *testing.T) {
-		originalKeyPair, err := GenerateECDSAKeyPair(P256)
+		originalKeyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
 		if err != nil {
 			t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 		}
@@ -327,7 +328,7 @@ func TestGenericParsingRoundTrip(t *testing.T) {
 	})
 
 	t.Run("Ed25519 round trip test", func(t *testing.T) {
-		originalKeyPair, err := GenerateEd25519KeyPair()
+		originalKeyPair, err := algo.GenerateEd25519KeyPair()
 		if err != nil {
 			t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 		}
