@@ -5,26 +5,26 @@ import (
 	"crypto/ed25519"
 	"crypto/rsa"
 	"fmt"
+	keypair2 "github.com/jasoet/gopki/keypair"
+	"github.com/jasoet/gopki/keypair/algo"
 	"log"
-
-	"github.com/jasoet/gopki/pkg/keypair"
 )
 
 func main() {
-	fmt.Println("=== GoPKI Generic Parsing Example ===\n")
+	fmt.Println("=== GoPKI Generic Parsing Example ===")
 
 	// Generate different types of key pairs
-	rsaKeyPair, err := keypair.GenerateRSAKeyPair(2048)
+	rsaKeyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		log.Fatal("Failed to generate RSA key pair:", err)
 	}
 
-	ecdsaKeyPair, err := keypair.GenerateECDSAKeyPair(keypair.P256)
+	ecdsaKeyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
 	if err != nil {
 		log.Fatal("Failed to generate ECDSA key pair:", err)
 	}
 
-	ed25519KeyPair, err := keypair.GenerateEd25519KeyPair()
+	ed25519KeyPair, err := algo.GenerateEd25519KeyPair()
 	if err != nil {
 		log.Fatal("Failed to generate Ed25519 key pair:", err)
 	}
@@ -56,12 +56,12 @@ func main() {
 
 func demonstrateRSAParsing(privatePEM, publicPEM []byte) {
 	// Parse with type safety - no type assertions needed!
-	privateKey, err := keypair.ParsePrivateKeyFromPEM[*rsa.PrivateKey](privatePEM)
+	privateKey, err := keypair2.ParsePrivateKeyFromPEM[*rsa.PrivateKey](privatePEM)
 	if err != nil {
 		log.Fatal("Failed to parse RSA private key:", err)
 	}
 
-	publicKey, err := keypair.ParsePublicKeyFromPEM[*rsa.PublicKey](publicPEM)
+	publicKey, err := keypair2.ParsePublicKeyFromPEM[*rsa.PublicKey](publicPEM)
 	if err != nil {
 		log.Fatal("Failed to parse RSA public key:", err)
 	}
@@ -74,12 +74,12 @@ func demonstrateRSAParsing(privatePEM, publicPEM []byte) {
 
 func demonstrateECDSAParsing(privatePEM, publicPEM []byte) {
 	// Parse with type safety
-	privateKey, err := keypair.ParsePrivateKeyFromPEM[*ecdsa.PrivateKey](privatePEM)
+	privateKey, err := keypair2.ParsePrivateKeyFromPEM[*ecdsa.PrivateKey](privatePEM)
 	if err != nil {
 		log.Fatal("Failed to parse ECDSA private key:", err)
 	}
 
-	publicKey, err := keypair.ParsePublicKeyFromPEM[*ecdsa.PublicKey](publicPEM)
+	publicKey, err := keypair2.ParsePublicKeyFromPEM[*ecdsa.PublicKey](publicPEM)
 	if err != nil {
 		log.Fatal("Failed to parse ECDSA public key:", err)
 	}
@@ -92,12 +92,12 @@ func demonstrateECDSAParsing(privatePEM, publicPEM []byte) {
 
 func demonstrateEd25519Parsing(privatePEM, publicPEM []byte) {
 	// Parse with type safety
-	privateKey, err := keypair.ParsePrivateKeyFromPEM[ed25519.PrivateKey](privatePEM)
+	privateKey, err := keypair2.ParsePrivateKeyFromPEM[ed25519.PrivateKey](privatePEM)
 	if err != nil {
 		log.Fatal("Failed to parse Ed25519 private key:", err)
 	}
 
-	publicKey, err := keypair.ParsePublicKeyFromPEM[ed25519.PublicKey](publicPEM)
+	publicKey, err := keypair2.ParsePublicKeyFromPEM[ed25519.PublicKey](publicPEM)
 	if err != nil {
 		log.Fatal("Failed to parse Ed25519 public key:", err)
 	}
@@ -105,7 +105,7 @@ func demonstrateEd25519Parsing(privatePEM, publicPEM []byte) {
 	// Direct access to Ed25519-specific methods
 	fmt.Printf("   Ed25519 Private Key Length: %d bytes\n", len(privateKey))
 	fmt.Printf("   Ed25519 Public Key Length: %d bytes\n", len(publicKey))
-	
+
 	// Demonstrate that we can use the key directly
 	derivedPublic := privateKey.Public().(ed25519.PublicKey)
 	fmt.Printf("   Keys match: %t\n", string(derivedPublic) == string(publicKey))
@@ -113,19 +113,19 @@ func demonstrateEd25519Parsing(privatePEM, publicPEM []byte) {
 
 func demonstrateTypeErrors(rsaPrivatePEM []byte) {
 	// This will fail with a clear error message
-	_, err := keypair.ParsePrivateKeyFromPEM[*ecdsa.PrivateKey](rsaPrivatePEM)
+	_, err := keypair2.ParsePrivateKeyFromPEM[*ecdsa.PrivateKey](rsaPrivatePEM)
 	if err != nil {
 		fmt.Printf("   Expected error when parsing RSA key as ECDSA: %v\n", err)
 	}
 
 	// This will also fail with a clear error message
-	_, err = keypair.ParsePrivateKeyFromPEM[ed25519.PrivateKey](rsaPrivatePEM)
+	_, err = keypair2.ParsePrivateKeyFromPEM[ed25519.PrivateKey](rsaPrivatePEM)
 	if err != nil {
 		fmt.Printf("   Expected error when parsing RSA key as Ed25519: %v\n", err)
 	}
 
 	// But parsing with correct type works perfectly
-	rsaKey, err := keypair.ParsePrivateKeyFromPEM[*rsa.PrivateKey](rsaPrivatePEM)
+	rsaKey, err := keypair2.ParsePrivateKeyFromPEM[*rsa.PrivateKey](rsaPrivatePEM)
 	if err != nil {
 		log.Fatal("Failed to parse RSA key:", err)
 	}

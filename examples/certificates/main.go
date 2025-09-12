@@ -3,23 +3,23 @@ package main
 import (
 	"crypto/x509/pkix"
 	"fmt"
+	keypair2 "github.com/jasoet/gopki/keypair"
+	"github.com/jasoet/gopki/keypair/algo"
 	"log"
 	"net"
 	"time"
-
-	"github.com/jasoet/gopki/pkg/keypair"
 )
 
 func main() {
 	// Generate a key pair for the CA
 	fmt.Println("Generating CA key pair...")
-	caKeyPair, err := keypair.GenerateRSAKeyPair(2048)
+	caKeyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		log.Fatalf("Failed to generate CA key pair: %v", err)
 	}
 
 	// Create CA certificate request
-	caRequest := keypair.CertificateRequest{
+	caRequest := keypair2.CertificateRequest{
 		Subject: pkix.Name{
 			Country:            []string{"US"},
 			Organization:       []string{"Test CA Organization"},
@@ -32,7 +32,7 @@ func main() {
 
 	// Create self-signed CA certificate
 	fmt.Println("Creating CA certificate...")
-	caCert, err := keypair.CreateCACertificate(caKeyPair, caRequest)
+	caCert, err := keypair2.CreateCACertificate(caKeyPair, caRequest)
 	if err != nil {
 		log.Fatalf("Failed to create CA certificate: %v", err)
 	}
@@ -46,13 +46,13 @@ func main() {
 
 	// Generate a key pair for the server certificate
 	fmt.Println("Generating server key pair...")
-	serverKeyPair, err := keypair.GenerateRSAKeyPair(2048)
+	serverKeyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		log.Fatalf("Failed to generate server key pair: %v", err)
 	}
 
 	// Create server certificate request
-	serverRequest := keypair.CertificateRequest{
+	serverRequest := keypair2.CertificateRequest{
 		Subject: pkix.Name{
 			Country:            []string{"US"},
 			Organization:       []string{"Test Organization"},
@@ -68,7 +68,7 @@ func main() {
 
 	// Sign server certificate with CA
 	fmt.Println("Signing server certificate with CA...")
-	serverCert, err := keypair.SignCertificate(caCert, caKeyPair, serverRequest, serverKeyPair.PublicKey)
+	serverCert, err := keypair2.SignCertificate(caCert, caKeyPair, serverRequest, serverKeyPair.PublicKey)
 	if err != nil {
 		log.Fatalf("Failed to sign server certificate: %v", err)
 	}
@@ -82,7 +82,7 @@ func main() {
 
 	// Verify server certificate against CA
 	fmt.Println("Verifying server certificate...")
-	err = keypair.VerifyCertificate(serverCert, caCert)
+	err = keypair2.VerifyCertificate(serverCert, caCert)
 	if err != nil {
 		log.Fatalf("Certificate verification failed: %v", err)
 	}
@@ -90,12 +90,12 @@ func main() {
 
 	// Create a self-signed certificate example
 	fmt.Println("Creating self-signed certificate...")
-	selfSignedKeyPair, err := keypair.GenerateECDSAKeyPair(keypair.P256)
+	selfSignedKeyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
 	if err != nil {
 		log.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
 
-	selfSignedRequest := keypair.CertificateRequest{
+	selfSignedRequest := keypair2.CertificateRequest{
 		Subject: pkix.Name{
 			Country:      []string{"US"},
 			Organization: []string{"Self-Signed Organization"},
@@ -106,7 +106,7 @@ func main() {
 		ValidFor:  365 * 24 * time.Hour, // 1 year
 	}
 
-	selfSignedCert, err := keypair.CreateSelfSignedCertificate(selfSignedKeyPair, selfSignedRequest)
+	selfSignedCert, err := keypair2.CreateSelfSignedCertificate(selfSignedKeyPair, selfSignedRequest)
 	if err != nil {
 		log.Fatalf("Failed to create self-signed certificate: %v", err)
 	}

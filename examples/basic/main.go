@@ -2,25 +2,24 @@ package main
 
 import (
 	"fmt"
+	"github.com/jasoet/gopki/keypair/algo"
+	"github.com/jasoet/gopki/utils"
 	"log"
-
-	"github.com/jasoet/gopki/pkg/keypair"
-	"github.com/jasoet/gopki/pkg/utils"
 )
 
 func main() {
-	fmt.Println("=== GoPKI Example Usage ===\n")
+	fmt.Println("=== GoPKI Example Usage ===")
 
 	// Generate RSA key pair
 	fmt.Println("1. Generating RSA 2048-bit key pair...")
-	rsaKeyPair, err := keypair.GenerateRSAKeyPair(2048)
+	rsaKeyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		log.Fatal("Failed to generate RSA key pair:", err)
 	}
 
 	rsaPrivatePEM, _ := rsaKeyPair.PrivateKeyToPEM()
 	rsaPublicPEM, _ := rsaKeyPair.PublicKeyToPEM()
-	
+
 	fmt.Printf("RSA Private Key (first 100 chars): %s...\n", string(rsaPrivatePEM)[:100])
 	fmt.Printf("RSA Public Key (first 100 chars): %s...\n\n", string(rsaPublicPEM)[:100])
 
@@ -31,14 +30,14 @@ func main() {
 
 	// Generate ECDSA key pair with P256 curve
 	fmt.Println("\n2. Generating ECDSA P-256 key pair...")
-	ecdsaKeyPair, err := keypair.GenerateECDSAKeyPair(keypair.P256)
+	ecdsaKeyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
 	if err != nil {
 		log.Fatal("Failed to generate ECDSA key pair:", err)
 	}
 
 	ecdsaPrivatePEM, _ := ecdsaKeyPair.PrivateKeyToPEM()
 	ecdsaPublicPEM, _ := ecdsaKeyPair.PublicKeyToPEM()
-	
+
 	fmt.Printf("ECDSA Private Key (first 100 chars): %s...\n", string(ecdsaPrivatePEM)[:100])
 	fmt.Printf("ECDSA Public Key (first 100 chars): %s...\n\n", string(ecdsaPublicPEM)[:100])
 
@@ -49,14 +48,14 @@ func main() {
 
 	// Generate Ed25519 key pair
 	fmt.Println("\n3. Generating Ed25519 key pair...")
-	ed25519KeyPair, err := keypair.GenerateEd25519KeyPair()
+	ed25519KeyPair, err := algo.GenerateEd25519KeyPair()
 	if err != nil {
 		log.Fatal("Failed to generate Ed25519 key pair:", err)
 	}
 
 	ed25519PrivatePEM, _ := ed25519KeyPair.PrivateKeyToPEM()
 	ed25519PublicPEM, _ := ed25519KeyPair.PublicKeyToPEM()
-	
+
 	fmt.Printf("Ed25519 Private Key (first 100 chars): %s...\n", string(ed25519PrivatePEM)[:100])
 	fmt.Printf("Ed25519 Public Key (first 100 chars): %s...\n\n", string(ed25519PublicPEM)[:100])
 
@@ -72,7 +71,7 @@ func main() {
 		log.Fatal("Failed to load RSA private key:", err)
 	}
 
-	loadedRSAKeyPair, err := keypair.RSAKeyPairFromPEM(loadedRSAPEM)
+	loadedRSAKeyPair, err := algo.RSAKeyPairFromPEM(loadedRSAPEM)
 	if err != nil {
 		log.Fatal("Failed to parse RSA key from PEM:", err)
 	}
