@@ -1,0 +1,138 @@
+package main
+
+import (
+	"crypto/x509/pkix"
+	"fmt"
+	"log"
+	"net"
+	"time"
+
+	"github.com/jasoet/gopki/pkg/keypair"
+)
+
+func main() {
+	// Generate a key pair for the CA
+	fmt.Println("Generating CA key pair...")
+	caKeyPair, err := keypair.GenerateRSAKeyPair(2048)
+	if err != nil {
+		log.Fatalf("Failed to generate CA key pair: %v", err)
+	}
+
+	// Create CA certificate request
+	caRequest := keypair.CertificateRequest{
+		Subject: pkix.Name{
+			Country:            []string{"US"},
+			Organization:       []string{"Test CA Organization"},
+			OrganizationalUnit: []string{"IT Department"},
+			CommonName:         "Test Root CA",
+		},
+		ValidFrom: time.Now(),
+		ValidFor:  10 * 365 * 24 * time.Hour, // 10 years
+	}
+
+	// Create self-signed CA certificate
+	fmt.Println("Creating CA certificate...")
+	caCert, err := keypair.CreateCACertificate(caKeyPair, caRequest)
+	if err != nil {
+		log.Fatalf("Failed to create CA certificate: %v", err)
+	}
+
+	// Save CA certificate to file
+	err = caCert.SaveToFile("ca-cert.pem")
+	if err != nil {
+		log.Fatalf("Failed to save CA certificate: %v", err)
+	}
+	fmt.Println("CA certificate saved to ca-cert.pem")
+
+	// Generate a key pair for the server certificate
+	fmt.Println("Generating server key pair...")
+	serverKeyPair, err := keypair.GenerateRSAKeyPair(2048)
+	if err != nil {
+		log.Fatalf("Failed to generate server key pair: %v", err)
+	}
+
+	// Create server certificate request
+	serverRequest := keypair.CertificateRequest{
+		Subject: pkix.Name{
+			Country:            []string{"US"},
+			Organization:       []string{"Test Organization"},
+			OrganizationalUnit: []string{"Web Services"},
+			CommonName:         "localhost",
+		},
+		DNSNames:     []string{"localhost", "example.com", "www.example.com"},
+		IPAddresses:  []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
+		EmailAddress: []string{"admin@example.com"},
+		ValidFrom:    time.Now(),
+		ValidFor:     365 * 24 * time.Hour, // 1 year
+	}
+
+	// Sign server certificate with CA
+	fmt.Println("Signing server certificate with CA...")
+	serverCert, err := keypair.SignCertificate(caCert, caKeyPair, serverRequest, serverKeyPair.PublicKey)
+	if err != nil {
+		log.Fatalf("Failed to sign server certificate: %v", err)
+	}
+
+	// Save server certificate to file
+	err = serverCert.SaveToFile("server-cert.pem")
+	if err != nil {
+		log.Fatalf("Failed to save server certificate: %v", err)
+	}
+	fmt.Println("Server certificate saved to server-cert.pem")
+
+	// Verify server certificate against CA
+	fmt.Println("Verifying server certificate...")
+	err = keypair.VerifyCertificate(serverCert, caCert)
+	if err != nil {
+		log.Fatalf("Certificate verification failed: %v", err)
+	}
+	fmt.Println("Server certificate verification successful!")
+
+	// Create a self-signed certificate example
+	fmt.Println("Creating self-signed certificate...")
+	selfSignedKeyPair, err := keypair.GenerateECDSAKeyPair(keypair.P256)
+	if err != nil {
+		log.Fatalf("Failed to generate ECDSA key pair: %v", err)
+	}
+
+	selfSignedRequest := keypair.CertificateRequest{
+		Subject: pkix.Name{
+			Country:      []string{"US"},
+			Organization: []string{"Self-Signed Organization"},
+			CommonName:   "self-signed.example.com",
+		},
+		DNSNames:  []string{"self-signed.example.com"},
+		ValidFrom: time.Now(),
+		ValidFor:  365 * 24 * time.Hour, // 1 year
+	}
+
+	selfSignedCert, err := keypair.CreateSelfSignedCertificate(selfSignedKeyPair, selfSignedRequest)
+	if err != nil {
+		log.Fatalf("Failed to create self-signed certificate: %v", err)
+	}
+
+	err = selfSignedCert.SaveToFile("self-signed-cert.pem")
+	if err != nil {
+		log.Fatalf("Failed to save self-signed certificate: %v", err)
+	}
+	fmt.Println("Self-signed certificate saved to self-signed-cert.pem")
+
+	// Display certificate information
+	fmt.Println("\n=== Certificate Information ===")
+	fmt.Printf("CA Certificate Subject: %s\n", caCert.Certificate.Subject.CommonName)
+	fmt.Printf("CA Certificate Valid From: %s\n", caCert.Certificate.NotBefore)
+	fmt.Printf("CA Certificate Valid Until: %s\n", caCert.Certificate.NotAfter)
+	fmt.Printf("CA Certificate Is CA: %v\n", caCert.Certificate.IsCA)
+
+	fmt.Printf("\nServer Certificate Subject: %s\n", serverCert.Certificate.Subject.CommonName)
+	fmt.Printf("Server Certificate Valid From: %s\n", serverCert.Certificate.NotBefore)
+	fmt.Printf("Server Certificate Valid Until: %s\n", serverCert.Certificate.NotAfter)
+	fmt.Printf("Server Certificate DNS Names: %v\n", serverCert.Certificate.DNSNames)
+	fmt.Printf("Server Certificate IP Addresses: %v\n", serverCert.Certificate.IPAddresses)
+
+	fmt.Printf("\nSelf-Signed Certificate Subject: %s\n", selfSignedCert.Certificate.Subject.CommonName)
+	fmt.Printf("Self-Signed Certificate Valid From: %s\n", selfSignedCert.Certificate.NotBefore)
+	fmt.Printf("Self-Signed Certificate Valid Until: %s\n", selfSignedCert.Certificate.NotAfter)
+
+	fmt.Println("\nCertificate operations completed successfully!")
+}
