@@ -2,7 +2,6 @@ package keypair
 
 import (
 	"github.com/jasoet/gopki/keypair/algo"
-	"github.com/jasoet/gopki/utils"
 	"os"
 	"path/filepath"
 	"testing"
@@ -28,25 +27,25 @@ func TestRSAKeyPairFileOperations(t *testing.T) {
 		t.Fatalf("Failed to convert public key to PEM: %v", err)
 	}
 
-	err = utils.SavePEMToFile(privatePEM, privateKeyFile)
+	err = os.WriteFile(privateKeyFile, privatePEM, 0600)
 	if err != nil {
 		t.Fatalf("Failed to save private key to file: %v", err)
 	}
 
-	err = utils.SavePEMToFile(publicPEM, publicKeyFile)
+	err = os.WriteFile(publicKeyFile, publicPEM, 0600)
 	if err != nil {
 		t.Fatalf("Failed to save public key to file: %v", err)
 	}
 
-	if !utils.FileExists(privateKeyFile) {
+	if _, err := os.Stat(privateKeyFile); os.IsNotExist(err) {
 		t.Fatal("Private key file was not created")
 	}
 
-	if !utils.FileExists(publicKeyFile) {
+	if _, err := os.Stat(publicKeyFile); os.IsNotExist(err) {
 		t.Fatal("Public key file was not created")
 	}
 
-	loadedPrivatePEM, err := utils.LoadPEMFromFile(privateKeyFile)
+	loadedPrivatePEM, err := os.ReadFile(privateKeyFile)
 	if err != nil {
 		t.Fatalf("Failed to load private key from file: %v", err)
 	}
@@ -90,17 +89,17 @@ func TestECDSAKeyPairFileOperations(t *testing.T) {
 		t.Fatalf("Failed to convert public key to PEM: %v", err)
 	}
 
-	err = utils.SavePEMToFile(privatePEM, privateKeyFile)
+	err = os.WriteFile(privateKeyFile, privatePEM, 0600)
 	if err != nil {
 		t.Fatalf("Failed to save private key to file: %v", err)
 	}
 
-	err = utils.SavePEMToFile(publicPEM, publicKeyFile)
+	err = os.WriteFile(publicKeyFile, publicPEM, 0600)
 	if err != nil {
 		t.Fatalf("Failed to save public key to file: %v", err)
 	}
 
-	loadedPrivatePEM, err := utils.LoadPEMFromFile(privateKeyFile)
+	loadedPrivatePEM, err := os.ReadFile(privateKeyFile)
 	if err != nil {
 		t.Fatalf("Failed to load private key from file: %v", err)
 	}
@@ -135,17 +134,17 @@ func TestEd25519KeyPairFileOperations(t *testing.T) {
 		t.Fatalf("Failed to convert public key to PEM: %v", err)
 	}
 
-	err = utils.SavePEMToFile(privatePEM, privateKeyFile)
+	err = os.WriteFile(privateKeyFile, privatePEM, 0600)
 	if err != nil {
 		t.Fatalf("Failed to save private key to file: %v", err)
 	}
 
-	err = utils.SavePEMToFile(publicPEM, publicKeyFile)
+	err = os.WriteFile(publicKeyFile, publicPEM, 0600)
 	if err != nil {
 		t.Fatalf("Failed to save public key to file: %v", err)
 	}
 
-	loadedPrivatePEM, err := utils.LoadPEMFromFile(privateKeyFile)
+	loadedPrivatePEM, err := os.ReadFile(privateKeyFile)
 	if err != nil {
 		t.Fatalf("Failed to load private key from file: %v", err)
 	}
@@ -186,21 +185,21 @@ func TestMultipleKeyPairFiles(t *testing.T) {
 	ecdsaFile := filepath.Join(tempDir, "multi_ecdsa.pem")
 	ed25519File := filepath.Join(tempDir, "multi_ed25519.pem")
 
-	utils.SavePEMToFile(rsaPrivatePEM, rsaFile)
-	utils.SavePEMToFile(ecdsaPrivatePEM, ecdsaFile)
-	utils.SavePEMToFile(ed25519PrivatePEM, ed25519File)
+	os.WriteFile(rsaFile, rsaPrivatePEM, 0600)
+	os.WriteFile(ecdsaFile, ecdsaPrivatePEM, 0600)
+	os.WriteFile(ed25519File, ed25519PrivatePEM, 0600)
 
-	loadedRSA, err := utils.LoadPEMFromFile(rsaFile)
+	loadedRSA, err := os.ReadFile(rsaFile)
 	if err != nil {
 		t.Fatalf("Failed to load RSA key: %v", err)
 	}
 
-	loadedECDSA, err := utils.LoadPEMFromFile(ecdsaFile)
+	loadedECDSA, err := os.ReadFile(ecdsaFile)
 	if err != nil {
 		t.Fatalf("Failed to load ECDSA key: %v", err)
 	}
 
-	loadedEd25519, err := utils.LoadPEMFromFile(ed25519File)
+	loadedEd25519, err := os.ReadFile(ed25519File)
 	if err != nil {
 		t.Fatalf("Failed to load Ed25519 key: %v", err)
 	}

@@ -2,7 +2,6 @@ package keypair
 
 import (
 	"github.com/jasoet/gopki/keypair/algo"
-	"github.com/jasoet/gopki/utils"
 	"os"
 	"path/filepath"
 	"testing"
@@ -105,7 +104,7 @@ InvalidBase64DataThatCannotBeParsed!@#$%^&*()
 
 func TestFileOperationErrors(t *testing.T) {
 	t.Run("Load non-existent file", func(t *testing.T) {
-		_, err := utils.LoadPEMFromFile("/non/existent/path/file.pem")
+		_, err := os.ReadFile("/non/existent/path/file.pem")
 		if err == nil {
 			t.Fatal("Expected error when loading non-existent file")
 		}
@@ -115,7 +114,7 @@ func TestFileOperationErrors(t *testing.T) {
 		keyPair, _ := algo.GenerateRSAKeyPair(2048)
 		pemData, _ := keyPair.PrivateKeyToPEM()
 
-		err := utils.SavePEMToFile(pemData, "/invalid/directory/file.pem")
+		err := os.WriteFile("/invalid/directory/file.pem", pemData, 0600)
 		if err == nil {
 			t.Fatal("Expected error when saving to invalid directory")
 		}
@@ -140,7 +139,7 @@ func TestFileOperationErrors(t *testing.T) {
 		keyPair, _ := algo.GenerateRSAKeyPair(2048)
 		pemData, _ := keyPair.PrivateKeyToPEM()
 
-		err = utils.SavePEMToFile(pemData, filepath.Join(readOnlyDir, "test.pem"))
+		err = os.WriteFile(filepath.Join(readOnlyDir, "test.pem"), pemData, 0600)
 		if err == nil {
 			t.Fatal("Expected error when saving to read-only directory")
 		}

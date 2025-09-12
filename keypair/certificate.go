@@ -8,9 +8,9 @@ import (
 	"encoding/pem"
 	"fmt"
 	"github.com/jasoet/gopki/keypair/algo"
-	"github.com/jasoet/gopki/utils"
 	"math/big"
 	"net"
+	"os"
 	"time"
 )
 
@@ -219,11 +219,11 @@ func SignCertificate(caCert *Certificate, caKeyPair interface{}, request Certifi
 }
 
 func (c *Certificate) SaveToFile(filename string) error {
-	return utils.SavePEMToFile(c.PEMData, filename)
+	return os.WriteFile(filename, c.PEMData, 0600)
 }
 
 func LoadCertificateFromFile(filename string) (*Certificate, error) {
-	pemData, err := utils.LoadPEMFromFile(filename)
+	pemData, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load PEM data: %v", err)
 	}

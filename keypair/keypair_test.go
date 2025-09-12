@@ -5,7 +5,6 @@ import (
 	"crypto/ed25519"
 	"crypto/rsa"
 	"github.com/jasoet/gopki/keypair/algo"
-	"github.com/jasoet/gopki/utils"
 	"os"
 	"path/filepath"
 	"testing"
@@ -278,11 +277,11 @@ func TestFileExists(t *testing.T) {
 	}
 	file.Close()
 
-	if !utils.FileExists(existingFile) {
+	if _, err := os.Stat(existingFile); os.IsNotExist(err) {
 		t.Fatal("FileExists returned false for existing file")
 	}
 
-	if utils.FileExists(nonExistentFile) {
+	if _, err := os.Stat(nonExistentFile); !os.IsNotExist(err) {
 		t.Fatal("FileExists returned true for non-existent file")
 	}
 }
@@ -301,12 +300,12 @@ func TestSaveAndLoadPEMRoundtrip(t *testing.T) {
 		t.Fatalf("Failed to convert to PEM: %v", err)
 	}
 
-	err = utils.SavePEMToFile(originalPEM, testFile)
+	err = os.WriteFile(testFile, originalPEM, 0600)
 	if err != nil {
 		t.Fatalf("Failed to save PEM: %v", err)
 	}
 
-	loadedPEM, err := utils.LoadPEMFromFile(testFile)
+	loadedPEM, err := os.ReadFile(testFile)
 	if err != nil {
 		t.Fatalf("Failed to load PEM: %v", err)
 	}

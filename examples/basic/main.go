@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"github.com/jasoet/gopki/keypair/algo"
-	"github.com/jasoet/gopki/utils"
 	"log"
+	"os"
 )
 
 func main() {
@@ -24,8 +24,8 @@ func main() {
 	fmt.Printf("RSA Public Key (first 100 chars): %s...\n\n", string(rsaPublicPEM)[:100])
 
 	// Save RSA keys to files
-	utils.SavePEMToFile(rsaPrivatePEM, "rsa_private.pem")
-	utils.SavePEMToFile(rsaPublicPEM, "rsa_public.pem")
+	os.WriteFile("rsa_private.pem", rsaPrivatePEM, 0600)
+	os.WriteFile("rsa_public.pem", rsaPublicPEM, 0600)
 	fmt.Println("RSA keys saved to rsa_private.pem and rsa_public.pem")
 
 	// Generate ECDSA key pair with P256 curve
@@ -42,8 +42,8 @@ func main() {
 	fmt.Printf("ECDSA Public Key (first 100 chars): %s...\n\n", string(ecdsaPublicPEM)[:100])
 
 	// Save ECDSA keys to files
-	utils.SavePEMToFile(ecdsaPrivatePEM, "ecdsa_private.pem")
-	utils.SavePEMToFile(ecdsaPublicPEM, "ecdsa_public.pem")
+	os.WriteFile("ecdsa_private.pem", ecdsaPrivatePEM, 0600)
+	os.WriteFile("ecdsa_public.pem", ecdsaPublicPEM, 0600)
 	fmt.Println("ECDSA keys saved to ecdsa_private.pem and ecdsa_public.pem")
 
 	// Generate Ed25519 key pair
@@ -60,13 +60,13 @@ func main() {
 	fmt.Printf("Ed25519 Public Key (first 100 chars): %s...\n\n", string(ed25519PublicPEM)[:100])
 
 	// Save Ed25519 keys to files
-	utils.SavePEMToFile(ed25519PrivatePEM, "ed25519_private.pem")
-	utils.SavePEMToFile(ed25519PublicPEM, "ed25519_public.pem")
+	os.WriteFile("ed25519_private.pem", ed25519PrivatePEM, 0600)
+	os.WriteFile("ed25519_public.pem", ed25519PublicPEM, 0600)
 	fmt.Println("Ed25519 keys saved to ed25519_private.pem and ed25519_public.pem")
 
 	// Demonstrate loading keys from PEM
 	fmt.Println("\n4. Loading RSA key from PEM...")
-	loadedRSAPEM, err := utils.LoadPEMFromFile("rsa_private.pem")
+	loadedRSAPEM, err := os.ReadFile("rsa_private.pem")
 	if err != nil {
 		log.Fatal("Failed to load RSA private key:", err)
 	}
