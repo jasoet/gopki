@@ -84,7 +84,12 @@ func DetectFormat(data []byte) (KeyFormat, error) {
 
 	dataStr := string(data)
 
-	// Check for PEM format - starts with "-----BEGIN"
+	// Check for SSH private key format first (before PEM check)
+	if strings.Contains(dataStr, "-----BEGIN OPENSSH PRIVATE KEY-----") {
+		return FormatSSH, nil
+	}
+
+	// Check for PEM format - starts with "-----BEGIN" (but not SSH private key)
 	if strings.HasPrefix(dataStr, "-----BEGIN") {
 		return FormatPEM, nil
 	}
@@ -93,11 +98,6 @@ func DetectFormat(data []byte) (KeyFormat, error) {
 	if strings.HasPrefix(dataStr, "ssh-rsa ") ||
 		strings.HasPrefix(dataStr, "ssh-ed25519 ") ||
 		strings.HasPrefix(dataStr, "ecdsa-sha2-") {
-		return FormatSSH, nil
-	}
-
-	// Check for SSH private key format
-	if strings.Contains(dataStr, "-----BEGIN OPENSSH PRIVATE KEY-----") {
 		return FormatSSH, nil
 	}
 
