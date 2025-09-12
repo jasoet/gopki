@@ -13,15 +13,14 @@ import (
 func main() {
 	fmt.Println("=== GoPKI Example Usage (Unified Wrapper) ===")
 
-	// Generate RSA key pair using unified wrapper
+	// Generate RSA key pair using consolidated functions
 	fmt.Println("1. Generating RSA 2048-bit key pair...")
-	rsaKeyPair, err := keypair.NewRSAKeyPair(2048)
+	rsaPrivateKey, rsaPublicKey, err := keypair.GenerateRSAKeyPair(2048)
 	if err != nil {
 		log.Fatal("Failed to generate RSA key pair:", err)
 	}
 
-	rsaPrivatePEM, _ := keypair.PrivateKeyToPEM(rsaKeyPair)
-	rsaPublicKey := keypair.RSAPublicKeyFromPrivate(rsaKeyPair)
+	rsaPrivatePEM, _ := keypair.PrivateKeyToPEM(rsaPrivateKey)
 	rsaPublicPEM, _ := keypair.PublicKeyToPEM(rsaPublicKey)
 
 	fmt.Printf("RSA Private Key (first 100 chars): %s...\n", string(rsaPrivatePEM)[:100])
@@ -32,15 +31,14 @@ func main() {
 	os.WriteFile("rsa_public.pem", rsaPublicPEM, 0600)
 	fmt.Println("RSA keys saved to rsa_private.pem and rsa_public.pem")
 
-	// Generate ECDSA key pair using unified wrapper
+	// Generate ECDSA key pair using consolidated functions
 	fmt.Println("\n2. Generating ECDSA P-256 key pair...")
-	ecdsaKeyPair, err := keypair.NewECDSAKeyPair(algo.P256)
+	ecdsaPrivateKey, ecdsaPublicKey, err := keypair.GenerateECDSAKeyPair(algo.P256)
 	if err != nil {
 		log.Fatal("Failed to generate ECDSA key pair:", err)
 	}
 
-	ecdsaPrivatePEM, _ := keypair.PrivateKeyToPEM(ecdsaKeyPair)
-	ecdsaPublicKey := keypair.ECDSAPublicKeyFromPrivate(ecdsaKeyPair)
+	ecdsaPrivatePEM, _ := keypair.PrivateKeyToPEM(ecdsaPrivateKey)
 	ecdsaPublicPEM, _ := keypair.PublicKeyToPEM(ecdsaPublicKey)
 
 	fmt.Printf("ECDSA Private Key (first 100 chars): %s...\n", string(ecdsaPrivatePEM)[:100])
@@ -51,15 +49,14 @@ func main() {
 	os.WriteFile("ecdsa_public.pem", ecdsaPublicPEM, 0600)
 	fmt.Println("ECDSA keys saved to ecdsa_private.pem and ecdsa_public.pem")
 
-	// Generate Ed25519 key pair using unified wrapper
+	// Generate Ed25519 key pair using consolidated functions
 	fmt.Println("\n3. Generating Ed25519 key pair...")
-	ed25519KeyPair, err := keypair.NewEd25519KeyPair()
+	ed25519PrivateKey, ed25519PublicKey, err := keypair.GenerateEd25519KeyPair()
 	if err != nil {
 		log.Fatal("Failed to generate Ed25519 key pair:", err)
 	}
 
-	ed25519PrivatePEM, _ := keypair.PrivateKeyToPEM(ed25519KeyPair)
-	ed25519PublicKey := keypair.Ed25519PublicKeyFromPrivate(ed25519KeyPair)
+	ed25519PrivatePEM, _ := keypair.PrivateKeyToPEM(ed25519PrivateKey)
 	ed25519PublicPEM, _ := keypair.PublicKeyToPEM(ed25519PublicKey)
 
 	fmt.Printf("Ed25519 Private Key (first 100 chars): %s...\n", string(ed25519PrivatePEM)[:100])
@@ -78,16 +75,16 @@ func main() {
 	}
 
 	// Load using generics with type safety
-	loadedRSAKeyPair, err := keypair.ParsePrivateKeyFromPEM[*rsa.PrivateKey](loadedRSAPEM)
+	loadedRSAPrivateKey, err := keypair.ParsePrivateKeyFromPEM[*rsa.PrivateKey](loadedRSAPEM)
 	if err != nil {
 		log.Fatal("Failed to parse RSA key from PEM:", err)
 	}
 
-	fmt.Printf("Successfully loaded RSA key pair. Key size: %d bits\n", loadedRSAKeyPair.Size()*8)
+	fmt.Printf("Successfully loaded RSA key pair. Key size: %d bits\n", loadedRSAPrivateKey.Size()*8)
 
 	// Demonstrate that we can load any algorithm without specifying it
 	fmt.Println("\n5. Demonstrating auto-detection for all algorithms...")
-	
+
 	testFiles := map[string]string{
 		"RSA":     "rsa_private.pem",
 		"ECDSA":   "ecdsa_private.pem",
@@ -108,7 +105,7 @@ func main() {
 		}
 
 		fmt.Printf("   %s: Auto-detected as %s ✓\n", filename, detectedAlgorithm)
-		
+
 		if detectedAlgorithm == expectedAlgo {
 			fmt.Printf("   Algorithm detection correct! ✓\n")
 		} else {

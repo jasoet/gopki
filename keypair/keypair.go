@@ -11,6 +11,10 @@ import (
 	"os"
 )
 
+type KeyPair interface {
+	*algo.RSAKeyPair | *algo.ECDSAKeyPair | *algo.Ed25519KeyPair
+}
+
 type PublicKey interface {
 	*rsa.PublicKey | *ecdsa.PublicKey | ed25519.PublicKey
 }
