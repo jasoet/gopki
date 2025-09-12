@@ -8,17 +8,19 @@ import (
 	"fmt"
 )
 
+type KeySize int
+
 type RSAKeyPair struct {
 	PrivateKey *rsa.PrivateKey
 	PublicKey  *rsa.PublicKey
 }
 
-func GenerateRSAKeyPair(keySize int) (*RSAKeyPair, error) {
+func GenerateRSAKeyPair(keySize KeySize) (*RSAKeyPair, error) {
 	if keySize < 2048 {
 		return nil, fmt.Errorf("RSA key size must be at least 2048 bits")
 	}
 
-	privateKey, err := rsa.GenerateKey(rand.Reader, keySize)
+	privateKey, err := rsa.GenerateKey(rand.Reader, int(keySize))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate RSA private key: %w", err)
 	}

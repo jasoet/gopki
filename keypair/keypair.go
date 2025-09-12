@@ -9,7 +9,12 @@ import (
 	"fmt"
 	"github.com/jasoet/gopki/keypair/algo"
 	"os"
+	"path/filepath"
 )
+
+type Param interface {
+	algo.KeySize | algo.ECDSACurve | algo.Ed25519Config
+}
 
 type KeyPair interface {
 	*algo.RSAKeyPair | *algo.ECDSAKeyPair | *algo.Ed25519KeyPair
@@ -21,6 +26,45 @@ type PublicKey interface {
 
 type PrivateKey interface {
 	*rsa.PrivateKey | *ecdsa.PrivateKey | ed25519.PrivateKey
+}
+
+func ValidatePEMFormat(pemData []byte) error {
+	block, _ := pem.Decode(pemData)
+	if block == nil {
+		return fmt.Errorf("invalid PEM format")
+	}
+
+	if block.Type != "PUBLIC KEY" && block.Type != "PRIVATE KEY" {
+		return fmt.Errorf("unsupported PEM type: %s", block.Type)
+	}
+
+	return nil
+}
+
+func GenerateKeyPair[T Param, K KeyPair](param T) (K, error) {
+	var zero K
+	switch par := any(param).(type) {
+	case algo.KeySize:
+		kp, err := algo.GenerateRSAKeyPair(par)
+		if err != nil {
+			return zero, fmt.Errorf("failed to generate RSA key pair: %w", err)
+		}
+		return any(kp).(K), nil
+	case algo.ECDSACurve:
+		kp, err := algo.GenerateECDSAKeyPair(par)
+		if err != nil {
+			return zero, fmt.Errorf("failed to generate ECDSA key pair: %w", err)
+		}
+		return any(kp).(K), nil
+	case algo.Ed25519Config:
+		kp, err := algo.GenerateEd25519KeyPair()
+		if err != nil {
+			return zero, fmt.Errorf("failed to generate Ed25519 key pair: %w", err)
+		}
+		return any(kp).(K), nil
+	default:
+		return zero, fmt.Errorf("unsupported parameter type")
+	}
 }
 
 func ParsePublicKeyFromPEM[T PublicKey](pemData []byte) (T, error) {
@@ -73,48 +117,6 @@ func ParsePrivateKeyFromPEM[T PrivateKey](pemData []byte) (T, error) {
 	return typedKey, nil
 }
 
-func ValidatePEMFormat(pemData []byte) error {
-	block, _ := pem.Decode(pemData)
-	if block == nil {
-		return fmt.Errorf("invalid PEM format")
-	}
-
-	if block.Type != "PUBLIC KEY" && block.Type != "PRIVATE KEY" {
-		return fmt.Errorf("unsupported PEM type: %s", block.Type)
-	}
-
-	return nil
-}
-
-func GenerateRSAKeyPair(keySize int) (*rsa.PrivateKey, *rsa.PublicKey, error) {
-	keyPair, err := algo.GenerateRSAKeyPair(keySize)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate RSA key pair: %w", err)
-	}
-
-	return keyPair.PrivateKey, keyPair.PublicKey, nil
-}
-
-func GenerateECDSAKeyPair(curve algo.ECDSACurve) (*ecdsa.PrivateKey, *ecdsa.PublicKey, error) {
-
-	keyPair, err := algo.GenerateECDSAKeyPair(curve)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate ECDSA key pair: %w", err)
-	}
-
-	return keyPair.PrivateKey, keyPair.PublicKey, nil
-}
-
-func GenerateEd25519KeyPair() (ed25519.PrivateKey, ed25519.PublicKey, error) {
-
-	keyPair, err := algo.GenerateEd25519KeyPair()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate Ed25519 key pair: %w", err)
-	}
-
-	return keyPair.PrivateKey, keyPair.PublicKey, nil
-}
-
 func PrivateKeyToPEM[T PrivateKey](privateKey T) ([]byte, error) {
 	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
 	if err != nil {
@@ -164,73 +166,97 @@ func GetPublicKey[TPriv PrivateKey, TPub PublicKey](privateKey TPriv) (TPub, err
 	return zero, fmt.Errorf("unsupported key type or type mismatch")
 }
 
-func ConvertKeyPairToPEM[TPriv PrivateKey, TPub PublicKey](privateKey TPriv, publicKey TPub) (privatePEM, publicPEM []byte, err error) {
-	privatePEM, err = PrivateKeyToPEM(privateKey)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert private key to PEM: %w", err)
-	}
+func PrivateKeyFromPEM[T PrivateKey](pemData []byte) (T, string, error) {
+	var zero T
 
-	publicPEM, err = PublicKeyToPEM(publicKey)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert public key to PEM: %w", err)
-	}
-
-	return privatePEM, publicPEM, nil
-}
-
-func DetectAlgorithmFromPEM(pemData []byte) (string, error) {
-	if _, err := ParsePrivateKeyFromPEM[*rsa.PrivateKey](pemData); err == nil {
-		return "RSA", nil
-	}
-
-	if _, err := ParsePrivateKeyFromPEM[*ecdsa.PrivateKey](pemData); err == nil {
-		return "ECDSA", nil
-	}
-
-	if _, err := ParsePrivateKeyFromPEM[ed25519.PrivateKey](pemData); err == nil {
-		return "Ed25519", nil
-	}
-
-	return "", fmt.Errorf("unable to detect algorithm: unsupported or invalid key format")
-}
-
-func ParseAnyPrivateKeyFromPEM(pemData []byte) (privateKey interface{}, algorithm string, err error) {
-	// Try RSA
 	if rsaKey, err := ParsePrivateKeyFromPEM[*rsa.PrivateKey](pemData); err == nil {
-		return rsaKey, "RSA", nil
+		if typedKey, ok := any(rsaKey).(T); ok {
+			return typedKey, "RSA", nil
+		}
 	}
 
-	// Try ECDSA
 	if ecdsaKey, err := ParsePrivateKeyFromPEM[*ecdsa.PrivateKey](pemData); err == nil {
-		return ecdsaKey, "ECDSA", nil
+		if typedKey, ok := any(ecdsaKey).(T); ok {
+			return typedKey, "ECDSA", nil
+		}
 	}
 
-	// Try Ed25519
 	if ed25519Key, err := ParsePrivateKeyFromPEM[ed25519.PrivateKey](pemData); err == nil {
-		return ed25519Key, "Ed25519", nil
+		if typedKey, ok := any(ed25519Key).(T); ok {
+			return typedKey, "Ed25519", nil
+		}
 	}
 
-	return nil, "", fmt.Errorf("unable to parse private key: unsupported algorithm or invalid format")
+	return zero, "", fmt.Errorf("unable to parse private key: unsupported algorithm or invalid format")
 }
 
-func SaveKeyPairToFiles[TPriv PrivateKey, TPub PublicKey](privateKey TPriv, publicKey TPub, privateFile, publicFile string) error {
-	privatePEM, publicPEM, err := ConvertKeyPairToPEM(privateKey, publicKey)
-	if err != nil {
-		return fmt.Errorf("failed to convert keys to PEM: %w", err)
+func KeyPairToFiles[T KeyPair](keyPair T, privateFile, publicFile string) error {
+	var privateKeyPEM, publicKeyPEM []byte
+	var err error
+
+	switch kp := any(keyPair).(type) {
+	case *algo.RSAKeyPair:
+		privateKeyPEM, err = PrivateKeyToPEM(kp.PrivateKey)
+		if err != nil {
+			return fmt.Errorf("failed to convert RSA private key to PEM: %w", err)
+		}
+		publicKeyPEM, err = PublicKeyToPEM(&kp.PrivateKey.PublicKey)
+		if err != nil {
+			return fmt.Errorf("failed to convert RSA public key to PEM: %w", err)
+		}
+	case *algo.ECDSAKeyPair:
+		privateKeyPEM, err = PrivateKeyToPEM(kp.PrivateKey)
+		if err != nil {
+			return fmt.Errorf("failed to convert ECDSA private key to PEM: %w", err)
+		}
+		publicKeyPEM, err = PublicKeyToPEM(&kp.PrivateKey.PublicKey)
+		if err != nil {
+			return fmt.Errorf("failed to convert ECDSA public key to PEM: %w", err)
+		}
+	case *algo.Ed25519KeyPair:
+		privateKeyPEM, err = PrivateKeyToPEM(kp.PrivateKey)
+		if err != nil {
+			return fmt.Errorf("failed to convert Ed25519 private key to PEM: %w", err)
+		}
+		publicKeyPEM, err = PublicKeyToPEM(kp.PublicKey)
+		if err != nil {
+			return fmt.Errorf("failed to convert Ed25519 public key to PEM: %w", err)
+		}
+	default:
+		return fmt.Errorf("unsupported key pair type")
 	}
 
-	if err := savePEMToFile(privatePEM, privateFile); err != nil {
+	if err := savePEMToFile(privateKeyPEM, privateFile); err != nil {
 		return fmt.Errorf("failed to save private key: %w", err)
 	}
 
-	if err := savePEMToFile(publicPEM, publicFile); err != nil {
+	if err := savePEMToFile(publicKeyPEM, publicFile); err != nil {
 		return fmt.Errorf("failed to save public key: %w", err)
 	}
 
 	return nil
 }
 
-// Helper function for saving PEM to file
 func savePEMToFile(pemData []byte, filename string) error {
-	return os.WriteFile(filename, pemData, 0600)
+	dir := filepath.Dir(filename)
+
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	if _, err := os.Stat(filename); err == nil {
+		file, err := os.OpenFile(filename, os.O_WRONLY, 0600)
+		if err != nil {
+			return fmt.Errorf("no write permission for existing file %s: %w", filename, err)
+		}
+		file.Close()
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to check file status %s: %w", filename, err)
+	}
+
+	if err := os.WriteFile(filename, pemData, 0600); err != nil {
+		return fmt.Errorf("failed to write file %s: %w", filename, err)
+	}
+
+	return nil
 }

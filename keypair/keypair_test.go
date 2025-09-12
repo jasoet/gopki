@@ -338,7 +338,7 @@ func TestParseAnyPrivateKeyFromPEM(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			key, algorithm, err := ParseAnyPrivateKeyFromPEM(tc.pemData)
+			key, algorithm, err := PrivateKeyFromPEM(tc.pemData)
 			if err != nil {
 				t.Fatalf("Failed to parse %s key: %v", tc.name, err)
 			}
@@ -427,7 +427,7 @@ func TestInvalidInputs(t *testing.T) {
 		t.Error("Expected error for invalid PEM data")
 	}
 
-	_, _, err = ParseAnyPrivateKeyFromPEM(invalidPEM)
+	_, _, err = PrivateKeyFromPEM(invalidPEM)
 	if err == nil {
 		t.Error("Expected error for invalid PEM data")
 	}

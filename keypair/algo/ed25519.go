@@ -8,6 +8,8 @@ import (
 	"fmt"
 )
 
+type Ed25519Config string
+
 type Ed25519KeyPair struct {
 	PrivateKey ed25519.PrivateKey
 	PublicKey  ed25519.PublicKey

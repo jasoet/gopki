@@ -194,7 +194,7 @@ func demonstrateAlgorithmDetection() {
 		fmt.Printf("   %s key detected as: %s ✓\n", name, algorithm)
 
 		// Parse without knowing the type
-		parsedKey, detectedAlgo, err := keypair.ParseAnyPrivateKeyFromPEM(pemData)
+		parsedKey, detectedAlgo, err := keypair.PrivateKeyFromPEM(pemData)
 		if err != nil {
 			log.Printf("Failed to parse %s key: %v", name, err)
 			continue

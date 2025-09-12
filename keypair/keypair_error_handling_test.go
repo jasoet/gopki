@@ -22,7 +22,7 @@ func TestRSAKeySizeEdgeCases(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			_, err := algo.GenerateRSAKeyPair(tc.keySize)
+			_, err := algo.GenerateRSAKeyPair(algo.KeySize(tc.keySize))
 			if tc.expectError && err == nil {
 				t.Fatalf("Expected error for %s but got none", tc.description)
 			}
