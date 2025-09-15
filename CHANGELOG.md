@@ -1,3 +1,35 @@
+## [1.1.0](https://github.com/jasoet/gopki/compare/v1.0.0...v1.1.0) (2025-09-15)
+
+
+### ✨ Features
+
+* complete PKCS[#7](https://github.com/jasoet/gopki/issues/7)/CMS signature format implementation ([1b1629b](https://github.com/jasoet/gopki/commit/1b1629b05e158c7bf071de02ad12c38098590f2d))
+* **signing:** implement document signing module ([7ec4c58](https://github.com/jasoet/gopki/commit/7ec4c584e63e81e6971c7337676794b0b9e28b40)), closes [PKCS#7](https://github.com/jasoet/PKCS/issues/7)
+
+
+### 🐛 Bug Fixes
+
+* remove redundant newline in example output ([76efb7c](https://github.com/jasoet/gopki/commit/76efb7c5d0c6713344739e81a69f5c09cdaa523b))
+
+
+### 📚 Documentation
+
+* integrate signing module documentation ([25fd22f](https://github.com/jasoet/gopki/commit/25fd22f77e7bb6c6a46f45785e7dbb43e1f6c9e4))
+* refactor documentation to eliminate redundancy ([dfda7b6](https://github.com/jasoet/gopki/commit/dfda7b6aaef1070c6c832fc583bcc0221405d9a8))
+
+
+### ♻️ Refactoring
+
+* improve output directory structure and update legacy code ([79ed698](https://github.com/jasoet/gopki/commit/79ed6985a5bf23f816796257a2e40f9a92308002)), closes [PKCS#7](https://github.com/jasoet/PKCS/issues/7) [PKCS#7](https://github.com/jasoet/PKCS/issues/7) [PKCS#7](https://github.com/jasoet/PKCS/issues/7)
+* reorganize keypair example with proper directory structure ([4084f67](https://github.com/jasoet/gopki/commit/4084f672db248e98a748ede8e3ce14cdec5050ac))
+* standardize certificates example output directory structure ([2cd95e8](https://github.com/jasoet/gopki/commit/2cd95e8553aabac17fa5aabe7471707a6c6e0025))
+
+
+### 🔧 Miscellaneous
+
+* add signatures/ directory to gitignore ([40be218](https://github.com/jasoet/gopki/commit/40be2188e57ddc77080fd58f9d456023c2e4bf2e))
+* remove certificate files from git tracking ([e675d51](https://github.com/jasoet/gopki/commit/e675d51b0687af63da074c192259855541c3d76c))
+
 ## 1.0.0 (2025-09-15)
 
 
