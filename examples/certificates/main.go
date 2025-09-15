@@ -17,8 +17,8 @@ func main() {
 	fmt.Println("=== GoPKI Certificate Examples ===")
 
 	// Create outputs directory
-	if err := os.MkdirAll("certs", 0755); err != nil {
-		log.Fatal("Failed to create certs directory:", err)
+	if err := os.MkdirAll("output", 0755); err != nil {
+		log.Fatal("Failed to create output directory:", err)
 	}
 
 	// Generate a key pair for the CA using unified API
@@ -48,11 +48,11 @@ func main() {
 	}
 
 	// Save CA certificate to file
-	err = caCert.SaveToFile("certs/ca-cert.pem")
+	err = caCert.SaveToFile("output/ca-cert.pem")
 	if err != nil {
 		log.Fatalf("Failed to save CA certificate: %v", err)
 	}
-	fmt.Println("CA certificate saved to certs/ca-cert.pem")
+	fmt.Println("CA certificate saved to output/ca-cert.pem")
 
 	// Generate a key pair for the server certificate using unified API
 	fmt.Println("Generating server key pair...")
@@ -84,11 +84,11 @@ func main() {
 	}
 
 	// Save server certificate to file
-	err = serverCert.SaveToFile("certs/server-cert.pem")
+	err = serverCert.SaveToFile("output/server-cert.pem")
 	if err != nil {
 		log.Fatalf("Failed to save server certificate: %v", err)
 	}
-	fmt.Println("Server certificate saved to certs/server-cert.pem")
+	fmt.Println("Server certificate saved to output/server-cert.pem")
 
 	// Verify server certificate against CA
 	fmt.Println("Verifying server certificate...")
@@ -121,25 +121,25 @@ func main() {
 		log.Fatalf("Failed to create self-signed certificate: %v", err)
 	}
 
-	err = selfSignedCert.SaveToFile("certs/self-signed-cert.pem")
+	err = selfSignedCert.SaveToFile("output/self-signed-cert.pem")
 	if err != nil {
 		log.Fatalf("Failed to save self-signed certificate: %v", err)
 	}
-	fmt.Println("Self-signed certificate saved to certs/self-signed-cert.pem")
+	fmt.Println("Self-signed certificate saved to output/self-signed-cert.pem")
 
 	// Save key pairs to files as well
 	fmt.Println("Saving key pairs...")
-	err = keypair.ToFiles(caKeyPair, "certs/ca_private.pem", "certs/ca_public.pem")
+	err = keypair.ToFiles(caKeyPair, "output/ca_private.pem", "output/ca_public.pem")
 	if err != nil {
 		log.Fatalf("Failed to save CA key pair: %v", err)
 	}
 
-	err = keypair.ToFiles(serverKeyPair, "certs/server_private.pem", "certs/server_public.pem")
+	err = keypair.ToFiles(serverKeyPair, "output/server_private.pem", "output/server_public.pem")
 	if err != nil {
 		log.Fatalf("Failed to save server key pair: %v", err)
 	}
 
-	err = keypair.ToFiles(selfSignedKeyPair, "certs/selfsigned_private.pem", "certs/selfsigned_public.pem")
+	err = keypair.ToFiles(selfSignedKeyPair, "output/selfsigned_private.pem", "output/selfsigned_public.pem")
 	if err != nil {
 		log.Fatalf("Failed to save self-signed key pair: %v", err)
 	}
@@ -163,13 +163,13 @@ func main() {
 
 	fmt.Println("\n=== Generated Files ===")
 	fmt.Println("Certificates:")
-	fmt.Println("  - certs/ca-cert.pem")
-	fmt.Println("  - certs/server-cert.pem")
-	fmt.Println("  - certs/self-signed-cert.pem")
+	fmt.Println("  - output/ca-cert.pem")
+	fmt.Println("  - output/server-cert.pem")
+	fmt.Println("  - output/self-signed-cert.pem")
 	fmt.Println("Key Pairs:")
-	fmt.Println("  - certs/ca_private.pem, certs/ca_public.pem")
-	fmt.Println("  - certs/server_private.pem, certs/server_public.pem")
-	fmt.Println("  - certs/selfsigned_private.pem, certs/selfsigned_public.pem")
+	fmt.Println("  - output/ca_private.pem, output/ca_public.pem")
+	fmt.Println("  - output/server_private.pem, output/server_public.pem")
+	fmt.Println("  - output/selfsigned_private.pem, output/selfsigned_public.pem")
 
 	fmt.Println("\n=== Certificate operations completed successfully! ===")
 }

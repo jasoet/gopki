@@ -7,12 +7,14 @@ A type-safe Go library for Public Key Infrastructure (PKI) operations using gene
 - **Type-Safe Cryptography**: Generic constraints ensure compile-time type safety
 - **Multi-Algorithm Support**: RSA, ECDSA (P-224/P-256/P-384/P-521), and Ed25519
 - **Complete PKI**: Self-signed certificates, CA certificates, certificate chains
+- **Document Signing**: Sign and verify documents with certificate-based signatures
 - **Production Ready**: PEM/DER formats, file operations, certificate verification
 
 ## Documentation
 
 - **📘 [KeyPair Module](docs/KeyPair.md)** - Cryptographic key pair generation and management
 - **📗 [Certificate Module](docs/Certificate.md)** - X.509 certificate creation and PKI operations
+- **📙 [Signing Module](docs/Signing.md)** - Document signing and signature verification
 
 ## Installation
 
@@ -77,17 +79,29 @@ GoPKI/
 
 The library uses Go generics for type safety across all cryptographic operations.
 
+### Document Signing Example
+
+```go
+// Sign a document
+signature, err := signing.SignData(document, keyPair, certificate)
+
+// Verify signature
+err = signing.VerifySignature(document, signature, signing.DefaultVerifyOptions())
+```
+
 ## Examples
 
 The `examples/` directory contains working demonstrations:
 
 - **`examples/main.go`** - Basic key generation and certificate creation
 - **`examples/certificates/`** - Advanced PKI with CA hierarchies
+- **`examples/signing/`** - Document signing and verification with all algorithms
 
 ```bash
 # Run examples
-cd examples && go run main.go
-cd examples/certificates && go run main.go
+cd examples && go run main.go                    # Basic keypairs and certificates
+cd examples/certificates && go run main.go      # Advanced PKI operations
+cd examples/signing && go run main.go          # Document signing with all algorithms
 ```
 
 ## Development

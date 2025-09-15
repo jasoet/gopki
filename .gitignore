@@ -213,11 +213,18 @@ sim_output
 *.db-wal
 
 aof/
-# Generated PEM files from examples
+# Generated files from examples
 examples/output/
-examples/certificates/certs/
+examples/certificates/output/
+examples/keypair/output/
+examples/signing/output/
 *.pem
 format_output/
+
+# Example binaries
+examples/keypair/keypair
+examples/signing/signing
+examples/certificates/certificates
 
 # Node.js / Semantic Release
 node_modules/

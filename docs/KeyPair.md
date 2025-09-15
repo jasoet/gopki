@@ -2,6 +2,8 @@
 
 Type-safe cryptographic key pair generation and management for RSA, ECDSA, and Ed25519 algorithms.
 
+> 📖 **Related Documentation**: [Certificate Module](Certificate.md) | [Signing Module](Signing.md) | [Main README](../README.md)
+
 ## Table of Contents
 - [Cryptographic Theory](#cryptographic-theory)
 - [Type System](#type-system)
@@ -492,6 +494,14 @@ func demonstrateAlgorithmDetection() {
 }
 ```
 
+## Integration with Other Modules
+
+Generated key pairs work seamlessly with:
+- **[Certificate Module](Certificate.md)**: Create certificates using any key algorithm
+- **[Signing Module](Signing.md)**: Sign documents with RSA, ECDSA, or Ed25519 keys
+
 ---
+
+> 📖 **Related Documentation**: [Certificate Module](Certificate.md) | [Signing Module](Signing.md) | [Main README](../README.md)
 
 For complete project documentation and development commands, see the main [README](../README.md).

@@ -2,6 +2,8 @@
 
 X.509 certificate creation and management with support for self-signed certificates, Certificate Authorities (CAs), and complex PKI hierarchies.
 
+> 📖 **Related Documentation**: [KeyPair Module](KeyPair.md) | [Signing Module](Signing.md) | [Main README](../README.md)
+
 ## Table of Contents
 - [PKI Theory](#pki-theory)
 - [Certificate Types](#certificate-types)
@@ -866,6 +868,14 @@ func demonstrateDifferentAlgorithmsExample() {
 }
 ```
 
+## Integration with Other Modules
+
+Certificates work seamlessly with:
+- **[KeyPair Module](KeyPair.md)**: Generate certificates using any supported key algorithm
+- **[Signing Module](Signing.md)**: Use certificates for document signing and verification
+
 ---
+
+> 📖 **Related Documentation**: [KeyPair Module](KeyPair.md) | [Signing Module](Signing.md) | [Main README](../README.md)
 
 For complete project documentation and development commands, see the main [README](../README.md).
