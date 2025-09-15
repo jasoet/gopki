@@ -215,7 +215,7 @@ sim_output
 aof/
 # Generated files from examples
 examples/output/
-examples/certificates/certs/
+examples/certificates/output/
 examples/keypair/output/
 examples/signing/output/
 *.pem
