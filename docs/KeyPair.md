@@ -81,6 +81,21 @@ type PrivateKey interface {
 
 ## API Reference
 
+### Type Definitions
+
+#### `type PEM []byte`
+Type alias for PEM-encoded data. This provides type safety and clarity when working with PEM-formatted keys and certificates.
+
+**Usage:**
+```go
+// Converting []byte to PEM type
+pemData := keypair.PEM(fileData)
+
+// PEM type is returned by conversion functions
+var privatePEM keypair.PEM
+privatePEM, err := keypair.PrivateKeyToPEM(privateKey)
+```
+
 ### Key Generation
 
 #### `GenerateKeyPair[T Param, K KeyPair](param T) (K, error)`
@@ -104,16 +119,16 @@ ed25519KeyPair, err := keypair.GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519
 
 ### PEM Operations
 
-#### `PrivateKeyToPEM[T PrivateKey](privateKey T) ([]byte, error)`
+#### `PrivateKeyToPEM[T PrivateKey](privateKey T) (PEM, error)`
 Converts a private key to PEM format.
 
-#### `PublicKeyToPEM[T PublicKey](publicKey T) ([]byte, error)`
+#### `PublicKeyToPEM[T PublicKey](publicKey T) (PEM, error)`
 Converts a public key to PEM format.
 
-#### `ParsePrivateKeyFromPEM[T PrivateKey](pemData []byte) (T, error)`
+#### `ParsePrivateKeyFromPEM[T PrivateKey](pemData PEM) (T, error)`
 Parses a private key from PEM data with type safety.
 
-#### `PrivateKeyFromPEM[T PrivateKey](pemData []byte) (T, string, error)`
+#### `PrivateKeyFromPEM[T PrivateKey](pemData PEM) (T, string, error)`
 Parses a private key and returns the detected algorithm.
 
 ### File Operations
@@ -123,7 +138,7 @@ Saves a key pair to files with proper permissions (0600 for private keys).
 
 ### Utility Functions
 
-#### `ValidatePEMFormat(pemData []byte) error`
+#### `ValidatePEMFormat(pemData PEM) error`
 Validates that data is in proper PEM format.
 
 #### `GetPublicKey[TPriv PrivateKey, TPub PublicKey](privateKey TPriv) (TPub, error)`
@@ -232,7 +247,7 @@ func demonstrateFileOperations() {
     }
     
     // Parse with type safety
-    loadedKey, err := keypair.ParsePrivateKeyFromPEM[*rsa.PrivateKey](privateData)
+    loadedKey, err := keypair.ParsePrivateKeyFromPEM[*rsa.PrivateKey](keypair.PEM(privateData))
     if err != nil {
         log.Fatal(err)
     }
@@ -262,9 +277,9 @@ func demonstrateAlgorithmDetection() {
     
     // Test algorithm detection
     for name, key := range keys {
-        var pemData []byte
+        var pemData keypair.PEM
         var err error
-        
+
         // Convert to PEM based on type
         switch k := key.(type) {
         case *rsa.PrivateKey:
@@ -435,7 +450,7 @@ func demonstrateFileOperations() {
     
     // Load and verify
     privateData, _ := os.ReadFile("demo_private.pem")
-    loadedKey, _ := keypair.ParsePrivateKeyFromPEM[*rsa.PrivateKey](privateData)
+    loadedKey, _ := keypair.ParsePrivateKeyFromPEM[*rsa.PrivateKey](keypair.PEM(privateData))
     
     if loadedKey.Size() == keyPair.PrivateKey.Size() {
         fmt.Println("✓ File round-trip successful")
@@ -459,8 +474,8 @@ func demonstrateAlgorithmDetection() {
     }
     
     for name, key := range keys {
-        var pemData []byte
-        
+        var pemData keypair.PEM
+
         switch k := key.(type) {
         case *rsa.PrivateKey:
             pemData, _ = keypair.PrivateKeyToPEM(k)
@@ -481,5 +496,43 @@ func demonstrateAlgorithmDetection() {
     }
 }
 ```
+
+## Development and Testing
+
+### Quick Start
+```bash
+# Install Task for development workflows
+brew install go-task/tap/go-task  # macOS
+# or see https://taskfile.dev/installation/
+
+# Setup the project
+task setup
+
+# Run tests for the keypair module
+task test:keypair
+
+# Run all tests with coverage
+task test:coverage
+
+# Format and check code
+task format
+task lint
+```
+
+### Working with Examples
+```bash
+# Run the basic keypair examples
+task dev
+
+# Build example binaries
+task build:examples
+
+# Clean generated files
+task clean
+```
+
+For more development commands, run `task` to see all available tasks.
+
+---
 
 This documentation provides a complete guide to using the GoPKI KeyPair module, from basic theory to practical examples. The generic type system ensures compile-time safety while supporting multiple cryptographic algorithms in a unified interface.

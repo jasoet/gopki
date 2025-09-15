@@ -70,7 +70,7 @@ func TestDetectFormat(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			format, err := DetectFormat(tt.data)
-			
+
 			if tt.hasError && err == nil {
 				t.Errorf("Expected error but got none")
 			}
@@ -138,8 +138,8 @@ func TestPrivateKeyToDER_ECDSA(t *testing.T) {
 
 	// Verify curve matches
 	if parsedKey.Curve.Params().Name != ecdsaKeyPair.PrivateKey.Curve.Params().Name {
-		t.Errorf("Curves don't match: original %s, parsed %s", 
-			ecdsaKeyPair.PrivateKey.Curve.Params().Name, 
+		t.Errorf("Curves don't match: original %s, parsed %s",
+			ecdsaKeyPair.PrivateKey.Curve.Params().Name,
 			parsedKey.Curve.Params().Name)
 	}
 }
@@ -169,7 +169,7 @@ func TestPrivateKeyToDER_Ed25519(t *testing.T) {
 
 	// Verify key length matches
 	if len(parsedKey) != len(ed25519KeyPair.PrivateKey) {
-		t.Errorf("Key lengths don't match: original %d, parsed %d", 
+		t.Errorf("Key lengths don't match: original %d, parsed %d",
 			len(ed25519KeyPair.PrivateKey), len(parsedKey))
 	}
 }
@@ -363,7 +363,7 @@ func TestGetKeyTypeFromDER(t *testing.T) {
 
 func TestFormatError(t *testing.T) {
 	err := NewFormatError(FormatDER, "test error", nil)
-	
+
 	expectedMsg := "DER format error: test error"
 	if err.Error() != expectedMsg {
 		t.Errorf("Expected error message %q, got %q", expectedMsg, err.Error())

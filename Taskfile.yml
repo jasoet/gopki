@@ -1,0 +1,340 @@
+version: '3'
+
+vars:
+  MODULE: github.com/jasoet/gopki
+  GO_FILES:
+    sh: find . -type f -name '*.go' -not -path './vendor/*' -not -path './.git/*' | head -20
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+    silent: true
+
+  # Setup and Dependencies
+  setup:
+    desc: Initial project setup - download dependencies and verify module
+    cmds:
+      - go mod download
+      - go mod verify
+      - go mod tidy
+      - 'echo "✅ Project setup complete"'
+    silent: true
+
+  # Build Tasks
+  build:
+    desc: Build the module and verify compilation
+    sources:
+      - '**/*.go'
+      - go.mod
+      - go.sum
+    cmds:
+      - go build ./...
+      - 'echo "✅ Build successful"'
+    silent: true
+
+  build:examples:
+    desc: Build example binaries
+    deps: [build]
+    cmds:
+      - go build -o bin/basic-example ./examples/main.go
+      - go build -o bin/certificates-example ./examples/certificates/main.go
+      - 'echo "✅ Examples built in bin/ directory"'
+    generates:
+      - bin/basic-example
+      - bin/certificates-example
+    silent: true
+
+  # Development Tasks
+  dev:
+    desc: Run basic example in development mode
+    deps: [build]
+    cmds:
+      - go run ./examples/main.go
+
+  dev:certs:
+    desc: Run certificate examples in development mode
+    deps: [build]
+    cmds:
+      - go run ./examples/certificates/main.go
+
+  # Testing Tasks
+  test:
+    desc: Run all tests
+    env:
+      CGO_ENABLED: 1
+    cmds:
+      - go test ./... -race
+
+  test:verbose:
+    desc: Run all tests with verbose output
+    cmds:
+      - go test -v ./... -race
+
+  test:coverage:
+    desc: Run tests with coverage report
+    cmds:
+      - go test -coverprofile=coverage.out ./...
+      - go tool cover -html=coverage.out -o coverage.html
+      - 'echo "✅ Coverage report generated: coverage.html"'
+    generates:
+      - coverage.out
+      - coverage.html
+    silent: true
+
+  test:keypair:
+    desc: Run keypair module tests
+    cmds:
+      - go test ./keypair -v
+
+  test:cert:
+    desc: Run certificate module tests
+    cmds:
+      - go test ./cert -v
+
+  test:format:
+    desc: Run format module tests
+    cmds:
+      - go test ./keypair/format -v
+
+  test:specific:
+    desc: Run specific test function (usage - task test:specific -- TestGenerateRSAKeyPair)
+    cmds:
+      - go test -run {{.CLI_ARGS}} ./... -v
+
+  # Code Quality Tasks
+  lint:
+    desc: Run static analysis with go vet
+    cmds:
+      - go vet ./...
+      - 'echo "✅ Linting complete"'
+    silent: true
+
+  lint:install:
+    desc: Install golangci-lint for advanced linting
+    cmds:
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - 'echo "✅ golangci-lint installed"'
+    silent: true
+
+  lint:full:
+    desc: Run comprehensive linting with golangci-lint
+    deps: [lint:install]
+    cmds:
+      - golangci-lint run ./...
+
+  format:
+    desc: Format all Go code
+    cmds:
+      - go fmt ./...
+      - 'echo "✅ Code formatted"'
+    silent: true
+
+  format:check:
+    desc: Check if code is properly formatted
+    cmds:
+      - |
+        if [ -n "$(gofmt -l .)" ]; then
+          echo "❌ The following files need formatting:"
+          gofmt -l .
+          exit 1
+        else
+          echo "✅ All files are properly formatted"
+        fi
+    silent: true
+
+  # Module Management
+  mod:verify:
+    desc: Verify module dependencies
+    cmds:
+      - go mod verify
+      - 'echo "✅ Module dependencies verified"'
+    silent: true
+
+  mod:tidy:
+    desc: Clean up module dependencies
+    cmds:
+      - go mod tidy
+      - 'echo "✅ Module dependencies tidied"'
+    silent: true
+
+  mod:update:
+    desc: Update all dependencies to latest versions
+    cmds:
+      - go get -u ./...
+      - go mod tidy
+      - 'echo "✅ Dependencies updated"'
+    silent: true
+
+  mod:graph:
+    desc: Show module dependency graph
+    cmds:
+      - go mod graph
+  # Clean Tasks
+  clean:
+    desc: Clean build artifacts and generated files
+    cmds:
+      - rm -rf bin/ dist/ _output/
+      - rm -f *.test *.out coverage.html
+      - rm -rf examples/output/
+      - rm -rf examples/certificates/certs/
+      - rm -rf format_output/
+      - rm -f *.pem *.key *.crt *.csr
+      - 'echo "✅ Cleaned build artifacts and generated files"'
+    silent: true
+
+  clean:cache:
+    desc: Clean Go build and test cache
+    cmds:
+      - go clean -cache
+      - go clean -testcache
+      - 'echo "✅ Go cache cleaned"'
+    silent: true
+
+  clean:all:
+    desc: Clean everything including module cache
+    deps: [clean, clean:cache]
+    cmds:
+      - go clean -modcache
+      - 'echo "✅ All caches and artifacts cleaned"'
+    silent: true
+
+  # Environment Tasks
+  env:check:
+    desc: Validate Go environment setup
+    cmds:
+      - go version
+      - go env GOPATH
+      - go env GOROOT
+      - go env GOOS
+      - go env GOARCH
+      - 'echo "✅ Go environment validated"'
+
+  env:doctor:
+    desc: Check project health and dependencies
+    cmds:
+      - 'echo "🔍 Checking project health..."'
+      - go version
+      - go mod verify
+      - go vet ./...
+      - 'echo "✅ Project health check complete"'
+    silent: true
+
+  # Benchmark Tasks
+  bench:
+    desc: Run all benchmarks
+    cmds:
+      - go test -bench=. ./...
+
+  bench:keypair:
+    desc: Run keypair benchmarks
+    cmds:
+      - go test -bench=. ./keypair
+
+  bench:cert:
+    desc: Run certificate benchmarks
+    cmds:
+      - go test -bench=. ./cert
+
+  # Security Tasks
+  security:check:
+    desc: Check for known vulnerabilities in dependencies
+    cmds:
+      - go list -json -m all | nancy sleuth
+
+  security:install:
+    desc: Install security scanning tools
+    cmds:
+      - go install github.com/sonatype-nexus-community/nancy@latest
+      - 'echo "✅ Security tools installed"'
+    silent: true
+
+  # Git Tasks
+  git:status:
+    desc: Show git status and current branch
+    cmds:
+      - git status
+      - git branch --show-current
+
+  git:update:
+    desc: Pull latest changes from repository
+    cmds:
+      - git pull
+
+  git:sync:
+    desc: Sync with remote repository
+    cmds:
+      - git fetch --all
+      - git pull
+
+  git:commit:
+    desc: Add and commit changes with message (usage - task git:commit -- "your commit message")
+    cmds:
+      - git add .
+      - git commit -m "{{.CLI_ARGS}}"
+
+  # Release Tasks
+  release:check:
+    desc: Check if ready for release
+    cmds:
+      - task: format:check
+      - task: lint
+      - task: test
+      - task: build
+      - 'echo "✅ Release checks passed"'
+    silent: true
+
+  release:tag:
+    desc: Create a new version tag (usage - task release:tag -- v1.0.0)
+    deps: [release:check]
+    cmds:
+      - git tag {{.CLI_ARGS}}
+      - git push origin {{.CLI_ARGS}}
+      - 'echo "✅ Tag {{.CLI_ARGS}} created and pushed"'
+    silent: true
+
+  # Quick Commands
+  quick:test:
+    desc: Quick test without race detection
+    cmds:
+      - go test ./...
+
+  quick:check:
+    desc: Quick format and vet check
+    cmds:
+      - go fmt ./...
+      - go vet ./...
+      - 'echo "✅ Quick check complete"'
+    silent: true
+
+  # CI/CD Preparation Tasks
+  ci:
+    desc: Run CI pipeline locally
+    cmds:
+      - task: setup
+      - task: format:check
+      - task: lint
+      - task: test:coverage
+      - task: build
+      - 'echo "✅ CI pipeline complete"'
+    silent: true
+
+  # Example Management
+  examples:run:
+    desc: Run all examples
+    deps: [build]
+    cmds:
+      - 'echo "🔐 Running basic PKI examples..."'
+      - go run ./examples/main.go
+      - 'echo ""'
+      - 'echo "📜 Running certificate examples..."'
+      - go run ./examples/certificates/main.go
+
+  examples:clean:
+    desc: Clean example output directories
+    cmds:
+      - rm -rf examples/output/
+      - rm -rf examples/certificates/certs/
+      - 'echo "✅ Example outputs cleaned"'
+    silent: true

@@ -165,7 +165,7 @@ func TestPrivateKeyToSSH_WithPassphrase(t *testing.T) {
 		t.Error("ParsePrivateKeyFromSSH should now work with passphrase:", err)
 	} else {
 		t.Log("SSH private key parsing with passphrase successful!")
-		
+
 		// Verify the parsed key is valid
 		if parsedKey.Curve.Params().Name != "P-256" {
 			t.Error("Parsed key should be P-256 ECDSA")
@@ -461,7 +461,7 @@ func TestFullFormatConversionMatrix(t *testing.T) {
 			t.Error("SSH private key parsing should now work:", err)
 		} else {
 			t.Log("SSH private key round-trip conversion successful!")
-			
+
 			// Verify the parsed key matches original
 			if parsedPrivateKey.Size() != rsaKeyPair.PrivateKey.Size() {
 				t.Error("Parsed private key size should match original")

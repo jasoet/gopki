@@ -27,6 +27,19 @@ A comprehensive Go library for Public Key Infrastructure (PKI) operations with t
 go get github.com/jasoet/gopki
 ```
 
+### Development Setup
+```bash
+# Install Task (https://taskfile.dev) for streamlined development
+brew install go-task/tap/go-task  # macOS
+# or see https://taskfile.dev/installation/ for other platforms
+
+# Setup project dependencies
+task setup
+
+# View all available tasks
+task
+```
+
 ### Basic Example
 ```go
 package main
@@ -245,6 +258,19 @@ Complete PKI examples with CA hierarchies:
 
 ### 🚀 **Running Examples**
 
+Using Taskfile (recommended):
+```bash
+# Run all examples
+task examples:run
+
+# Run basic examples only
+task dev
+
+# Run certificate examples only
+task dev:certs
+```
+
+Or manually:
 ```bash
 # Basic key operations and certificate creation
 cd examples
@@ -257,12 +283,39 @@ go run main.go
 
 Both examples generate working PEM files that you can use with standard tools like OpenSSL.
 
+## Development
+
+### Quick Commands
+```bash
+# Testing
+task test              # Run all tests
+task test:coverage     # Generate coverage report
+task test:keypair      # Test specific module
+
+# Code Quality
+task format            # Format all code
+task lint              # Run static analysis
+task ci                # Run complete CI pipeline locally
+
+# Building
+task build             # Build the module
+task build:examples    # Build example binaries
+
+# Cleanup
+task clean             # Clean generated files
+task clean:all         # Clean everything including caches
+```
+
+### Available Tasks
+Run `task` to see all available development tasks including testing, linting, formatting, building, and Git operations.
+
 ## Contributing
 
 1. Read the module documentation to understand the architecture
 2. Follow the existing patterns for type safety and error handling
 3. Include comprehensive tests for new functionality
 4. Update documentation for any API changes
+5. Run `task ci` before submitting pull requests
 
 ## License
 

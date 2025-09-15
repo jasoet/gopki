@@ -18,7 +18,7 @@ import (
 
 func main() {
 	fmt.Println("=== GoPKI Examples ===")
-	
+
 	// Create outputs directory
 	if err := os.MkdirAll("output", 0755); err != nil {
 		log.Fatal("Failed to create output directory:", err)
@@ -28,7 +28,7 @@ func main() {
 	fmt.Println("\n1. RSA Key Generation (2048-bit)")
 	rsaExample()
 
-	// Example 2: ECDSA Key Generation  
+	// Example 2: ECDSA Key Generation
 	fmt.Println("\n2. ECDSA Key Generation (P-256)")
 	ecdsaExample()
 
@@ -121,8 +121,8 @@ func certificateExample() {
 			Organization: []string{"Example Organization"},
 			Country:      []string{"US"},
 		},
-		DNSNames:  []string{"example.com", "www.example.com"},
-		ValidFor:  365 * 24 * 60 * 60, // 1 year in seconds
+		DNSNames: []string{"example.com", "www.example.com"},
+		ValidFor: 365 * 24 * 60 * 60, // 1 year in seconds
 	})
 	if err != nil {
 		log.Fatal("Failed to create certificate:", err)
@@ -222,13 +222,13 @@ func formatConversionExample() {
 
 	// Convert to different formats
 	fmt.Println("   Converting to different formats...")
-	
+
 	// PEM format (original)
 	pemData, err := keypair.PrivateKeyToPEM(keyPair.PrivateKey)
 	if err != nil {
 		log.Fatal("Failed to convert to PEM:", err)
 	}
-	
+
 	// DER format
 	derData, err := format.PrivateKeyToDER(keyPair.PrivateKey)
 	if err != nil {
@@ -243,9 +243,9 @@ func formatConversionExample() {
 
 	// Save to files with different extensions
 	files := map[string][]byte{
-		"output/conversion.pem":     pemData,
-		"output/conversion.der":     derData,
-		"output/conversion.pub":     []byte(sshData),
+		"output/conversion.pem": pemData,
+		"output/conversion.der": derData,
+		"output/conversion.pub": []byte(sshData),
 	}
 
 	for filename, data := range files {
@@ -260,17 +260,17 @@ func formatConversionExample() {
 	}
 
 	fmt.Printf("   ✓ PEM file: %d bytes\n", len(pemData))
-	fmt.Printf("   ✓ DER file: %d bytes (%.1f%% smaller)\n", 
-		len(derData), 
-		100.0 * (1.0 - float64(len(derData))/float64(len(pemData))))
+	fmt.Printf("   ✓ DER file: %d bytes (%.1f%% smaller)\n",
+		len(derData),
+		100.0*(1.0-float64(len(derData))/float64(len(pemData))))
 	fmt.Printf("   ✓ SSH file: %d bytes\n", len(sshData))
 
 	// Demonstrate format detection
 	fmt.Println("   Format detection:")
-	
+
 	testFiles := map[string]string{
 		"output/conversion.pem": "PEM",
-		"output/conversion.der": "DER", 
+		"output/conversion.der": "DER",
 		"output/conversion.pub": "SSH",
 	}
 
@@ -287,13 +287,13 @@ func formatConversionExample() {
 			continue
 		}
 
-		fmt.Printf("   ✓ %s detected as %s (expected %s)\n", 
+		fmt.Printf("   ✓ %s detected as %s (expected %s)\n",
 			filename, detected, expected)
 	}
 
 	// Demonstrate round-trip conversion
 	fmt.Println("   Round-trip conversion test (PEM → DER → PEM):")
-	
+
 	derFromPEM, err := format.ConvertPEMToDER(pemData)
 	if err != nil {
 		log.Fatal("PEM to DER conversion failed:", err)

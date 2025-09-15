@@ -15,7 +15,7 @@ import (
 
 func main() {
 	fmt.Println("=== GoPKI Certificate Examples ===")
-	
+
 	// Create outputs directory
 	if err := os.MkdirAll("certs", 0755); err != nil {
 		log.Fatal("Failed to create certs directory:", err)

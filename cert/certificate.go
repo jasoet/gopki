@@ -27,11 +27,11 @@ type CertificateRequest struct {
 	EmailAddress []string
 	ValidFrom    time.Time
 	ValidFor     time.Duration
-	
+
 	// CA-specific fields (optional)
-	IsCA           bool  // Set to true to create a CA certificate
-	MaxPathLen     int   // Maximum depth of intermediate CAs (0 = can only sign end-entity certs, -1 = no limit)
-	MaxPathLenZero bool  // Set to true to explicitly set MaxPathLen to 0
+	IsCA           bool // Set to true to create a CA certificate
+	MaxPathLen     int  // Maximum depth of intermediate CAs (0 = can only sign end-entity certs, -1 = no limit)
+	MaxPathLenZero bool // Set to true to explicitly set MaxPathLen to 0
 }
 
 func CreateSelfSignedCertificate[T keypair.KeyPair](keyPair T, request CertificateRequest) (*Certificate, error) {
@@ -133,7 +133,7 @@ func CreateCACertificate[T keypair.KeyPair](keyPair T, request CertificateReques
 	// Set MaxPathLen based on request or use default
 	maxPathLen := 0
 	maxPathLenZero := true
-	
+
 	if request.MaxPathLen > 0 {
 		maxPathLen = request.MaxPathLen
 		maxPathLenZero = false
@@ -141,7 +141,7 @@ func CreateCACertificate[T keypair.KeyPair](keyPair T, request CertificateReques
 		// -1 means no limit, don't set MaxPathLen
 		maxPathLenZero = false
 	}
-	
+
 	template := x509.Certificate{
 		SerialNumber:          serialNumber,
 		Subject:               request.Subject,
@@ -209,7 +209,7 @@ func SignCertificate[T keypair.KeyPair](caCert *Certificate, caKeyPair T, reques
 	// Determine key usage based on whether this is a CA certificate
 	var keyUsage x509.KeyUsage
 	var extKeyUsage []x509.ExtKeyUsage
-	
+
 	if request.IsCA {
 		// CA certificate - can sign other certificates
 		keyUsage = x509.KeyUsageCertSign | x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature
@@ -220,7 +220,7 @@ func SignCertificate[T keypair.KeyPair](caCert *Certificate, caKeyPair T, reques
 		keyUsage = x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature
 		extKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}
 	}
-	
+
 	template := x509.Certificate{
 		SerialNumber:          serialNumber,
 		Subject:               request.Subject,
@@ -234,7 +234,7 @@ func SignCertificate[T keypair.KeyPair](caCert *Certificate, caKeyPair T, reques
 		IPAddresses:           request.IPAddresses,
 		EmailAddresses:        request.EmailAddress,
 	}
-	
+
 	// Set MaxPathLen for CA certificates
 	if request.IsCA {
 		if request.MaxPathLenZero {

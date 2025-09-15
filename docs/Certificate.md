@@ -869,4 +869,57 @@ func demonstrateDifferentAlgorithmsExample() {
 }
 ```
 
+## Development and Testing
+
+### Quick Start
+```bash
+# Install Task for development workflows
+brew install go-task/tap/go-task  # macOS
+# or see https://taskfile.dev/installation/
+
+# Setup the project
+task setup
+
+# Run tests for the certificate module
+task test:cert
+
+# Run all tests with coverage
+task test:coverage
+
+# Format and check code
+task format
+task lint
+```
+
+### Working with Certificate Examples
+```bash
+# Run certificate examples
+task dev:certs
+
+# Run all examples (basic + certificates)
+task examples:run
+
+# Build example binaries
+task build:examples
+
+# Clean generated certificates and keys
+task examples:clean
+```
+
+### Development Workflow
+```bash
+# Run CI pipeline locally before commits
+task ci
+
+# Quick format and vet check
+task quick:check
+
+# Run specific tests
+task test:specific -- TestCreateSelfSignedCertificate
+```
+
+For more development commands, run `task` to see all available tasks.
+
+---
+
 This documentation provides comprehensive coverage of the GoPKI Certificate module, from basic theory to advanced certificate chain management, making it suitable for both learning and reference purposes.
