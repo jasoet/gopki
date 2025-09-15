@@ -13,7 +13,22 @@ import (
 // RawFormat implements the SignatureFormat interface for raw signatures
 type RawFormat struct{}
 
-// NewRawFormat creates a new raw format instance
+// NewRawFormat creates a new raw format instance.
+// Raw format produces bare signature bytes without any container structure,
+// metadata, or certificates. This is the simplest signature format.
+//
+// Raw signatures are:
+//   - Always detached (data is not included)
+//   - Minimal in size (just signature bytes)
+//   - Algorithm-dependent in structure
+//   - Suitable for simple verification scenarios
+//
+// Returns a new RawFormat instance ready for use.
+//
+// Example:
+//
+//	rawFormat := NewRawFormat()
+//	signature, err := rawFormat.Sign(data, signer, cert, opts)
 func NewRawFormat() *RawFormat {
 	return &RawFormat{}
 }
@@ -23,7 +38,38 @@ func (f *RawFormat) Name() string {
 	return FormatRaw
 }
 
-// Sign creates a raw signature
+// Sign creates a raw signature of the provided data.
+// This method produces bare signature bytes using the appropriate algorithm
+// without any container format or metadata.
+//
+// Algorithm-specific behavior:
+//   - RSA: Signs the hash digest using PKCS#1 v1.5 padding
+//   - ECDSA: Signs the hash digest with ASN.1 DER encoding
+//   - Ed25519: Signs the original message directly (no pre-hashing)
+//
+// Parameters:
+//   - data: The data to sign
+//   - signer: The private key for signing (crypto.Signer interface)
+//   - cert: The certificate (used to determine algorithm, can be nil for raw)
+//   - opts: Signing options (hash algorithm is required for RSA/ECDSA)
+//
+// Returns the raw signature bytes or an error if signing fails.
+//
+// The returned bytes are algorithm-specific:
+//   - RSA: PKCS#1 v1.5 signature bytes
+//   - ECDSA: ASN.1 DER-encoded signature
+//   - Ed25519: 64-byte signature
+//
+// Example:
+//
+//	opts := formats.SignOptions{HashAlgorithm: crypto.SHA256}
+//	rawSig, err := rawFormat.Sign(document, rsaSigner, nil, opts)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	// Save raw signature to file
+//	err = os.WriteFile("document.sig", rawSig, 0644)
 func (f *RawFormat) Sign(data []byte, signer crypto.Signer, cert *x509.Certificate, opts SignOptions) ([]byte, error) {
 	// For raw format, we just return the signature bytes
 	// Hash the data first (except for Ed25519)

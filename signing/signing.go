@@ -102,19 +102,36 @@ type VerifyOptions struct {
 
 // Common errors
 var (
-	ErrInvalidSignature     = errors.New("invalid signature")
-	ErrCertificateExpired   = errors.New("certificate has expired")
+	ErrInvalidSignature       = errors.New("invalid signature")
+	ErrCertificateExpired     = errors.New("certificate has expired")
 	ErrCertificateNotYetValid = errors.New("certificate is not yet valid")
-	ErrInvalidCertificate   = errors.New("invalid certificate")
-	ErrUnsupportedAlgorithm = errors.New("unsupported algorithm")
-	ErrUnsupportedFormat    = errors.New("unsupported signature format")
-	ErrMissingPrivateKey    = errors.New("missing private key")
-	ErrMissingCertificate   = errors.New("missing certificate")
-	ErrVerificationFailed   = errors.New("signature verification failed")
-	ErrInvalidTimestamp     = errors.New("invalid timestamp")
+	ErrInvalidCertificate     = errors.New("invalid certificate")
+	ErrUnsupportedAlgorithm   = errors.New("unsupported algorithm")
+	ErrUnsupportedFormat      = errors.New("unsupported signature format")
+	ErrMissingPrivateKey      = errors.New("missing private key")
+	ErrMissingCertificate     = errors.New("missing certificate")
+	ErrVerificationFailed     = errors.New("signature verification failed")
+	ErrInvalidTimestamp       = errors.New("invalid timestamp")
 )
 
-// DefaultSignOptions returns default signing options
+// DefaultSignOptions returns default signing options with secure defaults.
+// These options are suitable for most signing scenarios and provide a good
+// balance between security and compatibility.
+//
+// Default values:
+//   - HashAlgorithm: 0 (auto-selected based on key algorithm and size)
+//   - Format: FormatRaw (simple signature bytes)
+//   - IncludeCertificate: true (includes signer's certificate)
+//   - IncludeChain: false (certificate chain not included)
+//   - Detached: false (signature includes the data)
+//
+// Returns SignOptions with secure default values.
+//
+// Example:
+//
+//	opts := DefaultSignOptions()
+//	opts.Format = FormatPKCS7  // Override format if needed
+//	signature, err := SignDocument(data, keyPair, cert, opts)
 func DefaultSignOptions() SignOptions {
 	return SignOptions{
 		HashAlgorithm:      0, // Let the algorithm determine the default
@@ -125,7 +142,27 @@ func DefaultSignOptions() SignOptions {
 	}
 }
 
-// DefaultVerifyOptions returns default verification options
+// DefaultVerifyOptions returns default verification options with secure defaults.
+// These options provide basic signature verification without requiring complex
+// certificate chain validation, making them suitable for simple use cases.
+//
+// Default values:
+//   - RequiredKeyUsage: x509.KeyUsageDigitalSignature (requires digital signature capability)
+//   - VerifyChain: false (skips certificate chain verification for self-signed certificates)
+//   - VerifyTime: time.Now() (verifies certificate validity at current time)
+//   - SkipExpirationCheck: false (enforces certificate validity period)
+//
+// For production environments with proper PKI infrastructure, consider enabling
+// chain verification and providing root/intermediate certificate pools.
+//
+// Returns VerifyOptions with secure default values.
+//
+// Example:
+//
+//	opts := DefaultVerifyOptions()
+//	opts.VerifyChain = true              // Enable chain verification
+//	opts.Roots = rootCertPool            // Add trusted root certificates
+//	err := VerifySignature(data, signature, opts)
 func DefaultVerifyOptions() VerifyOptions {
 	return VerifyOptions{
 		RequiredKeyUsage: x509.KeyUsageDigitalSignature,
@@ -134,7 +171,24 @@ func DefaultVerifyOptions() VerifyOptions {
 	}
 }
 
-// GetHashAlgorithm returns the appropriate hash algorithm for the signature algorithm
+// GetHashAlgorithm returns the appropriate hash algorithm for the signature algorithm.
+// It selects the hash algorithm based on the signing algorithm and key size for optimal security.
+//
+// Algorithm recommendations:
+//   - RSA: SHA-256 for keys < 3072 bits, SHA-384 for keys >= 3072 bits
+//   - ECDSA: SHA-256 for P-256/P-224, SHA-384 for P-384, SHA-512 for P-521
+//   - Ed25519: SHA-512 (used internally by Ed25519)
+//
+// Parameters:
+//   - algo: The signature algorithm (RSA, ECDSA, or Ed25519)
+//   - keySize: The key size in bits
+//
+// Returns the recommended crypto.Hash for the given algorithm and key size.
+//
+// Example:
+//
+//	hash := GetHashAlgorithm(AlgorithmRSA, 2048)  // Returns crypto.SHA256
+//	hash = GetHashAlgorithm(AlgorithmRSA, 4096)   // Returns crypto.SHA384
 func GetHashAlgorithm(algo SignatureAlgorithm, keySize int) crypto.Hash {
 	switch algo {
 	case AlgorithmRSA:

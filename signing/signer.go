@@ -17,7 +17,48 @@ import (
 	"github.com/jasoet/gopki/signing/formats"
 )
 
-// SignDocument signs a document using the provided key pair and certificate
+// SignDocument signs a document using the provided key pair and certificate.
+// This is the primary function for creating digital signatures with full control
+// over signing options and formats.
+//
+// The function supports all major cryptographic algorithms:
+//   - RSA with PKCS#1 v1.5 padding
+//   - ECDSA with ASN.1 DER encoding
+//   - Ed25519 with native signature format
+//
+// Type parameter:
+//   - T: Key pair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//
+// Parameters:
+//   - data: The data to be signed (must not be empty)
+//   - keyPair: The cryptographic key pair for signing
+//   - certificate: The X.509 certificate associated with the signing key
+//   - opts: Signing options (format, hash algorithm, certificate inclusion, etc.)
+//
+// Returns a Signature containing the signature data, metadata, and certificate information,
+// or an error if signing fails.
+//
+// The function automatically selects the appropriate hash algorithm if not specified
+// in the options, based on the key type and size for optimal security.
+//
+// Supported formats:
+//   - FormatRaw: Simple signature bytes (default)
+//   - FormatPKCS7: PKCS#7/CMS signature container
+//   - FormatPKCS7Detached: Detached PKCS#7/CMS signature
+//
+// Example:
+//
+//	opts := DefaultSignOptions()
+//	opts.Format = FormatPKCS7
+//	opts.IncludeChain = true
+//
+//	signature, err := SignDocument(document, rsaKeyPair, certificate, opts)
+//	if err != nil {
+//		log.Printf("Signing failed: %v", err)
+//		return
+//	}
+//
+//	fmt.Printf("Created %s signature using %s\n", signature.Format, signature.Algorithm)
 func SignDocument[T keypair.KeyPair](data []byte, keyPair T, certificate *cert.Certificate, opts SignOptions) (*Signature, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("cannot sign empty data")
@@ -128,12 +169,73 @@ func SignDocument[T keypair.KeyPair](data []byte, keyPair T, certificate *cert.C
 	return sig, nil
 }
 
-// SignData is a convenience function for signing data with default options
+// SignData is a convenience function for signing data with default options.
+// This function provides a simple interface for common signing scenarios where
+// default settings are sufficient.
+//
+// The function uses DefaultSignOptions() which provides:
+//   - Raw signature format
+//   - Auto-selected hash algorithm
+//   - Certificate inclusion enabled
+//   - Non-detached signature
+//
+// Type parameter:
+//   - T: Key pair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//
+// Parameters:
+//   - data: The data to be signed
+//   - keyPair: The cryptographic key pair for signing
+//   - certificate: The X.509 certificate associated with the signing key
+//
+// Returns a Signature with default options applied, or an error if signing fails.
+//
+// For more control over signing parameters, use SignDocument() with custom options.
+//
+// Example:
+//
+//	signature, err := SignData(document, rsaKeyPair, certificate)
+//	if err != nil {
+//		log.Printf("Signing failed: %v", err)
+//		return
+//	}
+//
+//	// Verify the signature
+//	err = VerifySignature(document, signature, DefaultVerifyOptions())
 func SignData[T keypair.KeyPair](data []byte, keyPair T, certificate *cert.Certificate) (*Signature, error) {
 	return SignDocument(data, keyPair, certificate, DefaultSignOptions())
 }
 
-// SignFile signs a file and returns the signature
+// SignFile signs a file and returns the signature.
+// This convenience function reads a file from disk and signs its contents
+// using the specified options.
+//
+// The function reads the entire file into memory, so it may not be suitable
+// for very large files. For streaming large files, use SignStream() instead.
+//
+// Type parameter:
+//   - T: Key pair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//
+// Parameters:
+//   - filePath: Path to the file to be signed
+//   - keyPair: The cryptographic key pair for signing
+//   - certificate: The X.509 certificate associated with the signing key
+//   - opts: Signing options (format, hash algorithm, certificate inclusion, etc.)
+//
+// Returns a Signature for the file contents, or an error if reading or signing fails.
+//
+// Example:
+//
+//	opts := DefaultSignOptions()
+//	opts.Format = FormatPKCS7Detached
+//
+//	signature, err := SignFile("/path/to/document.pdf", rsaKeyPair, certificate, opts)
+//	if err != nil {
+//		log.Printf("File signing failed: %v", err)
+//		return
+//	}
+//
+//	// Save signature to a separate file
+//	err = os.WriteFile("/path/to/document.pdf.sig", signature.Data, 0644)
 func SignFile[T keypair.KeyPair](filePath string, keyPair T, certificate *cert.Certificate, opts SignOptions) (*Signature, error) {
 	data, err := readFile(filePath)
 	if err != nil {
@@ -143,7 +245,48 @@ func SignFile[T keypair.KeyPair](filePath string, keyPair T, certificate *cert.C
 	return SignDocument(data, keyPair, certificate, opts)
 }
 
-// SignStream signs data from a reader
+// SignStream signs data from a reader, supporting streaming for large data.
+// This function is optimized for processing large amounts of data that may not
+// fit comfortably in memory.
+//
+// Algorithm-specific behavior:
+//   - RSA/ECDSA: Stream data through hash function, then sign the digest
+//   - Ed25519: Must read entire data into memory (Ed25519 requirement)
+//
+// This function is ideal for signing large files, network streams, or any
+// data source where memory usage needs to be controlled.
+//
+// Type parameter:
+//   - T: Key pair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//
+// Parameters:
+//   - reader: io.Reader providing the data to be signed
+//   - keyPair: The cryptographic key pair for signing
+//   - certificate: The X.509 certificate associated with the signing key
+//   - opts: Signing options (format, hash algorithm, certificate inclusion, etc.)
+//
+// Returns a Signature for the streamed data, or an error if reading or signing fails.
+//
+// Note: For Ed25519 signatures, the entire stream will be read into memory due to
+// algorithm requirements. For memory-constrained environments with large data,
+// consider using RSA or ECDSA algorithms instead.
+//
+// Example:
+//
+//	file, err := os.Open("/path/to/large-file.bin")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer file.Close()
+//
+//	opts := DefaultSignOptions()
+//	opts.HashAlgorithm = crypto.SHA256
+//
+//	signature, err := SignStream(file, ecdsaKeyPair, certificate, opts)
+//	if err != nil {
+//		log.Printf("Stream signing failed: %v", err)
+//		return
+//	}
 func SignStream[T keypair.KeyPair](reader io.Reader, keyPair T, certificate *cert.Certificate, opts SignOptions) (*Signature, error) {
 	// Determine the algorithm and extract private key
 	var privateKey crypto.Signer
@@ -253,7 +396,38 @@ func readFile(path string) ([]byte, error) {
 
 // Utility functions for working with signatures
 
-// GetSignatureAlgorithm determines the signature algorithm from a public key
+// GetSignatureAlgorithm determines the signature algorithm from a public key.
+// This function examines the type of the public key and returns the corresponding
+// signature algorithm identifier.
+//
+// Supported key types:
+//   - *rsa.PublicKey: Returns AlgorithmRSA
+//   - *ecdsa.PublicKey: Returns AlgorithmECDSA
+//   - ed25519.PublicKey: Returns AlgorithmEd25519
+//
+// Parameters:
+//   - publicKey: The public key to analyze (crypto.PublicKey interface)
+//
+// Returns the corresponding SignatureAlgorithm, or an error if the key type
+// is not supported.
+//
+// This function is commonly used when verifying signatures where the algorithm
+// needs to be determined from certificate or key material.
+//
+// Example:
+//
+//	cert, err := x509.ParseCertificate(certDER)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	algorithm, err := GetSignatureAlgorithm(cert.PublicKey)
+//	if err != nil {
+//		log.Printf("Unsupported key algorithm: %v", err)
+//		return
+//	}
+//
+//	fmt.Printf("Certificate uses %s algorithm\n", algorithm)
 func GetSignatureAlgorithm(publicKey crypto.PublicKey) (SignatureAlgorithm, error) {
 	switch publicKey.(type) {
 	case *rsa.PublicKey:
@@ -267,7 +441,37 @@ func GetSignatureAlgorithm(publicKey crypto.PublicKey) (SignatureAlgorithm, erro
 	}
 }
 
-// ComputeDigest computes the hash of data using the specified algorithm
+// ComputeDigest computes the hash of data using the specified algorithm.
+// This utility function provides a convenient way to compute cryptographic
+// hashes with proper error handling and availability checking.
+//
+// Supported hash algorithms include:
+//   - crypto.SHA256: 256-bit SHA-2 (most common)
+//   - crypto.SHA384: 384-bit SHA-2
+//   - crypto.SHA512: 512-bit SHA-2
+//   - crypto.SHA224: 224-bit SHA-2
+//   - And other algorithms supported by the Go crypto package
+//
+// Parameters:
+//   - data: The data to hash
+//   - hashAlgo: The cryptographic hash algorithm to use
+//
+// Returns the computed hash digest as a byte slice, or an error if the
+// hash algorithm is not available or hashing fails.
+//
+// The function verifies that the requested hash algorithm is available
+// before attempting to use it, preventing runtime panics.
+//
+// Example:
+//
+//	data := []byte("Hello, world!")
+//	digest, err := ComputeDigest(data, crypto.SHA256)
+//	if err != nil {
+//		log.Printf("Hashing failed: %v", err)
+//		return
+//	}
+//
+//	fmt.Printf("SHA-256 digest: %x\n", digest)
 func ComputeDigest(data []byte, hashAlgo crypto.Hash) ([]byte, error) {
 	if !hashAlgo.Available() {
 		return nil, fmt.Errorf("hash algorithm %v is not available", hashAlgo)
@@ -281,7 +485,26 @@ func ComputeDigest(data []byte, hashAlgo crypto.Hash) ([]byte, error) {
 	return hasher.Sum(nil), nil
 }
 
-// HashAlgorithmFromString converts a string to a crypto.Hash
+// HashAlgorithmFromString converts a string to a crypto.Hash.
+// This function provides a convenient way to parse hash algorithm names
+// from configuration files, command-line arguments, or API parameters.
+//
+// Supported algorithm names (case-sensitive):
+//   - "SHA256": crypto.SHA256 (default if unknown)
+//   - "SHA384": crypto.SHA384
+//   - "SHA512": crypto.SHA512
+//   - "SHA224": crypto.SHA224
+//
+// Parameters:
+//   - name: The hash algorithm name as a string
+//
+// Returns the corresponding crypto.Hash constant, or crypto.SHA256
+// as a safe default for unrecognized names.
+//
+// Example:
+//
+//	algorithm := HashAlgorithmFromString("SHA384")
+//	digest, err := ComputeDigest(data, algorithm)
 func HashAlgorithmFromString(name string) crypto.Hash {
 	switch name {
 	case "SHA256":
@@ -297,7 +520,27 @@ func HashAlgorithmFromString(name string) crypto.Hash {
 	}
 }
 
-// HashAlgorithmToString converts a crypto.Hash to a string
+// HashAlgorithmToString converts a crypto.Hash to a string representation.
+// This function provides a convenient way to display hash algorithm names
+// in logs, error messages, or API responses.
+//
+// Supported hash algorithms:
+//   - crypto.SHA256: Returns "SHA256"
+//   - crypto.SHA384: Returns "SHA384"
+//   - crypto.SHA512: Returns "SHA512"
+//   - crypto.SHA224: Returns "SHA224"
+//   - Others: Returns "Unknown"
+//
+// Parameters:
+//   - hash: The crypto.Hash constant to convert
+//
+// Returns the string representation of the hash algorithm, or "Unknown"
+// for unrecognized algorithms.
+//
+// Example:
+//
+//	fmt.Printf("Using hash algorithm: %s\n", HashAlgorithmToString(crypto.SHA256))
+//	// Output: Using hash algorithm: SHA256
 func HashAlgorithmToString(hash crypto.Hash) string {
 	switch hash {
 	case crypto.SHA256:

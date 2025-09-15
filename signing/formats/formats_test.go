@@ -20,7 +20,7 @@ func TestRawFormat(t *testing.T) {
 	}
 
 	certificate, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
-		Subject: pkix.Name{CommonName: "Test Signer"},
+		Subject:  pkix.Name{CommonName: "Test Signer"},
 		ValidFor: 365 * 24 * time.Hour,
 	})
 	if err != nil {

@@ -18,7 +18,31 @@ type PKCS7Format struct {
 	detached bool
 }
 
-// NewPKCS7Format creates a new PKCS#7 format instance
+// NewPKCS7Format creates a new PKCS#7 format instance.
+// PKCS#7 (also known as CMS - Cryptographic Message Syntax) is a standard
+// for cryptographic message formats that can contain both the signature
+// and supporting information like certificates and timestamps.
+//
+// PKCS#7 signatures can include:
+//   - The signature itself
+//   - Signer's certificate
+//   - Certificate chain
+//   - Authenticated attributes (signing time, message digest)
+//   - Optionally the original data (non-detached mode)
+//
+// Parameters:
+//   - detached: If true, creates detached signatures (data not included)
+//     If false, creates attached signatures (data included)
+//
+// Returns a new PKCS7Format instance configured for the specified mode.
+//
+// Example:
+//
+//	// Create attached PKCS#7 format (includes data)
+//	attachedFormat := NewPKCS7Format(false)
+//
+//	// Create detached PKCS#7 format (data separate)
+//	detachedFormat := NewPKCS7Format(true)
 func NewPKCS7Format(detached bool) *PKCS7Format {
 	return &PKCS7Format{detached: detached}
 }
@@ -41,9 +65,9 @@ type pkcs7SignedData struct {
 	Version          int                        `asn1:"default:1"`
 	DigestAlgorithms []pkix.AlgorithmIdentifier `asn1:"set"`
 	ContentInfo      pkcs7ContentInfo
-	Certificates     []asn1.RawValue       `asn1:"implicit,optional,tag:0"`
+	Certificates     []asn1.RawValue        `asn1:"implicit,optional,tag:0"`
 	CRLs             []pkix.CertificateList `asn1:"implicit,optional,tag:1"`
-	SignerInfos      []pkcs7SignerInfo     `asn1:"set"`
+	SignerInfos      []pkcs7SignerInfo      `asn1:"set"`
 }
 
 type pkcs7ContentInfo struct {
@@ -73,21 +97,63 @@ type pkcs7Attribute struct {
 
 // OIDs for PKCS#7
 var (
-	oidSignedData          = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 2}
-	oidData                = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 1}
-	oidContentTypes        = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 12}
-	oidMessageDigest       = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 4}
-	oidSigningTime         = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 5}
-	oidRSAEncryption       = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}
-	oidSHA256              = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}
-	oidSHA384              = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 2}
-	oidSHA512              = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 3}
-	oidECDSAWithSHA256     = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 2}
-	oidECDSAWithSHA384     = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 3}
-	oidECDSAWithSHA512     = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 4}
+	oidSignedData      = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 2}
+	oidData            = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 1}
+	oidContentTypes    = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 12}
+	oidMessageDigest   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 4}
+	oidSigningTime     = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 5}
+	oidRSAEncryption   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}
+	oidSHA256          = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}
+	oidSHA384          = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 2}
+	oidSHA512          = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 3}
+	oidECDSAWithSHA256 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 2}
+	oidECDSAWithSHA384 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 3}
+	oidECDSAWithSHA512 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 4}
 )
 
-// Sign creates a PKCS#7 signature
+// Sign creates a PKCS#7/CMS signature of the provided data.
+// This method produces a complete PKCS#7 signature structure containing
+// the signature, certificates, and metadata according to RFC 2315.
+//
+// PKCS#7 signature creation process:
+//  1. Computes hash digest of the data
+//  2. Creates authenticated attributes (message digest, signing time)
+//  3. Signs the authenticated attributes digest
+//  4. Packages everything into ASN.1 DER-encoded PKCS#7 structure
+//
+// The signature can be created in two modes:
+//   - Attached: Original data is included in the PKCS#7 structure
+//   - Detached: Only signature and certificates are included
+//
+// Parameters:
+//   - data: The data to sign
+//   - signer: The private key for signing (crypto.Signer interface)
+//   - cert: The signer's certificate (will be included if opts.IncludeCertificate)
+//   - opts: Signing options controlling hash algorithm, certificates, and format
+//
+// Returns the DER-encoded PKCS#7 signature or an error if signing fails.
+//
+// The generated PKCS#7 includes:
+//   - SignedData structure with version 1
+//   - Digest algorithms used
+//   - Content info (with or without original data)
+//   - Signer's certificate (if requested)
+//   - Additional certificates from opts.ExtraCertificates
+//   - Signer info with authenticated attributes
+//
+// Example:
+//
+//	opts := formats.SignOptions{
+//		HashAlgorithm:      crypto.SHA256,
+//		IncludeCertificate: true,
+//	}
+//	pkcs7Sig, err := pkcs7Format.Sign(document, rsaSigner, cert, opts)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	// Save PKCS#7 signature to file
+//	err = os.WriteFile("document.p7s", pkcs7Sig, 0644)
 func (f *PKCS7Format) Sign(data []byte, signer crypto.Signer, cert *x509.Certificate, opts SignOptions) ([]byte, error) {
 	// Determine hash algorithm
 	hashAlg := opts.HashAlgorithm
@@ -170,7 +236,45 @@ func (f *PKCS7Format) Sign(data []byte, signer crypto.Signer, cert *x509.Certifi
 	return derBytes, nil
 }
 
-// Verify verifies a PKCS#7 signature
+// Verify verifies a PKCS#7/CMS signature against the original data.
+// This method performs comprehensive validation of the PKCS#7 structure
+// including signature verification, certificate validation, and attribute checking.
+//
+// PKCS#7 verification process:
+//  1. Parses the DER-encoded PKCS#7 structure
+//  2. Extracts signer information and certificates
+//  3. Validates authenticated attributes
+//  4. Verifies the cryptographic signature
+//  5. Optionally validates certificate chains
+//
+// For detached signatures, the original data must be provided separately.
+// For attached signatures, the data is extracted from the PKCS#7 structure.
+//
+// Parameters:
+//   - data: The original data that was signed
+//   - signatureData: DER-encoded PKCS#7 signature bytes
+//   - cert: Optional certificate to use (if not embedded in PKCS#7)
+//   - opts: Verification options for certificate chain validation
+//
+// Returns nil if the signature is valid, or an error describing the failure.
+//
+// The function validates:
+//   - PKCS#7 structure integrity and format
+//   - Signer info authenticity
+//   - Authenticated attributes consistency
+//   - Cryptographic signature validity
+//   - Certificate chain (if opts.SkipChainVerification is false)
+//
+// Example:
+//
+//	// Verify attached PKCS#7 signature
+//	err := pkcs7Format.Verify(originalData, pkcs7Bytes, nil, opts)
+//	if err != nil {
+//		log.Printf("PKCS#7 signature verification failed: %v", err)
+//		return
+//	}
+//
+//	fmt.Println("PKCS#7 signature is valid")
 func (f *PKCS7Format) Verify(data []byte, signatureData []byte, cert *x509.Certificate, opts VerifyOptions) error {
 	// Parse PKCS#7 structure
 	info, err := f.Parse(signatureData)
@@ -205,7 +309,49 @@ func (f *PKCS7Format) Verify(data []byte, signatureData []byte, cert *x509.Certi
 	return f.verifySignerInfo(&signerInfo, data, signingCert, info.HashAlgorithm)
 }
 
-// Parse extracts signature information from PKCS#7 data
+// Parse extracts signature information from PKCS#7/CMS data.
+// This method analyzes the DER-encoded PKCS#7 structure and extracts
+// metadata including certificates, hash algorithms, and attributes.
+//
+// The parsing process:
+//  1. Unmarshals the ASN.1 DER-encoded PKCS#7 structure
+//  2. Validates the content type as SignedData
+//  3. Extracts digest algorithms and certificates
+//  4. Parses signer information and authenticated attributes
+//  5. Builds a comprehensive SignatureInfo structure
+//
+// Parameters:
+//   - signatureData: DER-encoded PKCS#7/CMS bytes to parse
+//
+// Returns SignatureInfo containing extracted metadata, or an error if parsing fails.
+//
+// The returned SignatureInfo includes:
+//   - Algorithm: Always "PKCS#7" for this format
+//   - HashAlgorithm: The digest algorithm used (SHA256, SHA384, SHA512)
+//   - Certificate: The signer's certificate (if embedded)
+//   - CertificateChain: Additional certificates from the PKCS#7
+//   - Attributes: Map containing signing time and other attributes
+//   - Detached: Boolean indicating if this is a detached signature
+//
+// This function is useful for:
+//   - Inspecting signature properties before verification
+//   - Extracting certificates for separate validation
+//   - Displaying signature metadata to users
+//   - Building signature verification reports
+//
+// Example:
+//
+//	info, err := pkcs7Format.Parse(pkcs7Bytes)
+//	if err != nil {
+//		log.Printf("Failed to parse PKCS#7: %v", err)
+//		return
+//	}
+//
+//	fmt.Printf("Signer: %s\n", info.Certificate.Subject.CommonName)
+//	fmt.Printf("Hash Algorithm: %v\n", info.HashAlgorithm)
+//	if signingTime, ok := info.Attributes["signingTime"]; ok {
+//		fmt.Printf("Signed at: %v\n", signingTime)
+//	}
 func (f *PKCS7Format) Parse(signatureData []byte) (*SignatureInfo, error) {
 	var p7 pkcs7
 	if _, err := asn1.Unmarshal(signatureData, &p7); err != nil {
@@ -217,8 +363,8 @@ func (f *PKCS7Format) Parse(signatureData []byte) (*SignatureInfo, error) {
 	}
 
 	info := &SignatureInfo{
-		Algorithm: "PKCS#7",
-		Detached:  f.detached,
+		Algorithm:  "PKCS#7",
+		Detached:   f.detached,
 		Attributes: make(map[string]interface{}),
 	}
 
@@ -253,7 +399,9 @@ func (f *PKCS7Format) Parse(signatureData []byte) (*SignatureInfo, error) {
 	return info, nil
 }
 
-// SupportsDetached returns true
+// SupportsDetached returns true as PKCS#7 supports both attached and detached signatures.
+// PKCS#7 can be configured to include or exclude the original signed data,
+// making it suitable for both scenarios where data is embedded or kept separate.
 func (f *PKCS7Format) SupportsDetached() bool {
 	return true
 }
