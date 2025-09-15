@@ -1,7 +1,8 @@
-# GoPKI Certificate Documentation
+# Certificate Module
+
+X.509 certificate creation and management with support for self-signed certificates, Certificate Authorities (CAs), and complex PKI hierarchies.
 
 ## Table of Contents
-- [Overview](#overview)
 - [PKI Theory](#pki-theory)
 - [Certificate Types](#certificate-types)
 - [Architecture](#architecture)
@@ -11,11 +12,7 @@
 - [Best Practices](#best-practices)
 - [Examples](#examples)
 
-## Overview
-
-The GoPKI Certificate module provides comprehensive X.509 certificate management capabilities, supporting both self-signed certificates and complex Certificate Authority (CA) hierarchies. It integrates seamlessly with the KeyPair module to provide end-to-end PKI functionality.
-
-### Key Features
+## Features
 
 - **Multiple Certificate Types**: Self-signed, CA certificates, and intermediate CAs
 - **Type-Safe Integration**: Works with the KeyPair module's generic constraints
@@ -869,57 +866,6 @@ func demonstrateDifferentAlgorithmsExample() {
 }
 ```
 
-## Development and Testing
-
-### Quick Start
-```bash
-# Install Task for development workflows
-brew install go-task/tap/go-task  # macOS
-# or see https://taskfile.dev/installation/
-
-# Setup the project
-task setup
-
-# Run tests for the certificate module
-task test:cert
-
-# Run all tests with coverage
-task test:coverage
-
-# Format and check code
-task format
-task lint
-```
-
-### Working with Certificate Examples
-```bash
-# Run certificate examples
-task dev:certs
-
-# Run all examples (basic + certificates)
-task examples:run
-
-# Build example binaries
-task build:examples
-
-# Clean generated certificates and keys
-task examples:clean
-```
-
-### Development Workflow
-```bash
-# Run CI pipeline locally before commits
-task ci
-
-# Quick format and vet check
-task quick:check
-
-# Run specific tests
-task test:specific -- TestCreateSelfSignedCertificate
-```
-
-For more development commands, run `task` to see all available tasks.
-
 ---
 
-This documentation provides comprehensive coverage of the GoPKI Certificate module, from basic theory to advanced certificate chain management, making it suitable for both learning and reference purposes.
+For complete project documentation and development commands, see the main [README](../README.md).

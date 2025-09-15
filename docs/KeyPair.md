@@ -1,19 +1,16 @@
-# GoPKI KeyPair Documentation
+# KeyPair Module
+
+Type-safe cryptographic key pair generation and management for RSA, ECDSA, and Ed25519 algorithms.
 
 ## Table of Contents
-- [Overview](#overview)
 - [Cryptographic Theory](#cryptographic-theory)
-- [Architecture](#architecture)
+- [Type System](#type-system)
 - [API Reference](#api-reference)
 - [Tutorial](#tutorial)
 - [Best Practices](#best-practices)
 - [Examples](#examples)
 
-## Overview
-
-The GoPKI KeyPair module provides a unified, type-safe interface for generating and managing cryptographic key pairs across multiple algorithms. It leverages Go generics to ensure compile-time type safety while supporting RSA, ECDSA, and Ed25519 cryptographic algorithms.
-
-### Key Features
+## Features
 
 - **Type-Safe Generics**: Compile-time type checking prevents runtime errors
 - **Multi-Algorithm Support**: RSA, ECDSA (P-224, P-256, P-384, P-521), and Ed25519
@@ -45,9 +42,7 @@ The GoPKI KeyPair module provides a unified, type-safe interface for generating 
 - **Use Cases**: SSH keys, modern TLS, secure messaging
 - **Performance**: Fastest signing and verification
 
-## Architecture
-
-### Type System
+## Type System
 
 The module uses Go generics with interface constraints to ensure type safety:
 
@@ -497,42 +492,6 @@ func demonstrateAlgorithmDetection() {
 }
 ```
 
-## Development and Testing
-
-### Quick Start
-```bash
-# Install Task for development workflows
-brew install go-task/tap/go-task  # macOS
-# or see https://taskfile.dev/installation/
-
-# Setup the project
-task setup
-
-# Run tests for the keypair module
-task test:keypair
-
-# Run all tests with coverage
-task test:coverage
-
-# Format and check code
-task format
-task lint
-```
-
-### Working with Examples
-```bash
-# Run the basic keypair examples
-task dev
-
-# Build example binaries
-task build:examples
-
-# Clean generated files
-task clean
-```
-
-For more development commands, run `task` to see all available tasks.
-
 ---
 
-This documentation provides a complete guide to using the GoPKI KeyPair module, from basic theory to practical examples. The generic type system ensures compile-time safety while supporting multiple cryptographic algorithms in a unified interface.
+For complete project documentation and development commands, see the main [README](../README.md).
