@@ -97,8 +97,8 @@ func SignDocument[T keypair.KeyPair](data []byte, keyPair T, certificate *cert.C
 	case FormatRaw:
 		// Raw format is already complete
 	case FormatPKCS7, FormatPKCS7Detached:
-		// PKCS#7 format will be implemented in the formats package
-		return nil, fmt.Errorf("PKCS#7 format not yet implemented")
+		// PKCS#7 format is handled through the formats package
+		// The signature data is already set above using the format interface
 	default:
 		return nil, ErrUnsupportedFormat
 	}

@@ -23,7 +23,7 @@ func main() {
 	fmt.Println()
 
 	// Create output directory
-	if err := os.MkdirAll("signatures", 0755); err != nil {
+	if err := os.MkdirAll("examples/signing/output", 0755); err != nil {
 		log.Fatal("Failed to create output directory:", err)
 	}
 
@@ -41,7 +41,7 @@ func main() {
 	demonstratePKCS7Example()
 
 	fmt.Println("\n✅ All examples completed successfully!")
-	fmt.Println("Check the 'signatures' directory for output files.")
+	fmt.Println("Check the 'examples/signing/output' directory for output files.")
 }
 
 func demonstrateRSASigning() {
@@ -90,7 +90,7 @@ func demonstrateRSASigning() {
 		signing.HashAlgorithmToString(signature.HashAlgorithm))
 
 	// Save signature
-	saveSignature(signature, "signatures/rsa_signature.json")
+	saveSignature(signature, "examples/signing/output/rsa_signature.json")
 
 	// Verify the signature
 	err = signing.VerifySignature(document, signature, signing.DefaultVerifyOptions())
@@ -100,8 +100,8 @@ func demonstrateRSASigning() {
 	fmt.Println("✓ Signature verification successful")
 
 	// Save the certificate and keys
-	certificate.SaveToFile("signatures/rsa_signer.crt")
-	keypair.ToFiles(keyPair, "signatures/rsa_private.pem", "signatures/rsa_public.pem")
+	certificate.SaveToFile("examples/signing/output/rsa_signer.crt")
+	keypair.ToFiles(keyPair, "examples/signing/output/rsa_private.pem", "examples/signing/output/rsa_public.pem")
 
 	fmt.Println()
 }
@@ -163,7 +163,7 @@ func demonstrateECDSASigning() {
 	fmt.Println("✓ Signature verification successful")
 
 	// Save signature
-	saveSignature(signature, "signatures/ecdsa_signature.json")
+	saveSignature(signature, "examples/signing/output/ecdsa_signature.json")
 
 	fmt.Println()
 }
@@ -220,7 +220,7 @@ func demonstrateEd25519Signing() {
 	fmt.Printf("✓ Verified signature in %v\n", verificationTime)
 
 	// Save signature
-	saveSignature(signature, "signatures/ed25519_signature.json")
+	saveSignature(signature, "examples/signing/output/ed25519_signature.json")
 
 	fmt.Println()
 }
@@ -491,7 +491,7 @@ func demonstrateMultipleSignatures() {
 		multiSig["signatures"] = append(multiSig["signatures"].([]map[string]interface{}), sigData)
 	}
 
-	saveJSON(multiSig, "signatures/multi_signature.json")
+	saveJSON(multiSig, "examples/signing/output/multi_signature.json")
 	fmt.Println("\n✓ Multi-signature document saved")
 
 	fmt.Println()
@@ -619,9 +619,9 @@ func demonstratePKCS7Example() {
 	fmt.Printf("  Certificate: %s\n", detachedInfo.Certificate.Subject.CommonName)
 
 	// Save PKCS#7 signatures
-	os.WriteFile("signatures/pkcs7_attached.p7s", attachedSig, 0644)
-	os.WriteFile("signatures/pkcs7_detached.p7s", detachedSig, 0644)
-	fmt.Println("\n✓ PKCS#7 signatures saved to signatures/ directory")
+	os.WriteFile("examples/signing/output/pkcs7_attached.p7s", attachedSig, 0644)
+	os.WriteFile("examples/signing/output/pkcs7_detached.p7s", detachedSig, 0644)
+	fmt.Println("\n✓ PKCS#7 signatures saved to examples/signing/output/ directory")
 
 	fmt.Println()
 }

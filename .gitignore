@@ -216,11 +216,9 @@ aof/
 # Generated PEM files from examples
 examples/output/
 examples/certificates/certs/
+examples/signing/output/
 *.pem
 format_output/
-
-# Generated signature files from examples
-signatures/
 
 # Node.js / Semantic Release
 node_modules/
