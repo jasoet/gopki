@@ -1,3 +1,15 @@
+## [1.1.1](https://github.com/jasoet/gopki/compare/v1.1.0...v1.1.1) (2025-09-15)
+
+
+### 🐛 Bug Fixes
+
+* **signing:** integrate formats package and add comprehensive test coverage ([1833d99](https://github.com/jasoet/gopki/commit/1833d994ad214728df1a573830784fc5857220e3)), closes [PKCS#7](https://github.com/jasoet/PKCS/issues/7)
+
+
+### 📚 Documentation
+
+* **readme:** enhance documentation with comprehensive signing features ([50205ca](https://github.com/jasoet/gopki/commit/50205caa1671e1d0b0335a685ad3b22eac9db7cd)), closes [PKCS#7](https://github.com/jasoet/PKCS/issues/7) [PKCS#7](https://github.com/jasoet/PKCS/issues/7)
+
 ## [1.1.0](https://github.com/jasoet/gopki/compare/v1.0.0...v1.1.0) (2025-09-15)
 
 
