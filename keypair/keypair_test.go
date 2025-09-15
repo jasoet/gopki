@@ -4,11 +4,12 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
-	"github.com/jasoet/gopki/keypair/algo"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/jasoet/gopki/keypair/algo"
 )
 
 func TestGenerateRSAKeyPairGeneric(t *testing.T) {
@@ -182,58 +183,6 @@ func TestParsePrivateKeyFromPEMGeneric(t *testing.T) {
 	}
 }
 
-func TestPrivateKeyFromPEMWithDetection(t *testing.T) {
-	// Test RSA detection
-	rsaKeyPair, _ := GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
-	rsaPEM, _ := PrivateKeyToPEM(rsaKeyPair.PrivateKey)
-
-	parsedRSA, algorithm, err := PrivateKeyFromPEM[*rsa.PrivateKey](rsaPEM)
-	if err != nil {
-		t.Fatalf("Failed to detect and parse RSA key: %v", err)
-	}
-
-	if algorithm != "RSA" {
-		t.Errorf("Expected algorithm RSA, got %s", algorithm)
-	}
-
-	if parsedRSA.N.Cmp(rsaKeyPair.PrivateKey.N) != 0 {
-		t.Error("Detected RSA key does not match original")
-	}
-
-	// Test ECDSA detection
-	ecdsaKeyPair, _ := GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
-	ecdsaPEM, _ := PrivateKeyToPEM(ecdsaKeyPair.PrivateKey)
-
-	parsedECDSA, algorithm, err := PrivateKeyFromPEM[*ecdsa.PrivateKey](ecdsaPEM)
-	if err != nil {
-		t.Fatalf("Failed to detect and parse ECDSA key: %v", err)
-	}
-
-	if algorithm != "ECDSA" {
-		t.Errorf("Expected algorithm ECDSA, got %s", algorithm)
-	}
-
-	if parsedECDSA.D.Cmp(ecdsaKeyPair.PrivateKey.D) != 0 {
-		t.Error("Detected ECDSA key does not match original")
-	}
-
-	// Test Ed25519 detection
-	ed25519KeyPair, _ := GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
-	ed25519PEM, _ := PrivateKeyToPEM(ed25519KeyPair.PrivateKey)
-
-	parsedEd25519, algorithm, err := PrivateKeyFromPEM[ed25519.PrivateKey](ed25519PEM)
-	if err != nil {
-		t.Fatalf("Failed to detect and parse Ed25519 key: %v", err)
-	}
-
-	if algorithm != "Ed25519" {
-		t.Errorf("Expected algorithm Ed25519, got %s", algorithm)
-	}
-
-	if string(parsedEd25519) != string(ed25519KeyPair.PrivateKey) {
-		t.Error("Detected Ed25519 key does not match original")
-	}
-}
 
 func TestKeyPairToFiles(t *testing.T) {
 	// Create temporary directory for test files

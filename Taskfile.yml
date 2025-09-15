@@ -177,7 +177,7 @@ tasks:
   clean:
     desc: Clean build artifacts and generated files
     cmds:
-      - rm -rf bin/ dist/ _output/
+      - rm -rf bin/ dist/ _output/ output/docs/
       - rm -f *.test *.out coverage.html
       - rm -rf examples/keypair/output/
       - rm -rf examples/certificates/output/
@@ -321,6 +321,31 @@ tasks:
       - task: test:coverage
       - task: build
       - 'echo "✅ CI pipeline complete"'
+    silent: true
+
+  # Documentation Tasks
+  docs:generate:
+    desc: Generate HTML documentation using godoc
+    cmds:
+      - mkdir -p output/docs/
+      - godoc -html {{.MODULE}} > output/docs/godoc.html
+      - 'echo "✅ HTML documentation generated in output/docs/godoc.html"'
+    generates:
+      - output/docs/godoc.html
+    silent: true
+
+  docs:serve:
+    desc: Start godoc server for interactive documentation
+    cmds:
+      - 'echo "🌐 Starting godoc server on http://localhost:6060"'
+      - 'echo "📖 Visit http://localhost:6060/pkg/{{.MODULE}}/ to view documentation"'
+      - godoc -http=:6060
+
+  docs:clean:
+    desc: Clean generated documentation
+    cmds:
+      - rm -rf output/docs/
+      - 'echo "✅ Documentation cleaned"'
     silent: true
 
   # Example Management

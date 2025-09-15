@@ -20,7 +20,7 @@ X.509 certificate creation and management with support for self-signed certifica
 - **Type-Safe Integration**: Works with the KeyPair module's generic constraints
 - **Certificate Chains**: Support for multi-level certificate hierarchies
 - **Path Length Controls**: Configurable CA depth restrictions
-- **PEM Format Support**: Standard PEM encoding and decoding
+- **Multi-Format Support**: PEM and DER format support with seamless conversion
 - **File Operations**: Save and load certificates with proper metadata
 - **Certificate Verification**: Built-in certificate chain validation
 
@@ -867,6 +867,45 @@ func demonstrateDifferentAlgorithmsExample() {
     }
 }
 ```
+
+## Format Support
+
+The certificate module supports both PEM and DER formats with seamless conversion:
+
+### PEM Format (Default)
+```go
+// Save and load PEM format (text-based, Base64 encoded)
+certificate.SaveToFile("certificate.pem")
+loadedCert, _ := cert.LoadCertificateFromFile("certificate.pem")
+
+// Get PEM data directly
+pemData := certificate.ToPEM()
+```
+
+### DER Format (Binary)
+```go
+// Save and load DER format (binary, more compact)
+certificate.SaveToDERFile("certificate.der")
+derCert, _ := cert.LoadCertificateFromDERFile("certificate.der")
+
+// Get DER data directly
+derData := certificate.ToDER() // ~30% smaller than PEM
+```
+
+### Format Conversion
+```go
+// Convert between formats
+derBytes, _ := cert.ConvertPEMToDER(pemData)
+pemBytes, _ := cert.ConvertDERToPEM(derData)
+
+// Parse from either format
+pemCert, _ := cert.ParseCertificateFromPEM(pemData)
+derCert, _ := cert.ParseCertificateFromDER(derData)
+```
+
+**Format Comparison:**
+- **PEM**: Text-based, human-readable, larger file size, widely supported
+- **DER**: Binary format, ~30% smaller, faster parsing, used in Java keystores
 
 ## Integration with Other Modules
 

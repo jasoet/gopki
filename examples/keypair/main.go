@@ -155,11 +155,11 @@ func detectionExample() {
 
 		// Use the generic detection function - try each type
 		var algorithm string
-		if _, alg, err := keypair.PrivateKeyFromPEM[*rsa.PrivateKey](pemData); err == nil {
+		if _, alg, err := format.PrivateKeyFromPEM[*rsa.PrivateKey](pemData); err == nil {
 			algorithm = alg
-		} else if _, alg, err := keypair.PrivateKeyFromPEM[*ecdsa.PrivateKey](pemData); err == nil {
+		} else if _, alg, err := format.PrivateKeyFromPEM[*ecdsa.PrivateKey](pemData); err == nil {
 			algorithm = alg
-		} else if _, alg, err := keypair.PrivateKeyFromPEM[ed25519.PrivateKey](pemData); err == nil {
+		} else if _, alg, err := format.PrivateKeyFromPEM[ed25519.PrivateKey](pemData); err == nil {
 			algorithm = alg
 		} else {
 			fmt.Printf("   ❌ Failed to detect %s: %v\n", expectedAlgo, err)

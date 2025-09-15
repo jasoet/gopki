@@ -13,17 +13,43 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// SSH format constants
+// SSH format constants define the standard SSH key type identifiers
+// used in SSH public key formats and authorized_keys files.
 const (
+	// SSHRSAType is the SSH identifier for RSA public keys
 	SSHRSAType     = "ssh-rsa"
+	// SSHEd25519Type is the SSH identifier for Ed25519 public keys
 	SSHEd25519Type = "ssh-ed25519"
+	// SSHECDSAPrefix is the common prefix for ECDSA SSH key types (e.g., ecdsa-sha2-nistp256)
 	SSHECDSAPrefix = "ecdsa-sha2-"
 )
 
 var (
+	// sshPublicKeyRegex parses SSH public key format: "algorithm base64-key [comment]"
+	// Groups: 1=algorithm, 2=base64 key data, 3=optional comment
 	sshPublicKeyRegex = regexp.MustCompile(`^(ssh-rsa|ssh-ed25519|ecdsa-sha2-[a-z0-9]+)\s+([A-Za-z0-9+/=]+)(?:\s+(.*))?$`)
 )
 
+// PublicKeyToSSH converts a cryptographic public key to SSH public key format.
+// The SSH format is used in authorized_keys files and for key identification.
+//
+// Type parameter:
+//   - T: Public key type (*rsa.PublicKey, *ecdsa.PublicKey, or ed25519.PublicKey)
+//
+// Parameters:
+//   - publicKey: The public key to convert
+//   - comment: Optional comment to include in the SSH key (commonly username@hostname)
+//
+// Returns:
+//   - String in SSH public key format: "algorithm base64-key [comment]"
+//   - Error if conversion fails
+//
+// Example:
+//
+//	sshKey, err := PublicKeyToSSH(rsaPublicKey, "user@example.com")
+//	if err != nil {
+//		log.Printf("SSH conversion failed: %v", err)
+//	}
 func PublicKeyToSSH[T keypair.PublicKey](publicKey T, comment string) (string, error) {
 	sshPubKey, err := ssh.NewPublicKey(publicKey)
 	if err != nil {
@@ -43,6 +69,25 @@ func PublicKeyToSSH[T keypair.PublicKey](publicKey T, comment string) (string, e
 	return sshStr, nil
 }
 
+// ParsePublicKeyFromSSH parses a public key from SSH public key format.
+// This function can parse keys from authorized_keys files or SSH key strings.
+//
+// Type parameter:
+//   - T: Expected public key type (*rsa.PublicKey, *ecdsa.PublicKey, or ed25519.PublicKey)
+//
+// Parameters:
+//   - sshData: SSH public key string in format "algorithm base64-key [comment]"
+//
+// Returns:
+//   - The parsed public key of the specified type
+//   - Error if parsing fails or key type doesn't match
+//
+// Example:
+//
+//	rsaKey, err := ParsePublicKeyFromSSH[*rsa.PublicKey]("ssh-rsa AAAAB3... user@host")
+//	if err != nil {
+//		log.Printf("SSH key parsing failed: %v", err)
+//	}
 func ParsePublicKeyFromSSH[T keypair.PublicKey](sshData string) (T, error) {
 	var zero T
 
@@ -61,6 +106,29 @@ func ParsePublicKeyFromSSH[T keypair.PublicKey](sshData string) (T, error) {
 	return typedKey, nil
 }
 
+// PrivateKeyToSSH converts a cryptographic private key to OpenSSH private key format.
+// This format is used by OpenSSH for storing private keys, with optional passphrase protection.
+//
+// Type parameter:
+//   - T: Private key type (*rsa.PrivateKey, *ecdsa.PrivateKey, or ed25519.PrivateKey)
+//
+// Parameters:
+//   - privateKey: The private key to convert
+//   - comment: Optional comment to embed in the key file
+//   - passphrase: Optional passphrase for key encryption (empty string for unencrypted)
+//
+// Returns:
+//   - String containing the OpenSSH private key in PEM format
+//   - Error if conversion fails
+//
+// Security note: Using a passphrase is recommended for private key storage.
+//
+// Example:
+//
+//	sshKey, err := PrivateKeyToSSH(rsaPrivateKey, "my-key", "secure-passphrase")
+//	if err != nil {
+//		log.Printf("SSH conversion failed: %v", err)
+//	}
 func PrivateKeyToSSH[T keypair.PrivateKey](privateKey T, comment string, passphrase string) (string, error) {
 	var pemBlock *pem.Block
 	var err error
@@ -79,6 +147,28 @@ func PrivateKeyToSSH[T keypair.PrivateKey](privateKey T, comment string, passphr
 	return string(sshPrivateKey), nil
 }
 
+// ParsePrivateKeyFromSSH parses a private key from OpenSSH private key format.
+// This function handles both encrypted and unencrypted OpenSSH private keys.
+//
+// Type parameter:
+//   - T: Expected private key type (*rsa.PrivateKey, *ecdsa.PrivateKey, or ed25519.PrivateKey)
+//
+// Parameters:
+//   - sshData: OpenSSH private key data (typically from a file like id_rsa)
+//   - passphrase: Passphrase for encrypted keys (empty string for unencrypted)
+//
+// Returns:
+//   - The parsed private key of the specified type
+//   - Error if parsing fails, wrong passphrase, or key type doesn't match
+//
+// Note: The function handles the Ed25519 pointer/value type conversion automatically.
+//
+// Example:
+//
+//	rsaKey, err := ParsePrivateKeyFromSSH[*rsa.PrivateKey](sshKeyData, "passphrase")
+//	if err != nil {
+//		log.Printf("SSH key parsing failed: %v", err)
+//	}
 func ParsePrivateKeyFromSSH[T keypair.PrivateKey](sshData string, passphrase string) (T, error) {
 	var zero T
 
@@ -117,12 +207,33 @@ func ParsePrivateKeyFromSSH[T keypair.PrivateKey](sshData string, passphrase str
 	return typedKey, nil
 }
 
+// SSHPublicKeyInfo contains the parsed components of an SSH public key.
+// This structure provides easy access to the individual parts of an SSH key string.
 type SSHPublicKeyInfo struct {
-	Algorithm string
-	KeyData   string
-	Comment   string
+	Algorithm string // The key algorithm (ssh-rsa, ssh-ed25519, ecdsa-sha2-*)
+	KeyData   string // The Base64-encoded key data
+	Comment   string // Optional comment (often username@hostname)
 }
 
+// ParseSSHPublicKeyInfo parses an SSH public key string into its component parts.
+// This function extracts the algorithm, key data, and optional comment without
+// performing cryptographic validation.
+//
+// Parameters:
+//   - sshData: SSH public key string in standard format
+//
+// Returns:
+//   - *SSHPublicKeyInfo: Parsed components of the SSH key
+//   - Error if the format is invalid
+//
+// Example:
+//
+//	info, err := ParseSSHPublicKeyInfo("ssh-rsa AAAAB3... user@host")
+//	if err != nil {
+//		log.Printf("Invalid SSH key format: %v", err)
+//	} else {
+//		fmt.Printf("Algorithm: %s, Comment: %s\n", info.Algorithm, info.Comment)
+//	}
 func ParseSSHPublicKeyInfo(sshData string) (*SSHPublicKeyInfo, error) {
 	matches := sshPublicKeyRegex.FindStringSubmatch(strings.TrimSpace(sshData))
 	if matches == nil {
@@ -141,6 +252,19 @@ func ParseSSHPublicKeyInfo(sshData string) (*SSHPublicKeyInfo, error) {
 	return info, nil
 }
 
+// GetSSHKeyType maps SSH algorithm names to standardized key type names.
+// This function converts SSH-specific algorithm identifiers to common names.
+//
+// Parameters:
+//   - algorithm: SSH algorithm identifier (e.g., "ssh-rsa", "ssh-ed25519", "ecdsa-sha2-nistp256")
+//
+// Returns:
+//   - Standardized key type name ("RSA", "ECDSA", "Ed25519", or "Unknown")
+//
+// Example:
+//
+//	keyType := GetSSHKeyType("ssh-rsa") // Returns "RSA"
+//	keyType := GetSSHKeyType("ecdsa-sha2-nistp256") // Returns "ECDSA"
 func GetSSHKeyType(algorithm string) string {
 	switch {
 	case algorithm == SSHRSAType:
@@ -154,6 +278,26 @@ func GetSSHKeyType(algorithm string) string {
 	}
 }
 
+// ConvertPEMToSSH converts PEM-encoded key data to SSH format.
+// This function automatically detects the key algorithm and converts to the appropriate SSH format.
+//
+// Parameters:
+//   - pemData: PEM-encoded key data (PKCS#8 for private keys, PKIX for public keys)
+//   - comment: Optional comment to include in SSH format
+//   - isPrivate: true for private key conversion, false for public key conversion
+//
+// Returns:
+//   - String containing the key in SSH format
+//   - Error if conversion fails or key type is unsupported
+//
+// The function tries all supported algorithms (RSA, ECDSA, Ed25519) and uses the first successful match.
+//
+// Example:
+//
+//	sshKey, err := ConvertPEMToSSH(pemData, "user@host", false) // Convert public key
+//	if err != nil {
+//		log.Printf("PEM to SSH conversion failed: %v", err)
+//	}
 func ConvertPEMToSSH(pemData keypair.PEM, comment string, isPrivate bool) (string, error) {
 	if isPrivate {
 		if rsaKey, err := keypair.ParsePrivateKeyFromPEM[*rsa.PrivateKey](pemData); err == nil {
@@ -202,6 +346,26 @@ func ConvertDERToSSH(derData []byte, comment string, isPrivate bool) (string, er
 	}
 }
 
+// ConvertSSHToPEM converts SSH format key data to PEM encoding.
+// This function handles both SSH public keys (authorized_keys format) and OpenSSH private keys.
+//
+// Parameters:
+//   - sshData: SSH-formatted key data
+//   - isPrivate: true for private key conversion, false for public key conversion
+//   - passphrase: Passphrase for encrypted SSH private keys (empty for unencrypted/public keys)
+//
+// Returns:
+//   - PEM-encoded key data
+//   - Error if conversion fails or key type is unsupported
+//
+// The function automatically detects the key algorithm and performs the appropriate conversion.
+//
+// Example:
+//
+//	pemData, err := ConvertSSHToPEM(sshKeyData, true, "passphrase") // Convert private key
+//	if err != nil {
+//		log.Printf("SSH to PEM conversion failed: %v", err)
+//	}
 func ConvertSSHToPEM(sshData string, isPrivate bool, passphrase string) (keypair.PEM, error) {
 	if isPrivate {
 		// Try to parse SSH private key and convert to PEM
