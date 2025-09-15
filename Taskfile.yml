@@ -38,12 +38,14 @@ tasks:
     desc: Build example binaries
     deps: [build]
     cmds:
-      - go build -o bin/basic-example ./examples/main.go
+      - go build -o bin/keypair-example ./examples/keypair/main.go
       - go build -o bin/certificates-example ./examples/certificates/main.go
+      - go build -o bin/signing-example ./examples/signing/main.go
       - 'echo "✅ Examples built in bin/ directory"'
     generates:
-      - bin/basic-example
+      - bin/keypair-example
       - bin/certificates-example
+      - bin/signing-example
     silent: true
 
   # Development Tasks
@@ -51,7 +53,7 @@ tasks:
     desc: Run basic example in development mode
     deps: [build]
     cmds:
-      - go run ./examples/main.go
+      - go run ./examples/keypair/main.go
 
   dev:certs:
     desc: Run certificate examples in development mode
@@ -177,8 +179,9 @@ tasks:
     cmds:
       - rm -rf bin/ dist/ _output/
       - rm -f *.test *.out coverage.html
-      - rm -rf examples/output/
-      - rm -rf examples/certificates/certs/
+      - rm -rf examples/keypair/output/
+      - rm -rf examples/certificates/output/
+      - rm -rf examples/signing/output/
       - rm -rf format_output/
       - rm -f *.pem *.key *.crt *.csr
       - 'echo "✅ Cleaned build artifacts and generated files"'
@@ -325,16 +328,20 @@ tasks:
     desc: Run all examples
     deps: [build]
     cmds:
-      - 'echo "🔐 Running basic PKI examples..."'
-      - go run ./examples/main.go
+      - 'echo "🔐 Running keypair examples..."'
+      - go run ./examples/keypair/main.go
       - 'echo ""'
       - 'echo "📜 Running certificate examples..."'
       - go run ./examples/certificates/main.go
+      - 'echo ""'
+      - 'echo "✍️ Running document signing examples..."'
+      - go run ./examples/signing/main.go
 
   examples:clean:
     desc: Clean example output directories
     cmds:
-      - rm -rf examples/output/
-      - rm -rf examples/certificates/certs/
+      - rm -rf examples/keypair/output/
+      - rm -rf examples/certificates/output/
+      - rm -rf examples/signing/output/
       - 'echo "✅ Example outputs cleaned"'
     silent: true

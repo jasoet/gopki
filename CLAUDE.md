@@ -64,6 +64,7 @@ go test ./...
 go test -v ./...
 go test ./keypair -v
 go test ./cert -v
+go test ./signing -v
 go test -run TestGenerateRSAKeyPair ./keypair -v
 
 # Building
@@ -76,8 +77,9 @@ go fmt ./...
 go vet ./...
 
 # Examples
-cd examples && go run main.go
+cd examples/keypair && go run main.go
 cd examples/certificates && go run main.go
+cd examples/signing && go run main.go
 ```
 
 ## Architecture Overview
@@ -98,14 +100,22 @@ GoPKI is a type-safe Go library for PKI operations using generic constraints for
 - Path length constraints for CA hierarchies
 - Integrates with keypair module through generic constraints
 
+**`signing/`** - Document signing and signature verification
+- Digital signatures with RSA, ECDSA, and Ed25519 algorithms
+- Industry-standard PKCS#7/CMS format support (attached and detached)
+- Raw signature format for custom applications
+- Certificate integration for complete signature verification
+- Streaming API for large document signing
+
 **`keypair/format/`** - Key format conversion utilities
 - PEM/DER format interchange
 - SSH public key format support
 - Cross-format conversion capabilities
 
 **`examples/`** - Working demonstrations
-- `main.go` - Basic key generation and certificate creation
-- `certificates/` - Advanced PKI with CA hierarchies
+- `keypair/` - Key generation, format conversion, and SSH support
+- `certificates/` - Advanced PKI with CA hierarchies and certificate chains
+- `signing/` - Document signing with multi-algorithm and PKCS#7/CMS support
 
 ### Generic Type System
 
@@ -152,6 +162,27 @@ certificate, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRe
 
 CA certificates support path length constraints for controlling certificate chain depth.
 
+### Document Signing Operations
+
+The library includes a complete document signing module with PKCS#7/CMS support:
+```go
+// Basic document signing
+signature, err := signing.SignDocument(data, keyPair, certificate, signing.SignOptions{
+    Format: signing.FormatPKCS7,
+    HashAlgorithm: crypto.SHA256,
+    IncludeCertificate: true,
+})
+
+// Verify signature
+err = signing.VerifySignature(data, signature, signing.DefaultVerifyOptions())
+```
+
+Signing supports:
+- Multi-algorithm support (RSA, ECDSA, Ed25519)
+- Multiple signature formats (Raw, PKCS#7/CMS attached/detached)
+- Certificate integration and verification
+- Streaming API for large documents
+
 ## Key Development Patterns
 
 ### Type-Safe Key Generation
@@ -168,6 +199,8 @@ The library includes utilities for saving keys and certificates with proper file
 - Cross-compatibility tests between algorithms
 - File I/O and error handling test coverage
 - Integration tests with real certificate operations
+- Document signing tests across all algorithms and formats
+- PKCS#7/CMS format verification and parsing tests
 
 ### Format Conversions
 Use the `keypair/format/` package for converting between PEM, DER, and SSH formats. This handles the complexity of format-specific encoding requirements.

@@ -9,7 +9,7 @@ Document signing and signature verification with multi-algorithm support and cer
 - **Multi-Algorithm Support**: All algorithms from [KeyPair Module](KeyPair.md) - RSA, ECDSA (P-256/P-384/P-521), and Ed25519
 - **Type-Safe Design**: Uses Go generics for compile-time safety, consistent with other modules
 - **Certificate Integration**: Works seamlessly with [Certificate Module](Certificate.md) certificates
-- **Signature Formats**: Raw signatures (implemented) and planned PKCS#7/CMS support
+- **Signature Formats**: Raw signatures and complete PKCS#7/CMS support (industry standard)
 - **Streaming Support**: Efficient signing of large documents via `io.Reader`
 - **Complete Verification**: Full signature verification with certificate chain validation
 - **Metadata Support**: Include custom attributes and certificate chains in signatures
@@ -122,11 +122,10 @@ go test ./signing -v -cover
 - Streaming API
 - Full test coverage
 
-🔄 **Planned Features**
-- PKCS#7/CMS format support
-- Timestamp authority integration
-- PDF signing support
-- S/MIME email signing
+✅ **Advanced Features**
+- Complete PKCS#7/CMS format support (attached and detached signatures)
+- Format registry for extensible signature format support
+- Comprehensive test coverage for all algorithms and formats
 
 ## Integration
 
@@ -157,7 +156,7 @@ The signing module integrates seamlessly with other GoPKI modules:
 
 - **[KeyPair Module](KeyPair.md)**: Uses all supported algorithms (RSA, ECDSA, Ed25519)
 - **[Certificate Module](Certificate.md)**: Works with any certificate type (self-signed, CA-signed)
-- **Format Module**: Planned integration for PEM/DER signature formats
+- **Formats Package**: Complete signature format implementation (Raw, PKCS#7/CMS)
 
 For comprehensive examples and detailed API documentation, see:
 - Main project documentation: [README](../README.md)
