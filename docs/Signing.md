@@ -1,15 +1,18 @@
-# GoPKI Document Signing Module
+# Signing Module
 
-The signing module provides comprehensive document signing and signature verification functionality using certificates and various cryptographic algorithms.
+Document signing and signature verification with multi-algorithm support and certificate integration.
+
+> 📖 **Related Documentation**: [KeyPair Module](KeyPair.md) | [Certificate Module](Certificate.md) | [Main README](../README.md)
 
 ## Features
 
-- **Multi-Algorithm Support**: RSA, ECDSA (P-256/P-384/P-521), and Ed25519
-- **Type-Safe Design**: Uses Go generics for compile-time safety
-- **Flexible Formats**: Raw signatures with planned PKCS#7/CMS support
-- **Certificate Integration**: Works seamlessly with the GoPKI cert module
-- **Streaming Support**: Handle large documents efficiently
-- **Verification**: Complete signature verification with certificate validation
+- **Multi-Algorithm Support**: All algorithms from [KeyPair Module](KeyPair.md) - RSA, ECDSA (P-256/P-384/P-521), and Ed25519
+- **Type-Safe Design**: Uses Go generics for compile-time safety, consistent with other modules
+- **Certificate Integration**: Works seamlessly with [Certificate Module](Certificate.md) certificates
+- **Signature Formats**: Raw signatures (implemented) and planned PKCS#7/CMS support
+- **Streaming Support**: Efficient signing of large documents via `io.Reader`
+- **Complete Verification**: Full signature verification with certificate chain validation
+- **Metadata Support**: Include custom attributes and certificate chains in signatures
 
 ## Quick Start
 
@@ -29,13 +32,13 @@ import (
 )
 
 func main() {
-    // Generate key pair
+    // 1. Generate key pair (see KeyPair Module docs)
     keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
     if err != nil {
         log.Fatal(err)
     }
 
-    // Create certificate
+    // 2. Create certificate (see Certificate Module docs)
     certificate, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
         Subject: pkix.Name{CommonName: "Document Signer"},
         ValidFor: 365 * 24 * time.Hour,
@@ -44,20 +47,20 @@ func main() {
         log.Fatal(err)
     }
 
-    // Sign document
+    // 3. Sign document
     document := []byte("Important document content")
     signature, err := signing.SignData(document, keyPair, certificate)
     if err != nil {
         log.Fatal(err)
     }
 
-    // Verify signature
+    // 4. Verify signature
     err = signing.VerifySignature(document, signature, signing.DefaultVerifyOptions())
     if err != nil {
         log.Fatal(err)
     }
 
-    fmt.Println("Document signed and verified successfully!")
+    fmt.Println("✓ Document signed and verified successfully!")
 }
 ```
 
@@ -133,4 +136,35 @@ The signing module integrates seamlessly with other GoPKI modules:
 - Uses `cert` module for certificate operations
 - Maintains the same type-safe generic design patterns
 
-For more information, see the main GoPKI documentation and the examples directory.
+## Development
+
+See the [main README](../README.md) for development commands using Taskfile.
+
+```bash
+# Run signing module tests
+task test:signing          # Once implemented in Taskfile
+
+# Run all tests including signing
+task test
+
+# Run signing examples
+cd examples/signing && go run .
+```
+
+## Integration with Other Modules
+
+The signing module integrates seamlessly with other GoPKI modules:
+
+- **[KeyPair Module](KeyPair.md)**: Uses all supported algorithms (RSA, ECDSA, Ed25519)
+- **[Certificate Module](Certificate.md)**: Works with any certificate type (self-signed, CA-signed)
+- **Format Module**: Planned integration for PEM/DER signature formats
+
+For comprehensive examples and detailed API documentation, see:
+- Main project documentation: [README](../README.md)
+- Working examples: `examples/signing/`
+- Algorithm details: [KeyPair Module](KeyPair.md)
+- Certificate operations: [Certificate Module](Certificate.md)
+
+---
+
+> 📖 **Related Documentation**: [KeyPair Module](KeyPair.md) | [Certificate Module](Certificate.md) | [Main README](../README.md)
