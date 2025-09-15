@@ -1,0 +1,26 @@
+{
+  "document": "TXVsdGktcGFydHkgYWdyZWVtZW50IHJlcXVpcmluZyBtdWx0aXBsZSBzaWduYXR1cmVz",
+  "signatures": [
+    {
+      "algorithm": "RSA",
+      "digest": "YIpOOpUVl4A7k58MwSmER7IXplqQt4mKeeIRfq0VU4o=",
+      "hash": "SHA256",
+      "signature": "LlltYba+DsWgnVzHwxkW1EfHRFaLBK80uKE9I3BVmBaXYbcoujQspmhUgXUfRbkmrWkO7JkDyBr0X8DCoaSjaBaezUSCxwaG8UXXkjGzewvAfBGi1XH/ewQCJ0QL5/O+E/Kv7pQ5Gtvf1SG5lLCBdfwDgPcMQUz23aieQ9e8UqP0MVt6TtpDJAG4b3EvmzPGHlE+wFxCOYixwpgGVbYbsYdVZP9sgaww+LM1ZNJ/LPPtwqXomDAbnbfOoglU2BXO8evfgucVbz8Hjz3TZkCVPhpvFvphAE3ymSRv8j74bLQ1mR9Nr+9lDoUIXZpAc2JaaN5Mu9cakvsXKzl89wah4Q==",
+      "signer": "Alice"
+    },
+    {
+      "algorithm": "ECDSA",
+      "digest": "YIpOOpUVl4A7k58MwSmER7IXplqQt4mKeeIRfq0VU4o=",
+      "hash": "SHA256",
+      "signature": "MEUCIQDAg5lK6If7pqIcnbvUQaEY7VRVU9EMYE8y8PvbNbTYCQIgAWy49bX1wlPCl4XcrPvKxsgtb2d5XUPboIpupWHAH6Y=",
+      "signer": "Bob"
+    },
+    {
+      "algorithm": "Ed25519",
+      "digest": "qAyP9clSRdQBqGB04XcDXYMXtgHAQC7HkjU2liDIhyQZ1rH4yho3WRbLw2MgAA9rdV80m33qwAbyQIw+DDAUJw==",
+      "hash": "SHA512",
+      "signature": "Zn4I6EY+Wd7iGAo6fGXfaJGED4CTElyAMzQNjvBB4z17pbM/0kU+9pxGiSol96/wp8uZ2J+OVT4f95tV3rCsCQ==",
+      "signer": "Charlie"
+    }
+  ]
+}

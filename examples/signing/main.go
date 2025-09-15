@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto"
+	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/json"
@@ -14,6 +15,7 @@ import (
 	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
 	"github.com/jasoet/gopki/signing"
+	"github.com/jasoet/gopki/signing/formats"
 )
 
 func main() {
@@ -34,6 +36,9 @@ func main() {
 	demonstrateSigningWithOptions()
 	demonstrateSignatureVerification()
 	demonstrateMultipleSignatures()
+
+	// Demonstrate PKCS#7 formats
+	demonstratePKCS7Example()
 
 	fmt.Println("\n✅ All examples completed successfully!")
 	fmt.Println("Check the 'signatures' directory for output files.")
@@ -293,9 +298,11 @@ func demonstrateSigningWithOptions() {
 		}
 	}
 
-	// Verify with chain validation
+	// Verify with chain validation (create root pool with CA certificate)
 	verifyOpts := signing.DefaultVerifyOptions()
 	verifyOpts.VerifyChain = true
+	verifyOpts.Roots = x509.NewCertPool()
+	verifyOpts.Roots.AddCert(caCert.Certificate)
 	err = signing.VerifySignature(document, signature, verifyOpts)
 	if err != nil {
 		log.Fatal("Verification failed:", err)
@@ -525,4 +532,96 @@ func saveJSON(data interface{}, filename string) {
 		log.Printf("Failed to save file %s: %v", filename, err)
 		return
 	}
+}
+
+func demonstratePKCS7Example() {
+	fmt.Println("7. PKCS#7/CMS Format Examples")
+	fmt.Println("=============================")
+
+	// Generate key pair and certificate
+	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	if err != nil {
+		log.Fatal("Failed to generate key pair:", err)
+	}
+
+	certificate, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName:   "PKCS#7 Document Signer",
+			Organization: []string{"Example Corp"},
+		},
+		ValidFor: 365 * 24 * time.Hour,
+	})
+	if err != nil {
+		log.Fatal("Failed to create certificate:", err)
+	}
+	fmt.Printf("✓ Created certificate for: %s\n", certificate.Certificate.Subject.CommonName)
+
+	document := []byte("Important contract requiring PKCS#7 signature")
+
+	// Test attached PKCS#7
+	fmt.Println("\n--- Attached PKCS#7 ---")
+	attachedFormat := formats.NewPKCS7Format(false)
+
+	attachedOpts := formats.SignOptions{
+		HashAlgorithm:      crypto.SHA256,
+		IncludeCertificate: true,
+	}
+
+	attachedSig, err := attachedFormat.Sign(document, keyPair.PrivateKey, certificate.Certificate, attachedOpts)
+	if err != nil {
+		log.Fatal("Failed to create attached PKCS#7:", err)
+	}
+	fmt.Printf("✓ Created attached PKCS#7 signature (%d bytes)\n", len(attachedSig))
+
+	// Verify attached PKCS#7
+	attachedVerifyOpts := formats.VerifyOptions{}
+	err = attachedFormat.Verify(document, attachedSig, certificate.Certificate, attachedVerifyOpts)
+	if err != nil {
+		log.Fatal("Attached PKCS#7 verification failed:", err)
+	}
+	fmt.Println("✓ Attached PKCS#7 verified successfully")
+
+	// Test detached PKCS#7
+	fmt.Println("\n--- Detached PKCS#7 ---")
+	detachedFormat := formats.NewPKCS7Format(true)
+
+	detachedOpts := formats.SignOptions{
+		HashAlgorithm:      crypto.SHA384,
+		IncludeCertificate: true,
+	}
+
+	detachedSig, err := detachedFormat.Sign(document, keyPair.PrivateKey, certificate.Certificate, detachedOpts)
+	if err != nil {
+		log.Fatal("Failed to create detached PKCS#7:", err)
+	}
+	fmt.Printf("✓ Created detached PKCS#7 signature (%d bytes)\n", len(detachedSig))
+
+	// Verify detached PKCS#7
+	detachedVerifyOpts := formats.VerifyOptions{}
+	err = detachedFormat.Verify(document, detachedSig, certificate.Certificate, detachedVerifyOpts)
+	if err != nil {
+		log.Fatal("Detached PKCS#7 verification failed:", err)
+	}
+	fmt.Println("✓ Detached PKCS#7 verified successfully")
+
+	// Parse and display info
+	attachedInfo, _ := attachedFormat.Parse(attachedSig)
+	detachedInfo, _ := detachedFormat.Parse(detachedSig)
+
+	fmt.Printf("\nAttached PKCS#7 info:\n")
+	fmt.Printf("  Algorithm: %s\n", attachedInfo.Algorithm)
+	fmt.Printf("  Detached: %v\n", attachedInfo.Detached)
+	fmt.Printf("  Certificate: %s\n", attachedInfo.Certificate.Subject.CommonName)
+
+	fmt.Printf("\nDetached PKCS#7 info:\n")
+	fmt.Printf("  Algorithm: %s\n", detachedInfo.Algorithm)
+	fmt.Printf("  Detached: %v\n", detachedInfo.Detached)
+	fmt.Printf("  Certificate: %s\n", detachedInfo.Certificate.Subject.CommonName)
+
+	// Save PKCS#7 signatures
+	os.WriteFile("signatures/pkcs7_attached.p7s", attachedSig, 0644)
+	os.WriteFile("signatures/pkcs7_detached.p7s", detachedSig, 0644)
+	fmt.Println("\n✓ PKCS#7 signatures saved to signatures/ directory")
+
+	fmt.Println()
 }
