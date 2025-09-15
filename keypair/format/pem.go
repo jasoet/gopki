@@ -192,20 +192,6 @@ func GetKeyTypeFromPEM(pemData keypair.PEM) (string, error) {
 }
 
 
-// isPrivateKeyPEM determines if PEM data contains a private key by checking the block type.
-// This is an internal utility function used for automatic key type detection.
-//
-// Parameters:
-//   - pemData: PEM-encoded data
-//
-// Returns:
-//   - true if the PEM block type is "PRIVATE KEY", false otherwise
-//
-// The function checks the PEM block type without parsing the actual key data.
-func isPrivateKeyPEM(pemData keypair.PEM) bool {
-	block, _ := pem.Decode(pemData)
-	return block != nil && block.Type == "PRIVATE KEY"
-}
 
 // ValidatePEMFormat validates that the provided data is in proper PEM format
 // and contains a supported key type (PUBLIC KEY or PRIVATE KEY).

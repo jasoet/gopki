@@ -99,7 +99,6 @@ type pkcs7Attribute struct {
 var (
 	oidSignedData      = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 2}
 	oidData            = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 1}
-	oidContentTypes    = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 12}
 	oidMessageDigest   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 4}
 	oidSigningTime     = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 5}
 	oidRSAEncryption   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}

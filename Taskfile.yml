@@ -12,6 +12,34 @@ tasks:
       - task --list
     silent: true
 
+  help:quality:
+    desc: Show all code quality and analysis tasks
+    cmds:
+      - 'echo "📋 Code Quality & Analysis Tasks:"'
+      - 'echo ""'
+      - 'echo "Testing:"'
+      - 'echo "  task test              - Run tests with race detection and coverage"'
+      - 'echo "  task test:quick        - Run tests without race detection (faster)"'
+      - 'echo ""'
+      - 'echo "Code Analysis:"'
+      - 'echo "  task lint              - Run go vet static analysis"'
+      - 'echo "  task lint:full         - Run golangci-lint comprehensive check"'
+      - 'echo "  task deadcode          - Find unused/dead code with deadcode tool"'
+      - 'echo "  task unused            - Find unused code with golangci-lint"'
+      - 'echo "  task unused:all        - Run all unused code detection tools"'
+      - 'echo "  task analyze           - Run lint, vet, and deadcode"'
+      - 'echo "  task analyze:full      - Run full analysis with all tools"'
+      - 'echo ""'
+      - 'echo "Formatting:"'
+      - 'echo "  task format            - Format all Go code"'
+      - 'echo "  task format:check      - Check if code is properly formatted"'
+      - 'echo ""'
+      - 'echo "💡 Tips:"'
+      - 'echo "  • Use task test for comprehensive testing with coverage"'
+      - 'echo "  • Use task deadcode to quickly find unused functions"'
+      - 'echo "  • Use task analyze:full for complete code analysis"'
+    silent: true
+
   # Setup and Dependencies
   setup:
     desc: Initial project setup - download dependencies and verify module
@@ -48,62 +76,22 @@ tasks:
       - bin/signing-example
     silent: true
 
-  # Development Tasks
-  dev:
-    desc: Run basic example in development mode
-    deps: [build]
-    cmds:
-      - go run ./examples/keypair/main.go
-
-  dev:certs:
-    desc: Run certificate examples in development mode
-    deps: [build]
-    cmds:
-      - go run ./examples/certificates/main.go
-
   # Testing Tasks
   test:
-    desc: Run all tests
+    desc: Run all tests with race detection and coverage report
     env:
       CGO_ENABLED: 1
     cmds:
-      - go test ./... -race
-
-  test:verbose:
-    desc: Run all tests with verbose output
-    cmds:
-      - go test -v ./... -race
-
-  test:coverage:
-    desc: Run tests with coverage report
-    cmds:
-      - go test -coverprofile=coverage.out ./...
-      - go tool cover -html=coverage.out -o coverage.html
-      - 'echo "✅ Coverage report generated: coverage.html"'
+      - mkdir -p output/
+      - go test ./... -race -coverprofile=output/coverage.out
+      - go tool cover -html=output/coverage.out -o output/coverage.html
+      - go tool cover -func=output/coverage.out | tail -1
+      - 'echo "✅ Tests completed with coverage report: output/coverage.html"'
     generates:
-      - coverage.out
-      - coverage.html
+      - output/coverage.out
+      - output/coverage.html
     silent: true
 
-  test:keypair:
-    desc: Run keypair module tests
-    cmds:
-      - go test ./keypair -v
-
-  test:cert:
-    desc: Run certificate module tests
-    cmds:
-      - go test ./cert -v
-
-  test:format:
-    desc: Run format module tests
-    cmds:
-      - go test ./keypair/format -v
-
-  test:specific:
-    desc: Run specific test function (usage - task test:specific -- TestGenerateRSAKeyPair)
-    cmds:
-      - go test -run {{.CLI_ARGS}} ./... -v
 
   # Code Quality Tasks
   lint:
@@ -112,6 +100,17 @@ tasks:
       - go vet ./...
       - 'echo "✅ Linting complete"'
     silent: true
+
+  unused:
+    desc: Check for unused code using golangci-lint
+    cmds:
+      - |
+        if ! command -v golangci-lint &> /dev/null; then
+          echo "⚠️  golangci-lint not found. Installing..."
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+        fi
+      - golangci-lint run --enable=unused --disable-all ./...
+    silent: false
 
   lint:install:
     desc: Install golangci-lint for advanced linting
@@ -173,12 +172,13 @@ tasks:
     desc: Show module dependency graph
     cmds:
       - go mod graph
-  # Clean Tasks
+
+
   clean:
     desc: Clean build artifacts and generated files
     cmds:
-      - rm -rf bin/ dist/ _output/ output/docs/
-      - rm -f *.test *.out coverage.html
+      - rm -rf bin/ dist/ _output/ output/
+      - rm -f *.test *.out *.html
       - rm -rf examples/keypair/output/
       - rm -rf examples/certificates/output/
       - rm -rf examples/signing/output/
@@ -230,16 +230,6 @@ tasks:
     cmds:
       - go test -bench=. ./...
 
-  bench:keypair:
-    desc: Run keypair benchmarks
-    cmds:
-      - go test -bench=. ./keypair
-
-  bench:cert:
-    desc: Run certificate benchmarks
-    cmds:
-      - go test -bench=. ./cert
-
   # Security Tasks
   security:check:
     desc: Check for known vulnerabilities in dependencies
@@ -277,61 +267,41 @@ tasks:
       - git add .
       - git commit -m "{{.CLI_ARGS}}"
 
-  # Release Tasks
-  release:check:
-    desc: Check if ready for release
-    cmds:
-      - task: format:check
-      - task: lint
-      - task: test
-      - task: build
-      - 'echo "✅ Release checks passed"'
-    silent: true
-
-  release:tag:
-    desc: Create a new version tag (usage - task release:tag -- v1.0.0)
-    deps: [release:check]
-    cmds:
-      - git tag {{.CLI_ARGS}}
-      - git push origin {{.CLI_ARGS}}
-      - 'echo "✅ Tag {{.CLI_ARGS}} created and pushed"'
-    silent: true
-
-  # Quick Commands
-  quick:test:
-    desc: Quick test without race detection
-    cmds:
-      - go test ./...
-
-  quick:check:
-    desc: Quick format and vet check
-    cmds:
-      - go fmt ./...
-      - go vet ./...
-      - 'echo "✅ Quick check complete"'
-    silent: true
-
-  # CI/CD Preparation Tasks
-  ci:
-    desc: Run CI pipeline locally
-    cmds:
-      - task: setup
-      - task: format:check
-      - task: lint
-      - task: test:coverage
-      - task: build
-      - 'echo "✅ CI pipeline complete"'
-    silent: true
-
   # Documentation Tasks
+  docs:install:
+    desc: Install documentation tools
+    cmds:
+      - |
+        if ! command -v godoc &> /dev/null; then
+          echo "⚠️  godoc not found. Installing..."
+          go install golang.org/x/tools/cmd/godoc@latest
+        fi
+      - 'echo "✅ Documentation tools installed"'
+    silent: true
+
   docs:generate:
-    desc: Generate HTML documentation using godoc
+    desc: Generate documentation files for all packages
+    deps: [docs:install]
     cmds:
       - mkdir -p output/docs/
-      - godoc -html {{.MODULE}} > output/docs/godoc.html
-      - 'echo "✅ HTML documentation generated in output/docs/godoc.html"'
+      - |
+        echo "# GoPKI Library Documentation" > output/docs/README.md
+        echo "" >> output/docs/README.md
+        echo "## Keypair Package" >> output/docs/README.md
+        go doc -all ./keypair >> output/docs/README.md
+        echo "" >> output/docs/README.md
+        echo "## Certificate Package" >> output/docs/README.md
+        go doc -all ./cert >> output/docs/README.md
+        echo "" >> output/docs/README.md
+        echo "## Signing Package" >> output/docs/README.md
+        go doc -all ./signing >> output/docs/README.md
+        echo "" >> output/docs/README.md
+        echo "## Formats Package" >> output/docs/README.md
+        go doc -all ./signing/formats >> output/docs/README.md
+      - 'echo "✅ Documentation generated in output/docs/README.md"'
+      - 'echo "💡 For interactive docs, run: task docs:serve"'
     generates:
-      - output/docs/godoc.html
+      - output/docs/README.md
     silent: true
 
   docs:serve:

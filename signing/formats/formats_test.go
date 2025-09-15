@@ -407,3 +407,89 @@ func TestFormatErrors(t *testing.T) {
 		t.Error("Expected error when verifying invalid PKCS#7 signature")
 	}
 }
+
+
+// TestFormatRegistryList tests the FormatRegistry.List method
+func TestFormatRegistryList(t *testing.T) {
+	// Create a new registry
+	registry := NewFormatRegistry()
+
+	// Initially empty
+	list := registry.List()
+	if len(list) != 0 {
+		t.Errorf("Expected empty list, got %d items", len(list))
+	}
+
+	// Register some formats
+	rawFormat := NewRawFormat()
+	pkcs7Format := NewPKCS7Format(false)
+	pkcs7DetachedFormat := NewPKCS7Format(true)
+
+	registry.Register(rawFormat)
+	registry.Register(pkcs7Format)
+	registry.Register(pkcs7DetachedFormat)
+
+	// Should have 3 formats
+	list = registry.List()
+	if len(list) != 3 {
+		t.Errorf("Expected 3 formats, got %d", len(list))
+	}
+
+	// Check that all format names are present
+	expectedFormats := map[string]bool{
+		"raw":            false,
+		"pkcs7":          false,
+		"pkcs7-detached": false,
+	}
+
+	for _, name := range list {
+		if _, ok := expectedFormats[name]; ok {
+			expectedFormats[name] = true
+		} else {
+			t.Errorf("Unexpected format name: %s", name)
+		}
+	}
+
+	// Verify all expected formats were found
+	for name, found := range expectedFormats {
+		if !found {
+			t.Errorf("Expected format %s not found in list", name)
+		}
+	}
+}
+
+// TestListFormats tests the global ListFormats function
+func TestListFormats(t *testing.T) {
+	// The default registry should have formats registered via init()
+	formats := ListFormats()
+
+	if len(formats) == 0 {
+		t.Error("Expected default registry to have registered formats")
+	}
+
+	// Check for expected default formats
+	hasRaw := false
+	hasPKCS7 := false
+	hasPKCS7Detached := false
+
+	for _, format := range formats {
+		switch format {
+		case FormatRaw:
+			hasRaw = true
+		case FormatPKCS7:
+			hasPKCS7 = true
+		case FormatPKCS7Detached:
+			hasPKCS7Detached = true
+		}
+	}
+
+	if !hasRaw {
+		t.Error("Expected raw format to be registered by default")
+	}
+	if !hasPKCS7 {
+		t.Error("Expected pkcs7 format to be registered by default")
+	}
+	if !hasPKCS7Detached {
+		t.Error("Expected pkcs7-detached format to be registered by default")
+	}
+}

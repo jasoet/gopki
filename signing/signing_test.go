@@ -791,6 +791,90 @@ func TestHashAlgorithmToString(t *testing.T) {
 	}
 }
 
+// TestGetHashAlgorithm tests the GetHashAlgorithm function
+func TestGetHashAlgorithm(t *testing.T) {
+	tests := []struct {
+		name      string
+		algorithm SignatureAlgorithm
+		keySize   int
+		want      crypto.Hash
+	}{
+		// RSA tests
+		{
+			name:      "RSA 2048-bit key",
+			algorithm: AlgorithmRSA,
+			keySize:   2048,
+			want:      crypto.SHA256,
+		},
+		{
+			name:      "RSA 3072-bit key",
+			algorithm: AlgorithmRSA,
+			keySize:   3072,
+			want:      crypto.SHA384,
+		},
+		{
+			name:      "RSA 4096-bit key",
+			algorithm: AlgorithmRSA,
+			keySize:   4096,
+			want:      crypto.SHA384,
+		},
+		// ECDSA tests
+		{
+			name:      "ECDSA P-256 (256-bit)",
+			algorithm: AlgorithmECDSA,
+			keySize:   256,
+			want:      crypto.SHA256,
+		},
+		{
+			name:      "ECDSA P-384 (384-bit)",
+			algorithm: AlgorithmECDSA,
+			keySize:   384,
+			want:      crypto.SHA384,
+		},
+		{
+			name:      "ECDSA P-521 (521-bit)",
+			algorithm: AlgorithmECDSA,
+			keySize:   521,
+			want:      crypto.SHA384, // keySize >= 384 returns SHA384
+		},
+		// Ed25519 tests
+		{
+			name:      "Ed25519",
+			algorithm: AlgorithmEd25519,
+			keySize:   256, // Ed25519 has fixed key size
+			want:      crypto.SHA512,
+		},
+		// Default cases
+		{
+			name:      "Unknown algorithm",
+			algorithm: SignatureAlgorithm("UNKNOWN"),
+			keySize:   2048,
+			want:      crypto.SHA256, // Falls back to default
+		},
+		{
+			name:      "RSA with small keysize",
+			algorithm: AlgorithmRSA,
+			keySize:   1024,
+			want:      crypto.SHA256,
+		},
+		{
+			name:      "ECDSA with non-standard size",
+			algorithm: AlgorithmECDSA,
+			keySize:   224,
+			want:      crypto.SHA256, // Default for P-224
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GetHashAlgorithm(tt.algorithm, tt.keySize)
+			if got != tt.want {
+				t.Errorf("GetHashAlgorithm() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 // TestSignData tests the convenience SignData function
 func TestSignData(t *testing.T) {
 	// Generate RSA key pair
