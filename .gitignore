@@ -219,6 +219,9 @@ examples/certificates/certs/
 *.pem
 format_output/
 
+# Generated signature files from examples
+signatures/
+
 # Node.js / Semantic Release
 node_modules/
 package-lock.json

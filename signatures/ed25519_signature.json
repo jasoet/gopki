@@ -1,9 +1,0 @@
-{
-  "algorithm": "Ed25519",
-  "digest": "rTonddq3L5BfnsG1NIOy32xCq/UPd21zLTCSRRSXee4BGvJSY1tSWcmaHng2SI/ltMcKakd+iudRYTnmOGNktg==",
-  "format": "raw",
-  "hashAlgorithm": "SHA512",
-  "issuerCN": "Ed25519 Document Signer",
-  "signature": "lU3xPLPs1UisOVTylMhB2hqsLJKo8dF914wd4HWaRtPBZ00u6chfoCpa6AC6CkpL1c83oi+dDTE4he/RhkeYCA==",
-  "signerCN": "Ed25519 Document Signer"
-}

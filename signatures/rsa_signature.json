@@ -1,9 +1,0 @@
-{
-  "algorithm": "RSA",
-  "digest": "Tm3/k2QALGM5gDCXukWFnXiry98wUK4NGnWE3RkSaU4=",
-  "format": "raw",
-  "hashAlgorithm": "SHA256",
-  "issuerCN": "Document Signer",
-  "signature": "hZXSm4kKLh2nMxbbBO4uvMO8BiZ+E1vM4pXUZ57n74ELyfr9w6+k8Sila0iaBHUOLOCFwDtxMtwbA64P3+rboGNQhLWUDIyk4dUE1vWMSmFvkobLErZfLav4p66HWBXCHpyQm02eE5TVi5P5/EUITbqHYUmfBRtoQUL/TWrF7LxTzUlQiNCFMJ6JmCTXKBxDGolRnjdIiWZMgsElFUvrxX/v2fT7dxGzFrRVnDCdSySVrBxIyq96cn8QdhGhMehjQ8zED4uefYFPKZAznKNih7ggBar5WTHu4qhmmGedccxfEoJ1adxp0NnDzt4xOxpGjpa6+IQnd5PfOv49FFBSIg==",
-  "signerCN": "Document Signer"
-}
