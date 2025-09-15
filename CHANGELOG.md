@@ -1,3 +1,15 @@
+## [1.2.0](https://github.com/jasoet/gopki/compare/v1.1.1...v1.2.0) (2025-09-15)
+
+
+### ✨ Features
+
+* add comprehensive godoc documentation and DER format support ([45f41e8](https://github.com/jasoet/gopki/commit/45f41e8bdf1bc56b7634cd3bb000ea16171213fb))
+
+
+### 📚 Documentation
+
+* update documentation to reflect actual implementation status ([90b35d5](https://github.com/jasoet/gopki/commit/90b35d596990451d7e7197941aa3d7e4fedfef08)), closes [PKCS#7](https://github.com/jasoet/PKCS/issues/7)
+
 ## [1.1.1](https://github.com/jasoet/gopki/compare/v1.1.0...v1.1.1) (2025-09-15)
 
 
