@@ -216,8 +216,11 @@ aof/
 # Generated files from examples
 examples/output/
 examples/certificates/output/
+examples/certificates/examples/
 examples/keypair/output/
+examples/keypair/exmples/
 examples/signing/output/
+examples/signing/examples/
 *.pem
 format_output/
 

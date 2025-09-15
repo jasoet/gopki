@@ -9,10 +9,12 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
+	"github.com/jasoet/gopki/signing/formats"
 )
 
 // SignDocument signs a document using the provided key pair and certificate
@@ -48,26 +50,57 @@ func SignDocument[T keypair.KeyPair](data []byte, keyPair T, certificate *cert.C
 		opts.HashAlgorithm = getDefaultHashAlgorithm(algorithm, privateKey)
 	}
 
-	// Compute the hash of the data
-	hasher := opts.HashAlgorithm.New()
-	if _, err := hasher.Write(data); err != nil {
-		return nil, fmt.Errorf("failed to hash data: %w", err)
-	}
-	digest := hasher.Sum(nil)
+	// Get the appropriate format implementation
+	var formatImpl formats.SignatureFormat
+	var formatExists bool
 
-	// Sign the digest (Ed25519 requires special handling)
-	var signatureData []byte
-	var err error
-
-	if algorithm == AlgorithmEd25519 {
-		// Ed25519 signs the message directly, not a hash
-		signatureData, err = privateKey.Sign(rand.Reader, data, crypto.Hash(0))
-	} else {
-		signatureData, err = privateKey.Sign(rand.Reader, digest, opts.HashAlgorithm)
+	switch opts.Format {
+	case FormatRaw:
+		formatImpl, formatExists = formats.GetFormat(string(FormatRaw))
+	case FormatPKCS7:
+		formatImpl, formatExists = formats.GetFormat(string(FormatPKCS7))
+	case FormatPKCS7Detached:
+		formatImpl, formatExists = formats.GetFormat(string(FormatPKCS7Detached))
+	default:
+		return nil, ErrUnsupportedFormat
 	}
 
+	if !formatExists {
+		return nil, fmt.Errorf("format implementation not found: %s", opts.Format)
+	}
+
+	// Convert signing options to format options
+	formatOpts := formats.SignOptions{
+		HashAlgorithm:      opts.HashAlgorithm,
+		IncludeCertificate: opts.IncludeCertificate,
+		IncludeChain:       opts.IncludeChain,
+		Detached:           opts.Detached,
+		TimestampURL:       opts.TimestampURL,
+		Attributes:         opts.Attributes,
+	}
+
+	// Use the format implementation to create the signature
+	signatureData, err := formatImpl.Sign(data, privateKey, certificate.Certificate, formatOpts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign data: %w", err)
+		return nil, fmt.Errorf("failed to create signature in format %s: %w", opts.Format, err)
+	}
+
+	// Compute digest for metadata (some formats may need this separately)
+	var digest []byte
+	if algorithm == AlgorithmEd25519 {
+		// For Ed25519, we still compute the digest for metadata purposes
+		hasher := opts.HashAlgorithm.New()
+		if _, err := hasher.Write(data); err != nil {
+			return nil, fmt.Errorf("failed to hash data for metadata: %w", err)
+		}
+		digest = hasher.Sum(nil)
+	} else {
+		// For other algorithms, compute the digest normally
+		hasher := opts.HashAlgorithm.New()
+		if _, err := hasher.Write(data); err != nil {
+			return nil, fmt.Errorf("failed to hash data: %w", err)
+		}
+		digest = hasher.Sum(nil)
 	}
 
 	// Create the signature object
@@ -80,7 +113,7 @@ func SignDocument[T keypair.KeyPair](data []byte, keyPair T, certificate *cert.C
 		Metadata:      opts.Attributes,
 	}
 
-	// Include certificate if requested
+	// Include certificate if requested (format may have already included it)
 	if opts.IncludeCertificate {
 		sig.Certificate = certificate.Certificate
 	}
@@ -90,17 +123,6 @@ func SignDocument[T keypair.KeyPair](data []byte, keyPair T, certificate *cert.C
 		// For now, just include the signing certificate
 		// In a full implementation, we would build the complete chain
 		sig.CertificateChain = []*x509.Certificate{certificate.Certificate}
-	}
-
-	// Apply format-specific processing
-	switch opts.Format {
-	case FormatRaw:
-		// Raw format is already complete
-	case FormatPKCS7, FormatPKCS7Detached:
-		// PKCS#7 format is handled through the formats package
-		// The signature data is already set above using the format interface
-	default:
-		return nil, ErrUnsupportedFormat
 	}
 
 	return sig, nil
@@ -226,11 +248,7 @@ func getDefaultHashAlgorithm(algo SignatureAlgorithm, signer crypto.Signer) cryp
 
 // readFile reads a file and returns its contents
 func readFile(path string) ([]byte, error) {
-	// This is a simple implementation
-	// In production, you might want to use os.ReadFile
-	var data []byte
-	// Implementation would go here
-	return data, fmt.Errorf("file reading not yet implemented")
+	return os.ReadFile(path)
 }
 
 // Utility functions for working with signatures
