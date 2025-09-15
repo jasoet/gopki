@@ -17,7 +17,8 @@ import (
 )
 
 func main() {
-	fmt.Println("=== GoPKI Document Signing Example ===\n")
+	fmt.Println("=== GoPKI Document Signing Example ===")
+	fmt.Println()
 
 	// Create output directory
 	if err := os.MkdirAll("signatures", 0755); err != nil {
