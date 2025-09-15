@@ -295,7 +295,7 @@ func TestConvertDERToPEM(t *testing.T) {
 	}
 
 	// Verify we can parse the PEM data
-	_, err = keypair.ParsePrivateKeyFromPEM[*rsa.PrivateKey](pemData)
+	_, err = ParsePrivateKeyFromPEM[*rsa.PrivateKey](pemData)
 	if err != nil {
 		t.Fatalf("Failed to parse converted PEM data: %v", err)
 	}
@@ -390,5 +390,40 @@ func TestKeyFormat_String(t *testing.T) {
 		if tt.format.String() != tt.expected {
 			t.Errorf("Expected %s, got %s", tt.expected, tt.format.String())
 		}
+	}
+}
+
+func TestValidatePEMFormat(t *testing.T) {
+	// Generate test key
+	rsaKeyPair, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+
+	// Test valid private key PEM
+	privatePEM, _ := keypair.PrivateKeyToPEM(rsaKeyPair.PrivateKey)
+	err := ValidatePEMFormat(privatePEM)
+	if err != nil {
+		t.Errorf("Valid private key PEM failed validation: %v", err)
+	}
+
+	// Test valid public key PEM
+	publicPEM, _ := keypair.PublicKeyToPEM(&rsaKeyPair.PrivateKey.PublicKey)
+	err = ValidatePEMFormat(publicPEM)
+	if err != nil {
+		t.Errorf("Valid public key PEM failed validation: %v", err)
+	}
+
+	// Test invalid PEM
+	invalidPEM := []byte("not a PEM")
+	err = ValidatePEMFormat(invalidPEM)
+	if err == nil {
+		t.Error("Invalid PEM should have failed validation")
+	}
+
+	// Test wrong PEM type
+	wrongTypePEM := []byte(`-----BEGIN CERTIFICATE-----
+MIIBkTCB+wIJAMlyFqk69v+9MA0GCSqGSIb3DQEBBQUAMBUxEzARBgNVBAoTCkFj
+-----END CERTIFICATE-----`)
+	err = ValidatePEMFormat(wrongTypePEM)
+	if err == nil {
+		t.Error("Wrong PEM type should have failed validation")
 	}
 }

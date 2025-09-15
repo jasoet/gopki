@@ -305,7 +305,7 @@ func formatConversionExample() {
 	}
 
 	// Verify we can parse the result
-	_, err = keypair.ParsePrivateKeyFromPEM[*rsa.PrivateKey](pemFromDER)
+	_, err = format.ParsePrivateKeyFromPEM[*rsa.PrivateKey](pemFromDER)
 	if err != nil {
 		log.Fatal("Failed to parse round-trip PEM:", err)
 	}

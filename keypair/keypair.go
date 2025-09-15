@@ -26,9 +26,10 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"github.com/jasoet/gopki/keypair/algo"
 	"os"
 	"path/filepath"
+
+	"github.com/jasoet/gopki/keypair/algo"
 )
 
 // Param defines the constraint for key generation parameters.
@@ -58,164 +59,6 @@ type PrivateKey interface {
 // PEM represents PEM-encoded key data as a byte slice.
 // PEM format uses Base64 encoding with headers for text-based key storage.
 type PEM []byte
-
-// ValidatePEMFormat validates that the provided data is in proper PEM format
-// and contains a supported key type (PUBLIC KEY or PRIVATE KEY).
-//
-// It returns an error if:
-//   - The data is not valid PEM format
-//   - The PEM block type is not PUBLIC KEY or PRIVATE KEY
-//
-// Example:
-//
-//	err := ValidatePEMFormat(pemData)
-//	if err != nil {
-//		log.Printf("Invalid PEM format: %v", err)
-//	}
-func ValidatePEMFormat(pemData PEM) error {
-	block, _ := pem.Decode(pemData)
-	if block == nil {
-		return fmt.Errorf("invalid PEM format")
-	}
-
-	if block.Type != "PUBLIC KEY" && block.Type != "PRIVATE KEY" {
-		return fmt.Errorf("unsupported PEM type: %s", block.Type)
-	}
-
-	return nil
-}
-
-// GenerateKeyPair generates a cryptographic key pair using type-safe generic constraints.
-// The function supports RSA, ECDSA, and Ed25519 algorithms with compile-time type safety.
-//
-// Type parameters:
-//   - T: Parameter type (algo.KeySize, algo.ECDSACurve, or algo.Ed25519Config)
-//   - K: Key pair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
-//
-// Parameters:
-//   - param: Algorithm-specific parameter (key size, curve, or config)
-//
-// Returns the generated key pair or an error if generation fails.
-//
-// Examples:
-//
-//	// RSA key pair with 2048-bit key size
-//	rsaKeys, err := GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
-//
-//	// ECDSA key pair with P-256 curve
-//	ecdsaKeys, err := GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
-//
-//	// Ed25519 key pair
-//	ed25519Keys, err := GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
-func GenerateKeyPair[T Param, K KeyPair](param T) (K, error) {
-	var zero K
-	switch par := any(param).(type) {
-	case algo.KeySize:
-		kp, err := algo.GenerateRSAKeyPair(par)
-		if err != nil {
-			return zero, fmt.Errorf("failed to generate RSA key pair: %w", err)
-		}
-		return any(kp).(K), nil
-	case algo.ECDSACurve:
-		kp, err := algo.GenerateECDSAKeyPair(par)
-		if err != nil {
-			return zero, fmt.Errorf("failed to generate ECDSA key pair: %w", err)
-		}
-		return any(kp).(K), nil
-	case algo.Ed25519Config:
-		kp, err := algo.GenerateEd25519KeyPair()
-		if err != nil {
-			return zero, fmt.Errorf("failed to generate Ed25519 key pair: %w", err)
-		}
-		return any(kp).(K), nil
-	default:
-		return zero, fmt.Errorf("unsupported parameter type")
-	}
-}
-
-// ParsePublicKeyFromPEM parses a public key from PEM-encoded data with type safety.
-// The function uses generics to ensure the returned key matches the expected type.
-//
-// Type parameter:
-//   - T: Expected public key type (*rsa.PublicKey, *ecdsa.PublicKey, or ed25519.PublicKey)
-//
-// Parameters:
-//   - pemData: PEM-encoded public key data
-//
-// Returns the parsed public key or an error if parsing fails or type doesn't match.
-//
-// Example:
-//
-//	rsaPublicKey, err := ParsePublicKeyFromPEM[*rsa.PublicKey](pemData)
-//	if err != nil {
-//		log.Printf("Failed to parse RSA public key: %v", err)
-//	}
-func ParsePublicKeyFromPEM[T PublicKey](pemData PEM) (T, error) {
-	var zero T
-
-	block, _ := pem.Decode(pemData)
-	if block == nil {
-		return zero, fmt.Errorf("failed to decode PEM block")
-	}
-
-	if block.Type != "PUBLIC KEY" {
-		return zero, fmt.Errorf("PEM block is not a public key")
-	}
-
-	publicKey, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if err != nil {
-		return zero, fmt.Errorf("failed to parse public key: %w", err)
-	}
-
-	typedKey, ok := publicKey.(T)
-	if !ok {
-		return zero, fmt.Errorf("public key is not of expected type")
-	}
-
-	return typedKey, nil
-}
-
-// ParsePrivateKeyFromPEM parses a private key from PEM-encoded data with type safety.
-// The function uses generics to ensure the returned key matches the expected type.
-//
-// Type parameter:
-//   - T: Expected private key type (*rsa.PrivateKey, *ecdsa.PrivateKey, or ed25519.PrivateKey)
-//
-// Parameters:
-//   - pemData: PEM-encoded private key data in PKCS#8 format
-//
-// Returns the parsed private key or an error if parsing fails or type doesn't match.
-//
-// Example:
-//
-//	rsaPrivateKey, err := ParsePrivateKeyFromPEM[*rsa.PrivateKey](pemData)
-//	if err != nil {
-//		log.Printf("Failed to parse RSA private key: %v", err)
-//	}
-func ParsePrivateKeyFromPEM[T PrivateKey](pemData PEM) (T, error) {
-	var zero T
-
-	block, _ := pem.Decode(pemData)
-	if block == nil {
-		return zero, fmt.Errorf("failed to decode PEM block")
-	}
-
-	if block.Type != "PRIVATE KEY" {
-		return zero, fmt.Errorf("PEM block is not a private key")
-	}
-
-	privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-	if err != nil {
-		return zero, fmt.Errorf("failed to parse private key: %w", err)
-	}
-
-	typedKey, ok := privateKey.(T)
-	if !ok {
-		return zero, fmt.Errorf("private key is not of expected type")
-	}
-
-	return typedKey, nil
-}
 
 // PrivateKeyToPEM converts a private key to PEM-encoded format.
 // The key is marshaled using PKCS#8 format for maximum compatibility.
@@ -278,6 +121,59 @@ func PublicKeyToPEM[T PublicKey](publicKey T) (PEM, error) {
 
 	return publicKeyPEM, nil
 }
+
+
+// GenerateKeyPair generates a cryptographic key pair using type-safe generic constraints.
+// The function supports RSA, ECDSA, and Ed25519 algorithms with compile-time type safety.
+//
+// Type parameters:
+//   - T: Parameter type (algo.KeySize, algo.ECDSACurve, or algo.Ed25519Config)
+//   - K: Key pair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//
+// Parameters:
+//   - param: Algorithm-specific parameter (key size, curve, or config)
+//
+// Returns the generated key pair or an error if generation fails.
+//
+// Examples:
+//
+//	// RSA key pair with 2048-bit key size
+//	rsaKeys, err := GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+//
+//	// ECDSA key pair with P-256 curve
+//	ecdsaKeys, err := GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
+//
+//	// Ed25519 key pair
+//	ed25519Keys, err := GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
+func GenerateKeyPair[T Param, K KeyPair](param T) (K, error) {
+	var zero K
+	switch par := any(param).(type) {
+	case algo.KeySize:
+		kp, err := algo.GenerateRSAKeyPair(par)
+		if err != nil {
+			return zero, fmt.Errorf("failed to generate RSA key pair: %w", err)
+		}
+		return any(kp).(K), nil
+	case algo.ECDSACurve:
+		kp, err := algo.GenerateECDSAKeyPair(par)
+		if err != nil {
+			return zero, fmt.Errorf("failed to generate ECDSA key pair: %w", err)
+		}
+		return any(kp).(K), nil
+	case algo.Ed25519Config:
+		kp, err := algo.GenerateEd25519KeyPair()
+		if err != nil {
+			return zero, fmt.Errorf("failed to generate Ed25519 key pair: %w", err)
+		}
+		return any(kp).(K), nil
+	default:
+		return zero, fmt.Errorf("unsupported parameter type")
+	}
+}
+
+
+
+
 
 // GetPublicKey extracts the public key from a private key with type safety.
 // This function works with all supported key types and maintains type relationships.

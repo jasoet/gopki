@@ -357,7 +357,7 @@ func TestConvertSSHToPEM(t *testing.T) {
 	}
 
 	// Verify round-trip by parsing the PEM
-	_, err = keypair.ParsePublicKeyFromPEM[*rsa.PublicKey](pemData)
+	_, err = ParsePublicKeyFromPEM[*rsa.PublicKey](pemData)
 	if err != nil {
 		t.Fatalf("Failed to parse converted PEM: %v", err)
 	}
@@ -432,7 +432,7 @@ func TestFullFormatConversionMatrix(t *testing.T) {
 		}
 
 		// Verify we can parse the final result
-		finalKey, err := keypair.ParsePublicKeyFromPEM[*rsa.PublicKey](finalPEM)
+		finalKey, err := ParsePublicKeyFromPEM[*rsa.PublicKey](finalPEM)
 		if err != nil {
 			t.Fatalf("Failed to parse final PEM: %v", err)
 		}

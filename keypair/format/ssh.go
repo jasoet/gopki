@@ -300,21 +300,21 @@ func GetSSHKeyType(algorithm string) string {
 //	}
 func ConvertPEMToSSH(pemData keypair.PEM, comment string, isPrivate bool) (string, error) {
 	if isPrivate {
-		if rsaKey, err := keypair.ParsePrivateKeyFromPEM[*rsa.PrivateKey](pemData); err == nil {
+		if rsaKey, err := ParsePrivateKeyFromPEM[*rsa.PrivateKey](pemData); err == nil {
 			return PrivateKeyToSSH(rsaKey, comment, "")
-		} else if ecdsaKey, err := keypair.ParsePrivateKeyFromPEM[*ecdsa.PrivateKey](pemData); err == nil {
+		} else if ecdsaKey, err := ParsePrivateKeyFromPEM[*ecdsa.PrivateKey](pemData); err == nil {
 			return PrivateKeyToSSH(ecdsaKey, comment, "")
-		} else if ed25519Key, err := keypair.ParsePrivateKeyFromPEM[ed25519.PrivateKey](pemData); err == nil {
+		} else if ed25519Key, err := ParsePrivateKeyFromPEM[ed25519.PrivateKey](pemData); err == nil {
 			return PrivateKeyToSSH(ed25519Key, comment, "")
 		} else {
 			return "", NewFormatError(FormatSSH, "unable to parse PEM private key for SSH conversion", nil)
 		}
 	} else {
-		if rsaKey, err := keypair.ParsePublicKeyFromPEM[*rsa.PublicKey](pemData); err == nil {
+		if rsaKey, err := ParsePublicKeyFromPEM[*rsa.PublicKey](pemData); err == nil {
 			return PublicKeyToSSH(rsaKey, comment)
-		} else if ecdsaKey, err := keypair.ParsePublicKeyFromPEM[*ecdsa.PublicKey](pemData); err == nil {
+		} else if ecdsaKey, err := ParsePublicKeyFromPEM[*ecdsa.PublicKey](pemData); err == nil {
 			return PublicKeyToSSH(ecdsaKey, comment)
-		} else if ed25519Key, err := keypair.ParsePublicKeyFromPEM[ed25519.PublicKey](pemData); err == nil {
+		} else if ed25519Key, err := ParsePublicKeyFromPEM[ed25519.PublicKey](pemData); err == nil {
 			return PublicKeyToSSH(ed25519Key, comment)
 		} else {
 			return "", NewFormatError(FormatSSH, "unable to parse PEM public key for SSH conversion", nil)
