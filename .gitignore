@@ -218,3 +218,10 @@ examples/output/
 examples/certificates/certs/
 *.pem
 format_output/
+
+# Node.js / Semantic Release
+node_modules/
+package-lock.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
