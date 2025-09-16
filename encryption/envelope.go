@@ -310,13 +310,23 @@ func (e *EnvelopeEncryptor) EncryptForPublicKey(data []byte, publicKey any, opts
 		return nil, fmt.Errorf("failed to encrypt AES key: %w", err)
 	}
 
+	// Create recipient info with complete encrypted key data (same as multi-recipient flow)
+	recipient := &RecipientInfo{
+		EncryptedKey:           encryptedKey.Data,
+		KeyEncryptionAlgorithm: encryptedKey.Algorithm,
+		EphemeralKey:           encryptedKey.EncryptedKey, // For ECDSA/Ed25519
+		KeyIV:                  encryptedKey.IV,
+		KeyTag:                 encryptedKey.Tag,
+	}
+
 	return &EncryptedData{
 		Algorithm:    AlgorithmEnvelope,
 		Format:       opts.Format,
 		Data:         encryptedData.Data,
-		EncryptedKey: encryptedKey.Data,
+		EncryptedKey: encryptedKey.Data, // Primary encrypted key for backward compatibility
 		IV:           encryptedData.IV,
 		Tag:          encryptedData.Tag,
+		Recipients:   []*RecipientInfo{recipient}, // Single recipient info
 		Timestamp:    time.Now(),
 		Metadata:     opts.Metadata,
 	}, nil
@@ -370,6 +380,9 @@ func (e *EnvelopeEncryptor) EncryptForMultipleRecipients(data []byte, recipients
 			KeyID:                  []byte(fmt.Sprintf("recipient-%d", i)),
 			EncryptedKey:           encryptedKey.Data,
 			KeyEncryptionAlgorithm: encryptedKey.Algorithm,
+			EphemeralKey:           encryptedKey.EncryptedKey, // For ECDSA/Ed25519
+			KeyIV:                  encryptedKey.IV,
+			KeyTag:                 encryptedKey.Tag,
 		})
 	}
 
@@ -415,9 +428,12 @@ func (e *EnvelopeEncryptor) DecryptForRecipient(encrypted *EncryptedData, keyPai
 	}
 
 	keyEncryptedData := &EncryptedData{
-		Algorithm: recipient.KeyEncryptionAlgorithm,
-		Format:    FormatCMS,
-		Data:      recipient.EncryptedKey,
+		Algorithm:    recipient.KeyEncryptionAlgorithm,
+		Format:       FormatCMS,
+		Data:         recipient.EncryptedKey,
+		EncryptedKey: recipient.EphemeralKey, // For ECDSA/Ed25519 ephemeral keys
+		IV:           recipient.KeyIV,
+		Tag:          recipient.KeyTag,
 	}
 
 	aesKey, err := e.asymmetric.Decrypt(keyEncryptedData, keyPair, keyDecryptOpts)
