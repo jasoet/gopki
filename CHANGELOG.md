@@ -1,3 +1,15 @@
+## [1.5.0](https://github.com/jasoet/gopki/compare/v1.4.1...v1.5.0) (2025-09-16)
+
+
+### ✨ Features
+
+* add encryption examples and fix ECDSA ephemeral key handling ([af0f367](https://github.com/jasoet/gopki/commit/af0f367c76766401e9af2975fb33acec754780a0))
+
+
+### ♻️ Refactoring
+
+* **encryption:** remove GPG support and simplify to CMS-only format ([1af7867](https://github.com/jasoet/gopki/commit/1af7867db7db1f20c566e05848586383efe9917f))
+
 ## [1.4.1](https://github.com/jasoet/gopki/compare/v1.4.0...v1.4.1) (2025-09-16)
 
 
