@@ -17,7 +17,7 @@ import (
 // used in SSH public key formats and authorized_keys files.
 const (
 	// SSHRSAType is the SSH identifier for RSA public keys
-	SSHRSAType     = "ssh-rsa"
+	SSHRSAType = "ssh-rsa"
 	// SSHEd25519Type is the SSH identifier for Ed25519 public keys
 	SSHEd25519Type = "ssh-ed25519"
 	// SSHECDSAPrefix is the common prefix for ECDSA SSH key types (e.g., ecdsa-sha2-nistp256)
@@ -50,7 +50,7 @@ var (
 //	if err != nil {
 //		log.Printf("SSH conversion failed: %v", err)
 //	}
-func PublicKeyToSSH[T keypair.PublicKey](publicKey T, comment string) (string, error) {
+func PublicKeyToSSH[T keypair.PublicKey](publicKey T, comment string) (keypair.SSH, error) {
 	sshPubKey, err := ssh.NewPublicKey(publicKey)
 	if err != nil {
 		return "", NewFormatError(FormatSSH, "failed to convert to SSH public key", err)
@@ -66,7 +66,7 @@ func PublicKeyToSSH[T keypair.PublicKey](publicKey T, comment string) (string, e
 		}
 	}
 
-	return sshStr, nil
+	return keypair.SSH(sshStr), nil
 }
 
 // ParsePublicKeyFromSSH parses a public key from SSH public key format.
@@ -88,7 +88,7 @@ func PublicKeyToSSH[T keypair.PublicKey](publicKey T, comment string) (string, e
 //	if err != nil {
 //		log.Printf("SSH key parsing failed: %v", err)
 //	}
-func ParsePublicKeyFromSSH[T keypair.PublicKey](sshData string) (T, error) {
+func ParsePublicKeyFromSSH[T keypair.PublicKey](sshData keypair.SSH) (T, error) {
 	var zero T
 
 	sshPubKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(sshData))
@@ -129,7 +129,7 @@ func ParsePublicKeyFromSSH[T keypair.PublicKey](sshData string) (T, error) {
 //	if err != nil {
 //		log.Printf("SSH conversion failed: %v", err)
 //	}
-func PrivateKeyToSSH[T keypair.PrivateKey](privateKey T, comment string, passphrase string) (string, error) {
+func PrivateKeyToSSH[T keypair.PrivateKey](privateKey T, comment string, passphrase string) (keypair.SSH, error) {
 	var pemBlock *pem.Block
 	var err error
 
@@ -144,7 +144,7 @@ func PrivateKeyToSSH[T keypair.PrivateKey](privateKey T, comment string, passphr
 	}
 
 	sshPrivateKey := pem.EncodeToMemory(pemBlock)
-	return string(sshPrivateKey), nil
+	return keypair.SSH(sshPrivateKey), nil
 }
 
 // ParsePrivateKeyFromSSH parses a private key from OpenSSH private key format.
@@ -169,7 +169,7 @@ func PrivateKeyToSSH[T keypair.PrivateKey](privateKey T, comment string, passphr
 //	if err != nil {
 //		log.Printf("SSH key parsing failed: %v", err)
 //	}
-func ParsePrivateKeyFromSSH[T keypair.PrivateKey](sshData string, passphrase string) (T, error) {
+func ParsePrivateKeyFromSSH[T keypair.PrivateKey](sshData keypair.SSH, passphrase string) (T, error) {
 	var zero T
 
 	// Parse the SSH private key using ParseRawPrivateKey
@@ -234,8 +234,8 @@ type SSHPublicKeyInfo struct {
 //	} else {
 //		fmt.Printf("Algorithm: %s, Comment: %s\n", info.Algorithm, info.Comment)
 //	}
-func ParseSSHPublicKeyInfo(sshData string) (*SSHPublicKeyInfo, error) {
-	matches := sshPublicKeyRegex.FindStringSubmatch(strings.TrimSpace(sshData))
+func ParseSSHPublicKeyInfo(sshData keypair.SSH) (*SSHPublicKeyInfo, error) {
+	matches := sshPublicKeyRegex.FindStringSubmatch(strings.TrimSpace(string(sshData)))
 	if matches == nil {
 		return nil, NewFormatError(FormatSSH, "invalid SSH public key format", nil)
 	}
@@ -298,7 +298,7 @@ func GetSSHKeyType(algorithm string) string {
 //	if err != nil {
 //		log.Printf("PEM to SSH conversion failed: %v", err)
 //	}
-func ConvertPEMToSSH(pemData keypair.PEM, comment string, isPrivate bool) (string, error) {
+func ConvertPEMToSSH(pemData keypair.PEM, comment string, isPrivate bool) (keypair.SSH, error) {
 	if isPrivate {
 		if rsaKey, err := ParsePrivateKeyFromPEM[*rsa.PrivateKey](pemData); err == nil {
 			return PrivateKeyToSSH(rsaKey, comment, "")
@@ -322,7 +322,7 @@ func ConvertPEMToSSH(pemData keypair.PEM, comment string, isPrivate bool) (strin
 	}
 }
 
-func ConvertDERToSSH(derData []byte, comment string, isPrivate bool) (string, error) {
+func ConvertDERToSSH(derData keypair.DER, comment string, isPrivate bool) (keypair.SSH, error) {
 	if isPrivate {
 		if rsaKey, err := ParsePrivateKeyFromDER[*rsa.PrivateKey](derData); err == nil {
 			return PrivateKeyToSSH(rsaKey, comment, "")
@@ -366,7 +366,7 @@ func ConvertDERToSSH(derData []byte, comment string, isPrivate bool) (string, er
 //	if err != nil {
 //		log.Printf("SSH to PEM conversion failed: %v", err)
 //	}
-func ConvertSSHToPEM(sshData string, isPrivate bool, passphrase string) (keypair.PEM, error) {
+func ConvertSSHToPEM(sshData keypair.SSH, isPrivate bool, passphrase string) (keypair.PEM, error) {
 	if isPrivate {
 		// Try to parse SSH private key and convert to PEM
 		if rsaKey, err := ParsePrivateKeyFromSSH[*rsa.PrivateKey](sshData, passphrase); err == nil {
@@ -392,7 +392,7 @@ func ConvertSSHToPEM(sshData string, isPrivate bool, passphrase string) (keypair
 	}
 }
 
-func ConvertSSHToDER(sshData string, isPrivate bool, passphrase string) ([]byte, error) {
+func ConvertSSHToDER(sshData keypair.SSH, isPrivate bool, passphrase string) ([]byte, error) {
 	if isPrivate {
 		// Try to parse SSH private key and convert to DER
 		if rsaKey, err := ParsePrivateKeyFromSSH[*rsa.PrivateKey](sshData, passphrase); err == nil {

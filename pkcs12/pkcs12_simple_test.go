@@ -182,7 +182,7 @@ func TestP12ErrorHandling(t *testing.T) {
 		opts := DefaultCreateOptions("password")
 
 		// Test nil private key
-		_, err := CreateP12(nil, &x509.Certificate{}, nil, opts)
+		_, err := CreateP12[*rsa.PrivateKey](nil, &x509.Certificate{}, nil, opts)
 		if err == nil {
 			t.Error("Expected error for nil private key")
 		}

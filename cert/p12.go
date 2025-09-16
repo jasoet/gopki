@@ -123,7 +123,7 @@ func (c *Certificate) SaveToP12(privateKey any, filename, password string) error
 
 	// Create P12 file
 	opts := pkcs12.DefaultCreateOptions(password)
-	return pkcs12.CreateP12File(filename, privateKey, c.Certificate, nil, opts)
+	return pkcs12.CreateP12FileAny(filename, privateKey, c.Certificate, nil, opts)
 }
 
 // SaveToP12WithChain saves a certificate with a certificate chain to PKCS#12 format
@@ -152,7 +152,7 @@ func (c *Certificate) SaveToP12WithChain(privateKey any, caCerts []*Certificate,
 	// Create P12 file with chain
 	opts := pkcs12.DefaultCreateOptions(password)
 	opts.IncludeChain = true
-	return pkcs12.CreateP12File(filename, privateKey, c.Certificate, x509CACerts, opts)
+	return pkcs12.CreateP12FileAny(filename, privateKey, c.Certificate, x509CACerts, opts)
 }
 
 // ExtractCertificatesFromP12 extracts all certificates from a P12 file and saves them as separate PEM files

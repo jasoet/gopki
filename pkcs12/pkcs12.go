@@ -66,12 +66,15 @@
 //	err = pkcs12.QuickCreateP12("quick.p12", "password", privateKey, certificate)
 //
 // Integration with GoPKI:
-//   This package is designed to work seamlessly with other GoPKI packages.
-//   See the keypair/p12.go and cert/p12.go files for type-safe integration
-//   functions that leverage the GoPKI keypair and certificate abstractions.
+//
+//	This package is designed to work seamlessly with other GoPKI packages.
+//	See the keypair/p12.go and cert/p12.go files for type-safe integration
+//	functions that leverage the GoPKI keypair and certificate abstractions.
 package pkcs12
 
 import (
+	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -80,9 +83,12 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"reflect"
 	"time"
 
 	"software.sslmate.com/src/go-pkcs12"
+
+	"github.com/jasoet/gopki/keypair"
 )
 
 // P12Container represents a PKCS#12 container with its contents
@@ -175,14 +181,17 @@ func DefaultLoadOptions(password string) LoadOptions {
 	}
 }
 
-// CreateP12 creates PKCS#12 binary data from a private key, certificate, and optional chain.
+// CreateP12 creates PKCS#12 binary data from a private key, certificate, and optional chain using type-safe generics.
 //
 // This is the core function for creating P12 data. It accepts any private key type
 // supported by the underlying PKCS#12 library (RSA, ECDSA, Ed25519) and combines
 // it with the certificate and optional certificate chain into encrypted P12 data.
 //
+// Type parameter:
+//   - T: Private key type (*rsa.PrivateKey, *ecdsa.PrivateKey, ed25519.PrivateKey)
+//
 // Parameters:
-//   - privateKey: The private key (any supported type: *rsa.PrivateKey, *ecdsa.PrivateKey, ed25519.PrivateKey)
+//   - privateKey: The private key (type-safe generic: *rsa.PrivateKey, *ecdsa.PrivateKey, ed25519.PrivateKey)
 //   - certificate: The X.509 certificate associated with the private key
 //   - caCerts: Optional certificate chain (can be nil)
 //   - opts: Creation options including password and encryption settings
@@ -205,8 +214,9 @@ func DefaultLoadOptions(password string) LoadOptions {
 //	}
 //	// Save to file or transmit securely
 //	os.WriteFile("certificate.p12", p12Data, 0600)
-func CreateP12(privateKey any, certificate *x509.Certificate, caCerts []*x509.Certificate, opts CreateOptions) ([]byte, error) {
-	if privateKey == nil {
+func CreateP12[T keypair.PrivateKey](privateKey T, certificate *x509.Certificate, caCerts []*x509.Certificate, opts CreateOptions) ([]byte, error) {
+	// Check for nil private key using reflection
+	if any(privateKey) == nil || reflect.ValueOf(privateKey).IsNil() {
 		return nil, fmt.Errorf("private key is required")
 	}
 	if certificate == nil {
@@ -232,6 +242,21 @@ func CreateP12(privateKey any, certificate *x509.Certificate, caCerts []*x509.Ce
 	} else {
 		// Use modern mode (default)
 		return pkcs12.Modern.Encode(privateKey, certificate, allCACerts, opts.Password)
+	}
+}
+
+// CreateP12FileAny creates a PKCS#12 file from any private key type (wrapper for backward compatibility).
+// This function detects the private key type and calls the appropriate generic version.
+func CreateP12FileAny(filename string, privateKey any, certificate *x509.Certificate, caCerts []*x509.Certificate, opts CreateOptions) error {
+	switch priv := privateKey.(type) {
+	case *rsa.PrivateKey:
+		return CreateP12File(filename, priv, certificate, caCerts, opts)
+	case *ecdsa.PrivateKey:
+		return CreateP12File(filename, priv, certificate, caCerts, opts)
+	case ed25519.PrivateKey:
+		return CreateP12File(filename, priv, certificate, caCerts, opts)
+	default:
+		return fmt.Errorf("unsupported private key type: %T", privateKey)
 	}
 }
 
@@ -273,8 +298,11 @@ func ParseP12(p12Data []byte, opts LoadOptions) (*P12Container, error) {
 	return container, nil
 }
 
-// CreateP12File creates a PKCS#12 file from a private key and certificate
-func CreateP12File(filename string, privateKey any, certificate *x509.Certificate, caCerts []*x509.Certificate, opts CreateOptions) error {
+// CreateP12File creates a PKCS#12 file from a private key and certificate using type-safe generics.
+//
+// Type parameter:
+//   - T: Private key type (*rsa.PrivateKey, *ecdsa.PrivateKey, ed25519.PrivateKey)
+func CreateP12File[T keypair.PrivateKey](filename string, privateKey T, certificate *x509.Certificate, caCerts []*x509.Certificate, opts CreateOptions) error {
 	// Create P12 data
 	p12Data, err := CreateP12(privateKey, certificate, caCerts, opts)
 	if err != nil {
@@ -343,11 +371,14 @@ func (c *P12Container) Validate() error {
 	return nil
 }
 
-// QuickCreateP12 provides a simple interface for creating P12 files with default options.
+// QuickCreateP12 provides a simple interface for creating P12 files with default options using type-safe generics.
 //
 // This is a simplified wrapper around CreateP12File that uses default creation
 // options. It's perfect for development, testing, or simple use cases where
 // you don't need to customize the P12 creation settings.
+//
+// Type parameter:
+//   - T: Private key type (*rsa.PrivateKey, *ecdsa.PrivateKey, ed25519.PrivateKey)
 //
 // Parameters:
 //   - filename: Path where the P12 file will be created
@@ -364,7 +395,7 @@ func (c *P12Container) Validate() error {
 //	if err != nil {
 //		log.Fatal("Failed to create P12:", err)
 //	}
-func QuickCreateP12(filename, password string, privateKey any, certificate *x509.Certificate) error {
+func QuickCreateP12[T keypair.PrivateKey](filename, password string, privateKey T, certificate *x509.Certificate) error {
 	opts := DefaultCreateOptions(password)
 	return CreateP12File(filename, privateKey, certificate, nil, opts)
 }

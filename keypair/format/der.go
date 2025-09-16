@@ -93,7 +93,7 @@ func PublicKeyToDER[T keypair.PublicKey](publicKey T) ([]byte, error) {
 //	if err != nil {
 //		log.Printf("DER parsing failed: %v", err)
 //	}
-func ParsePrivateKeyFromDER[T keypair.PrivateKey](derData []byte) (T, error) {
+func ParsePrivateKeyFromDER[T keypair.PrivateKey](derData keypair.DER) (T, error) {
 	var zero T
 
 	privateKey, err := x509.ParsePKCS8PrivateKey(derData)
@@ -131,7 +131,7 @@ func ParsePrivateKeyFromDER[T keypair.PrivateKey](derData []byte) (T, error) {
 //	if err != nil {
 //		log.Printf("DER parsing failed: %v", err)
 //	}
-func ParsePublicKeyFromDER[T keypair.PublicKey](derData []byte) (T, error) {
+func ParsePublicKeyFromDER[T keypair.PublicKey](derData keypair.DER) (T, error) {
 	var zero T
 
 	publicKey, err := x509.ParsePKIXPublicKey(derData)
@@ -196,7 +196,7 @@ func ConvertPEMToDER(pemData keypair.PEM) ([]byte, error) {
 //	if err != nil {
 //		log.Printf("DER to PEM conversion failed: %v", err)
 //	}
-func ConvertDERToPEM(derData []byte, keyType string) (keypair.PEM, error) {
+func ConvertDERToPEM(derData keypair.DER, keyType string) (keypair.PEM, error) {
 	var blockType string
 
 	if isPrivateKeyDER(derData) {
@@ -229,7 +229,7 @@ func ConvertDERToPEM(derData []byte, keyType string) (keypair.PEM, error) {
 //
 // The function attempts to parse the data as a PKCS#8 private key without
 // causing side effects. It's used to distinguish between private and public keys.
-func isPrivateKeyDER(derData []byte) bool {
+func isPrivateKeyDER(derData keypair.DER) bool {
 	_, err := x509.ParsePKCS8PrivateKey(derData)
 	return err == nil
 }
@@ -255,7 +255,7 @@ func isPrivateKeyDER(derData []byte) bool {
 //	} else {
 //		fmt.Printf("Key type: %s\n", keyType)
 //	}
-func GetKeyTypeFromDER(derData []byte) (string, error) {
+func GetKeyTypeFromDER(derData keypair.DER) (string, error) {
 	if privateKey, err := x509.ParsePKCS8PrivateKey(derData); err == nil {
 		return getKeyTypeFromInterface(privateKey), nil
 	}

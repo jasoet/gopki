@@ -59,6 +59,8 @@ type PrivateKey interface {
 // PEM represents PEM-encoded key data as a byte slice.
 // PEM format uses Base64 encoding with headers for text-based key storage.
 type PEM []byte
+type DER []byte
+type SSH string
 
 // PrivateKeyToPEM converts a private key to PEM-encoded format.
 // The key is marshaled using PKCS#8 format for maximum compatibility.
@@ -122,7 +124,6 @@ func PublicKeyToPEM[T PublicKey](publicKey T) (PEM, error) {
 	return publicKeyPEM, nil
 }
 
-
 // GenerateKeyPair generates a cryptographic key pair using type-safe generic constraints.
 // The function supports RSA, ECDSA, and Ed25519 algorithms with compile-time type safety.
 //
@@ -171,10 +172,6 @@ func GenerateKeyPair[T Param, K KeyPair](param T) (K, error) {
 	}
 }
 
-
-
-
-
 // GetPublicKey extracts the public key from a private key with type safety.
 // This function works with all supported key types and maintains type relationships.
 //
@@ -213,7 +210,6 @@ func GetPublicKey[TPriv PrivateKey, TPub PublicKey](privateKey TPriv) (TPub, err
 
 	return zero, fmt.Errorf("unsupported key type or type mismatch")
 }
-
 
 // ToFiles saves a key pair to separate private and public key files in PEM format.
 // The function creates the necessary directory structure and sets appropriate file permissions.

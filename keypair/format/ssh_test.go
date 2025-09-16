@@ -25,11 +25,11 @@ func TestPublicKeyToSSH_RSA(t *testing.T) {
 	}
 
 	// Verify SSH format
-	if !strings.HasPrefix(sshData, "ssh-rsa ") {
+	if !strings.HasPrefix(string(sshData), "ssh-rsa ") {
 		t.Error("SSH RSA public key should start with 'ssh-rsa '")
 	}
 
-	if !strings.Contains(sshData, "test@example.com") {
+	if !strings.Contains(string(sshData), "test@example.com") {
 		t.Error("SSH key should contain the comment")
 	}
 
@@ -59,11 +59,11 @@ func TestPublicKeyToSSH_ECDSA(t *testing.T) {
 	}
 
 	// Verify SSH format
-	if !strings.HasPrefix(sshData, "ecdsa-sha2-") {
+	if !strings.HasPrefix(string(sshData), "ecdsa-sha2-") {
 		t.Error("SSH ECDSA public key should start with 'ecdsa-sha2-'")
 	}
 
-	if !strings.Contains(sshData, "ecdsa-test@example.com") {
+	if !strings.Contains(string(sshData), "ecdsa-test@example.com") {
 		t.Error("SSH key should contain the comment")
 	}
 
@@ -93,11 +93,11 @@ func TestPublicKeyToSSH_Ed25519(t *testing.T) {
 	}
 
 	// Verify SSH format
-	if !strings.HasPrefix(sshData, "ssh-ed25519 ") {
+	if !strings.HasPrefix(string(sshData), "ssh-ed25519 ") {
 		t.Error("SSH Ed25519 public key should start with 'ssh-ed25519 '")
 	}
 
-	if !strings.Contains(sshData, "ed25519-test@example.com") {
+	if !strings.Contains(string(sshData), "ed25519-test@example.com") {
 		t.Error("SSH key should contain the comment")
 	}
 
@@ -127,7 +127,7 @@ func TestPrivateKeyToSSH_RSA(t *testing.T) {
 	}
 
 	// Verify SSH private key format
-	if !strings.Contains(sshData, "-----BEGIN OPENSSH PRIVATE KEY-----") {
+	if !strings.Contains(string(sshData), "-----BEGIN OPENSSH PRIVATE KEY-----") {
 		t.Error("SSH private key should be in OpenSSH format")
 	}
 
@@ -152,7 +152,7 @@ func TestPrivateKeyToSSH_WithPassphrase(t *testing.T) {
 	}
 
 	// Verify SSH private key format
-	if !strings.Contains(sshData, "-----BEGIN OPENSSH PRIVATE KEY-----") {
+	if !strings.Contains(string(sshData), "-----BEGIN OPENSSH PRIVATE KEY-----") {
 		t.Error("SSH private key should be in OpenSSH format")
 	}
 
@@ -176,7 +176,7 @@ func TestPrivateKeyToSSH_WithPassphrase(t *testing.T) {
 func TestParseSSHPublicKeyInfo(t *testing.T) {
 	tests := []struct {
 		name            string
-		sshKey          string
+		sshKey          keypair.SSH
 		expectedAlgo    string
 		expectedComment string
 		hasError        bool
@@ -271,11 +271,11 @@ func TestConvertPEMToSSH_PublicKey(t *testing.T) {
 	}
 
 	// Verify SSH format
-	if !strings.HasPrefix(sshData, "ssh-rsa ") {
+	if !strings.HasPrefix(string(sshData), "ssh-rsa ") {
 		t.Error("Converted SSH key should be RSA format")
 	}
 
-	if !strings.Contains(sshData, "converted@example.com") {
+	if !strings.Contains(string(sshData), "converted@example.com") {
 		t.Error("Converted SSH key should contain comment")
 	}
 }
@@ -299,7 +299,7 @@ func TestConvertPEMToSSH_PrivateKey(t *testing.T) {
 	}
 
 	// Verify SSH private key format
-	if !strings.Contains(sshData, "-----BEGIN OPENSSH PRIVATE KEY-----") {
+	if !strings.Contains(string(sshData), "-----BEGIN OPENSSH PRIVATE KEY-----") {
 		t.Error("Converted SSH private key should be in OpenSSH format")
 	}
 }
@@ -323,11 +323,11 @@ func TestConvertDERToSSH(t *testing.T) {
 	}
 
 	// Verify SSH format
-	if !strings.HasPrefix(sshData, "ecdsa-sha2-") {
+	if !strings.HasPrefix(string(sshData), "ecdsa-sha2-") {
 		t.Error("Converted SSH key should be ECDSA format")
 	}
 
-	if !strings.Contains(sshData, "der-converted@example.com") {
+	if !strings.Contains(string(sshData), "der-converted@example.com") {
 		t.Error("Converted SSH key should contain comment")
 	}
 }
@@ -451,7 +451,7 @@ func TestFullFormatConversionMatrix(t *testing.T) {
 			t.Fatalf("SSH private key generation should work: %v", err)
 		}
 
-		if !strings.Contains(sshPrivateData, "-----BEGIN OPENSSH PRIVATE KEY-----") {
+		if !strings.Contains(string(sshPrivateData), "-----BEGIN OPENSSH PRIVATE KEY-----") {
 			t.Error("SSH private key should be generated correctly")
 		}
 
