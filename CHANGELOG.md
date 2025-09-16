@@ -1,3 +1,11 @@
+## [1.5.1](https://github.com/jasoet/gopki/compare/v1.5.0...v1.5.1) (2025-09-16)
+
+
+### 🐛 Bug Fixes
+
+* **encryption:** implement ephemeral key generation for public-key-only encryption ([6223510](https://github.com/jasoet/gopki/commit/62235104c5c8894856f3c61e6fda635d002e5831))
+* remove Ed25519 public-key-only encryption due to complexity ([b35ad44](https://github.com/jasoet/gopki/commit/b35ad444e725a39eab212f09fbd3a4059899c9e7))
+
 ## [1.5.0](https://github.com/jasoet/gopki/compare/v1.4.1...v1.5.0) (2025-09-16)
 
 
