@@ -1,3 +1,10 @@
+## [1.4.0](https://github.com/jasoet/gopki/compare/v1.3.0...v1.4.0) (2025-09-16)
+
+
+### ✨ Features
+
+* **pkcs12:** implement comprehensive PKCS[#12](https://github.com/jasoet/gopki/issues/12) support across GoPKI packages ([b299c7a](https://github.com/jasoet/gopki/commit/b299c7a95ec25fffbeddd8a5e7e33594cf3b65bb))
+
 ## [1.3.0](https://github.com/jasoet/gopki/compare/v1.2.0...v1.3.0) (2025-09-16)
 
 
