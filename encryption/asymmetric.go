@@ -397,8 +397,9 @@ func (e *AsymmetricEncryptor) EncryptForPublicKey(data []byte, publicKey any, op
 		return e.encryptForECDSAPublicKey(data, pk, opts)
 
 	case ed25519.PublicKey:
-		// For Ed25519, generate ephemeral X25519 key pair
-		return e.encryptForEd25519PublicKey(data, pk, opts)
+		// Ed25519 public-key-only encryption is not supported due to complex coordinate conversion
+		// Use Ed25519 key pairs instead for encryption scenarios
+		return nil, fmt.Errorf("Ed25519 public-key-only encryption not supported - use Ed25519 key pairs or ECDSA/RSA for public-key-only encryption")
 
 	default:
 		return nil, fmt.Errorf("unsupported public key type: %T", publicKey)
@@ -496,79 +497,3 @@ func (e *AsymmetricEncryptor) encryptForECDSAPublicKey(data []byte, publicKey *e
 	}, nil
 }
 
-// encryptForEd25519PublicKey encrypts data for an Ed25519 public key using ephemeral X25519
-func (e *AsymmetricEncryptor) encryptForEd25519PublicKey(data []byte, publicKey ed25519.PublicKey, opts EncryptOptions) (*EncryptedData, error) {
-	// For Ed25519 public key encryption, we need to derive the corresponding X25519 public key
-	// Ed25519 and X25519 both use Curve25519 but with different point representations
-	curve := ecdh.X25519()
-
-	// Convert Ed25519 public key to X25519 format using Montgomery ladder point conversion
-	// This is the standard conversion from Edwards coordinates to Montgomery coordinates
-	x25519PublicKeyBytes, err := ed25519PublicKeyToX25519PublicKey(publicKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert Ed25519 public key to X25519: %w", err)
-	}
-
-	x25519PublicKey, err := curve.NewPublicKey(x25519PublicKeyBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create X25519 public key: %w", err)
-	}
-
-	// Generate ephemeral X25519 key pair
-	ephemeralPrivateKey, err := curve.GenerateKey(rand.Reader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate ephemeral X25519 key: %w", err)
-	}
-
-	// Perform X25519 key agreement
-	sharedSecret, err := ephemeralPrivateKey.ECDH(x25519PublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("X25519 key agreement failed: %w", err)
-	}
-
-	// Derive AES key from shared secret
-	aesKey := deriveAESKey(sharedSecret)
-
-	// Encrypt data using AES-GCM
-	encryptedData, iv, tag, err := encryptAESGCM(data, aesKey)
-	if err != nil {
-		return nil, fmt.Errorf("AES-GCM encryption failed: %w", err)
-	}
-
-	return &EncryptedData{
-		Algorithm:    AlgorithmX25519,
-		Format:       opts.Format,
-		Data:         encryptedData,
-		EncryptedKey: ephemeralPrivateKey.PublicKey().Bytes(), // Store ephemeral public key
-		IV:           iv,
-		Tag:          tag,
-		Timestamp:    time.Now(),
-		Metadata:     opts.Metadata,
-	}, nil
-}
-// ed25519PublicKeyToX25519PublicKey converts an Ed25519 public key to X25519 format
-// This implements the standard conversion from Edwards coordinates (Ed25519) to
-// Montgomery coordinates (X25519) on Curve25519.
-//
-// The conversion formula is: u = (1+y)/(1-y) where y is the Edwards y-coordinate
-// and u is the Montgomery u-coordinate. This requires modular arithmetic on the field.
-func ed25519PublicKeyToX25519PublicKey(ed25519PublicKey ed25519.PublicKey) ([]byte, error) {
-	if len(ed25519PublicKey) != 32 {
-		return nil, fmt.Errorf("invalid Ed25519 public key length: %d", len(ed25519PublicKey))
-	}
-
-	// For now, use a simple approach: try to create the X25519 key directly
-	// Ed25519 public keys are often compatible with X25519 in practice
-	// This is a temporary solution until we implement the full coordinate conversion
-
-	// The Ed25519 public key is 32 bytes representing the y-coordinate
-	// For X25519, we need the u-coordinate (Montgomery form)
-	// As a temporary workaround, we'll use the Ed25519 bytes directly
-	// since they often work in practice (this is not mathematically correct
-	// but may work for testing)
-
-	x25519Bytes := make([]byte, 32)
-	copy(x25519Bytes, ed25519PublicKey)
-
-	return x25519Bytes, nil
-}

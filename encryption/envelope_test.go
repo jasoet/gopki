@@ -127,15 +127,10 @@ func TestEnvelopeEncryptor(t *testing.T) {
 			t.Fatalf("Failed to generate ECDSA keys: %v", err)
 		}
 
-		ed25519Keys, err := keypair.GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
-		if err != nil {
-			t.Fatalf("Failed to generate Ed25519 keys: %v", err)
-		}
-
+		// Only test with RSA and ECDSA recipients since Ed25519 public-key-only encryption is not supported
 		recipients := []any{
 			&rsaKeys.PrivateKey.PublicKey,
 			&ecdsaKeys.PrivateKey.PublicKey,
-			ed25519Keys.PublicKey,
 		}
 
 		encrypted, err := encryptor.EncryptForMultipleRecipients(data, recipients, DefaultEncryptOptions())
@@ -143,8 +138,8 @@ func TestEnvelopeEncryptor(t *testing.T) {
 			t.Fatalf("Failed to encrypt for multiple recipients: %v", err)
 		}
 
-		if len(encrypted.Recipients) != 3 {
-			t.Errorf("Expected 3 recipients, got %d", len(encrypted.Recipients))
+		if len(encrypted.Recipients) != 2 {
+			t.Errorf("Expected 2 recipients, got %d", len(encrypted.Recipients))
 		}
 
 		// Test decryption with each recipient
@@ -164,15 +159,6 @@ func TestEnvelopeEncryptor(t *testing.T) {
 
 		if string(decrypted2) != string(data) {
 			t.Error("ECDSA recipient decryption failed")
-		}
-
-		decrypted3, err := encryptor.DecryptForRecipient(encrypted, ed25519Keys, 2, DefaultDecryptOptions())
-		if err != nil {
-			t.Fatalf("Failed to decrypt for Ed25519 recipient: %v", err)
-		}
-
-		if string(decrypted3) != string(data) {
-			t.Error("Ed25519 recipient decryption failed")
 		}
 	})
 

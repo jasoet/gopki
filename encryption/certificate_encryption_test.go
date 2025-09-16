@@ -2,6 +2,7 @@ package encryption
 
 import (
 	"crypto/x509/pkix"
+	"strings"
 	"testing"
 	"time"
 
@@ -92,7 +93,7 @@ func TestCertificateEncryptor(t *testing.T) {
 		}
 	})
 
-	t.Run("EncryptDocument Ed25519", func(t *testing.T) {
+	t.Run("EncryptDocument Ed25519 - Should Fail", func(t *testing.T) {
 		ed25519Keys, err := keypair.GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
 		if err != nil {
 			t.Fatalf("Failed to generate Ed25519 keys: %v", err)
@@ -100,18 +101,16 @@ func TestCertificateEncryptor(t *testing.T) {
 
 		certificate := createTestCertificate(ed25519Keys)
 
-		encrypted, err := encryptor.EncryptDocument(data, certificate, DefaultEncryptOptions())
-		if err != nil {
-			t.Fatalf("Failed to encrypt document: %v", err)
+		// Ed25519 public-key-only encryption is not supported, should return an error
+		_, err = encryptor.EncryptDocument(data, certificate, DefaultEncryptOptions())
+		if err == nil {
+			t.Fatal("Expected error for Ed25519 public-key-only encryption, but got none")
 		}
 
-		decrypted, err := encryptor.DecryptDocument(encrypted, ed25519Keys, DefaultDecryptOptions())
-		if err != nil {
-			t.Fatalf("Failed to decrypt document: %v", err)
-		}
-
-		if string(decrypted) != string(data) {
-			t.Error("Decrypted data doesn't match original")
+		// Verify we get the expected error message
+		expectedError := "Ed25519 public-key-only encryption not supported"
+		if !strings.Contains(err.Error(), expectedError) {
+			t.Errorf("Expected error containing '%s', got: %v", expectedError, err)
 		}
 	})
 
