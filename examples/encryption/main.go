@@ -9,7 +9,6 @@ import (
 
 	"github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/encryption"
-	"github.com/jasoet/gopki/encryption/formats"
 	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
 )
@@ -113,7 +112,7 @@ func demonstrateEnvelopeEncryption() {
 
 	// Use envelope encryption
 	opts := encryption.DefaultEncryptOptions()
-	opts.Format = encryption.FormatRaw
+	opts.Format = encryption.FormatCMS
 
 	encrypted, err := encryption.EncryptData(largeData, rsaKeys, opts)
 	if err != nil {
@@ -136,7 +135,7 @@ func demonstrateEnvelopeEncryption() {
 	fmt.Printf("✅ Envelope encryption/decryption successful!\n\n")
 
 	// Save to file with format
-	saveEncryptedDataWithFormat("examples/encryption/output/envelope_encrypted.raw", encrypted, encryption.FormatRaw)
+	saveEncryptedDataWithFormat("examples/encryption/output/envelope_encrypted.cms", encrypted, encryption.FormatCMS)
 }
 
 func demonstrateCertificateBasedEncryption() {
@@ -213,54 +212,37 @@ func demonstrateFormatSupport() {
 		log.Fatal("Encryption failed:", err)
 	}
 
-	// Demonstrate different formats (only Raw format is fully working)
-	supportedFormats := []encryption.EncryptionFormat{
-		encryption.FormatRaw,
-		// encryption.FormatPKCS7, // Has known issues with envelope encryption
-		// encryption.FormatCMS,   // Has known issues with envelope encryption
+	// Demonstrate CMS format encoding/decoding
+	fmt.Printf("\nFormat: %s\n", encryption.FormatCMS)
+
+	// Encode in CMS format
+	encodedData, err := encryption.EncodeData(encrypted)
+	if err != nil {
+		log.Printf("Failed to encode in CMS format: %v", err)
+		return
 	}
 
-	for _, format := range supportedFormats {
-		fmt.Printf("\nFormat: %s\n", format)
+	fmt.Printf("Encoded size: %d bytes\n", len(encodedData))
 
-		// Encode in specific format
-		encodedData, err := formats.Encode(encrypted, format)
-		if err != nil {
-			log.Printf("Failed to encode in %s format: %v", format, err)
-			continue
-		}
-
-		fmt.Printf("Encoded size: %d bytes\n", len(encodedData))
-
-		// Auto-detect format
-		detectedFormat, err := formats.AutoDetectFormat(encodedData)
-		if err != nil {
-			log.Printf("Failed to detect format: %v", err)
-			continue
-		}
-
-		fmt.Printf("Detected format: %s\n", detectedFormat)
-
-		// Decode back
-		decodedData, err := formats.Decode(encodedData, detectedFormat)
-		if err != nil {
-			log.Printf("Failed to decode from %s format: %v", detectedFormat, err)
-			continue
-		}
-
-		// Decrypt
-		decrypted, err := encryption.DecryptData(decodedData, rsaKeys, encryption.DefaultDecryptOptions())
-		if err != nil {
-			log.Printf("Failed to decrypt: %v", err)
-			continue
-		}
-
-		fmt.Printf("Decrypted: %s\n", decrypted)
-
-		// Save format example
-		filename := fmt.Sprintf("examples/encryption/output/format_%s.bin", format)
-		saveToFile(filename, encodedData)
+	// Decode back from CMS format
+	decodedData, err := encryption.DecodeData(encodedData)
+	if err != nil {
+		log.Printf("Failed to decode from CMS format: %v", err)
+		return
 	}
+
+	// Decrypt
+	decrypted, err := encryption.DecryptData(decodedData, rsaKeys, encryption.DefaultDecryptOptions())
+	if err != nil {
+		log.Printf("Failed to decrypt: %v", err)
+		return
+	}
+
+	fmt.Printf("Decrypted: %s\n", decrypted)
+
+	// Save format example
+	filename := "examples/encryption/output/format_cms.bin"
+	saveToFile(filename, encodedData)
 
 	fmt.Printf("✅ Format demonstration successful!\n\n")
 }
@@ -348,8 +330,8 @@ func demonstrateMultiRecipientEncryption() {
 // Helper functions
 
 func saveEncryptedDataToFile(filename string, encrypted *encryption.EncryptedData) {
-	// Use Raw format for simplicity
-	data, err := formats.Encode(encrypted, encryption.FormatRaw)
+	// Use CMS format
+	data, err := encryption.EncodeData(encrypted)
 	if err != nil {
 		log.Printf("Failed to encode encrypted data: %v", err)
 		return
@@ -359,7 +341,7 @@ func saveEncryptedDataToFile(filename string, encrypted *encryption.EncryptedDat
 }
 
 func saveEncryptedDataWithFormat(filename string, encrypted *encryption.EncryptedData, format encryption.EncryptionFormat) {
-	data, err := formats.Encode(encrypted, format)
+	data, err := encryption.EncodeData(encrypted)
 	if err != nil {
 		log.Printf("Failed to encode encrypted data in %s format: %v", format, err)
 		return

@@ -165,7 +165,7 @@ func (e *EnvelopeEncryptor) Encrypt(data []byte, keyPair any, opts EncryptOption
 	// Encrypt AES key with recipient's public key
 	keyEncryptOpts := EncryptOptions{
 		Algorithm: GetAlgorithmForKeyType(getKeyType(keyPair)),
-		Format:    FormatRaw,
+		Format:    FormatCMS, // Use CMS format for standards compliance
 		Metadata:  make(map[string]interface{}),
 	}
 
@@ -174,26 +174,32 @@ func (e *EnvelopeEncryptor) Encrypt(data []byte, keyPair any, opts EncryptOption
 		return nil, fmt.Errorf("failed to encrypt AES key: %w", err)
 	}
 
+	// Create recipient info with complete encrypted key data
+	recipient := &RecipientInfo{
+		EncryptedKey:           encryptedKey.Data,
+		KeyEncryptionAlgorithm: encryptedKey.Algorithm,
+		EphemeralKey:           encryptedKey.EncryptedKey, // For ECDSA/Ed25519
+		KeyIV:                  encryptedKey.IV,
+		KeyTag:                 encryptedKey.Tag,
+	}
+
 	// Create envelope encrypted data
 	envelope := &EncryptedData{
 		Algorithm:    AlgorithmEnvelope,
 		Format:       opts.Format,
 		Data:         encryptedData.Data,
-		EncryptedKey: encryptedKey.Data,
+		EncryptedKey: encryptedKey.Data, // Keep for backward compatibility
 		IV:           encryptedData.IV,
 		Tag:          encryptedData.Tag,
+		Recipients:   []*RecipientInfo{recipient},
 		Timestamp:    time.Now(),
 		Metadata:     opts.Metadata,
 	}
 
-	// Add recipient info if certificates are available
+	// Add certificate to recipient info if requested
 	if opts.IncludeCertificate {
-		envelope.Recipients = []*RecipientInfo{
-			{
-				EncryptedKey:           encryptedKey.Data,
-				KeyEncryptionAlgorithm: encryptedKey.Algorithm,
-			},
-		}
+		// Certificate info would be added here if we had access to it
+		// For now, the recipient info is already populated above
 	}
 
 	return envelope, nil
@@ -217,14 +223,33 @@ func (e *EnvelopeEncryptor) Decrypt(encrypted *EncryptedData, keyPair any, opts 
 		ValidationOptions: make(map[string]interface{}),
 	}
 
-	// Create temporary encrypted data for key decryption
-	keyEncryptedData := &EncryptedData{
-		Algorithm: GetAlgorithmForKeyType(getKeyType(keyPair)),
-		Format:    FormatRaw,
-		Data:      encrypted.EncryptedKey,
+	var aesKey []byte
+	var err error
+
+	// Try to use recipient info if available (new format with ECDSA/Ed25519 support)
+	if len(encrypted.Recipients) > 0 {
+		recipient := encrypted.Recipients[0] // Use first recipient
+		keyEncryptedData := &EncryptedData{
+			Algorithm:    recipient.KeyEncryptionAlgorithm,
+			Format:       FormatCMS, // Use CMS format for standards compliance
+			Data:         recipient.EncryptedKey,
+			EncryptedKey: recipient.EphemeralKey, // Ephemeral key for ECDSA/Ed25519
+			IV:           recipient.KeyIV,
+			Tag:          recipient.KeyTag,
+		}
+
+		aesKey, err = e.asymmetric.Decrypt(keyEncryptedData, keyPair, keyDecryptOpts)
+	} else {
+		// Fallback to legacy format (RSA only)
+		keyEncryptedData := &EncryptedData{
+			Algorithm: GetAlgorithmForKeyType(getKeyType(keyPair)),
+			Format:    FormatCMS, // Use CMS format for standards compliance
+			Data:      encrypted.EncryptedKey,
+		}
+
+		aesKey, err = e.asymmetric.Decrypt(keyEncryptedData, keyPair, keyDecryptOpts)
 	}
 
-	aesKey, err := e.asymmetric.Decrypt(keyEncryptedData, keyPair, keyDecryptOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt AES key: %w", err)
 	}
@@ -276,7 +301,7 @@ func (e *EnvelopeEncryptor) EncryptForPublicKey(data []byte, publicKey any, opts
 	// Encrypt AES key with recipient's public key
 	keyEncryptOpts := EncryptOptions{
 		Algorithm: GetAlgorithmForKeyType(getPublicKeyType(publicKey)),
-		Format:    FormatRaw,
+		Format:    FormatCMS,
 		Metadata:  make(map[string]interface{}),
 	}
 
@@ -332,7 +357,7 @@ func (e *EnvelopeEncryptor) EncryptForMultipleRecipients(data []byte, recipients
 	for i, publicKey := range recipients {
 		keyEncryptOpts := EncryptOptions{
 			Algorithm: GetAlgorithmForKeyType(getPublicKeyType(publicKey)),
-			Format:    FormatRaw,
+			Format:    FormatCMS,
 			Metadata:  make(map[string]interface{}),
 		}
 
@@ -391,7 +416,7 @@ func (e *EnvelopeEncryptor) DecryptForRecipient(encrypted *EncryptedData, keyPai
 
 	keyEncryptedData := &EncryptedData{
 		Algorithm: recipient.KeyEncryptionAlgorithm,
-		Format:    FormatRaw,
+		Format:    FormatCMS,
 		Data:      recipient.EncryptedKey,
 	}
 

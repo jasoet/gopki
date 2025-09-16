@@ -274,7 +274,7 @@ func TestDefaultOptions(t *testing.T) {
 	if encOpts.Algorithm != AlgorithmEnvelope {
 		t.Errorf("Default encrypt algorithm should be envelope, got %s", encOpts.Algorithm)
 	}
-	if encOpts.Format != FormatRaw {
+	if encOpts.Format != FormatCMS {
 		t.Errorf("Default format should be raw, got %s", encOpts.Format)
 	}
 
@@ -291,7 +291,7 @@ func TestValidateOptions(t *testing.T) {
 	// Valid encrypt options
 	validEncOpts := EncryptOptions{
 		Algorithm: AlgorithmEnvelope,
-		Format:    FormatRaw,
+		Format:    FormatCMS,
 		Metadata:  make(map[string]interface{}),
 	}
 	if err := ValidateEncryptOptions(validEncOpts); err != nil {
@@ -301,7 +301,7 @@ func TestValidateOptions(t *testing.T) {
 	// Invalid encrypt options
 	invalidEncOpts := EncryptOptions{
 		Algorithm: "INVALID",
-		Format:    FormatRaw,
+		Format:    FormatCMS,
 	}
 	if err := ValidateEncryptOptions(invalidEncOpts); err == nil {
 		t.Error("Invalid encrypt options should fail validation")

@@ -43,7 +43,7 @@
 //   - Long-term secure archival with format evolution
 //   - Integration with next-generation cryptographic systems
 //   - Multi-recipient scenarios with complex requirements
-package formats
+package encryption
 
 import (
 	"crypto/x509/pkix"
@@ -51,58 +51,23 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/jasoet/gopki/encryption"
 )
 
-// CMSFormat implements the Format interface for Cryptographic Message Syntax (CMS).
-//
-// This format handler provides advanced cryptographic message formatting according
-// to RFC 5652 and related standards. It extends beyond PKCS#7 capabilities with
-// support for modern cryptographic algorithms, authenticated encryption, and
-// enhanced attribute systems.
-//
-// The implementation supports:
-//   - EnvelopedData for traditional public key encryption
-//   - AuthEnvelopedData for authenticated encryption
-//   - Enhanced recipient information encoding
-//   - Originator information for complex PKI scenarios
-//   - Unprotected attributes for extensible metadata
-//   - Algorithm identifier protection
-//
-// Version support:
-//   - CMS v1: Basic enveloped data
-//   - CMS v2: Enhanced features and attributes
-//   - CMS v3: Algorithm identifier protection
-//   - CMS v4: Modern AEAD support
-//
-// This format is particularly suitable for:
-//   - Enterprise PKI environments
-//   - Applications requiring standards compliance
-//   - Long-term secure archival
-//   - Multi-recipient encryption scenarios
-type CMSFormat struct{}
-
-// NewCMSFormat creates a new CMS format handler instance.
-//
-// Returns:
-//   - *CMSFormat: A new format handler ready for CMS operations
-//
-// Example:
-//
-//	format := NewCMSFormat()
-//	encoded, err := format.Encode(encryptedData)
-//	if err != nil {
-//		log.Fatal("CMS encoding failed:", err)
-//	}
-func NewCMSFormat() *CMSFormat {
-	return &CMSFormat{}
-}
-
-// Name returns the format name
-func (f *CMSFormat) Name() string {
-	return string(encryption.FormatCMS)
-}
+// OIDs for CMS and encryption algorithms
+var (
+	oidData                   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 1}
+	oidEnvelopedData          = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 3}
+	oidEncryptedData          = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 6}
+	oidRSAEncryption          = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}
+	oidAES256CBC              = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 42}
+	oidAES256GCM              = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 46}
+	oidKeyTransport           = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}
+	oidECDH                   = asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}    // ECDH
+	oidX25519                 = asn1.ObjectIdentifier{1, 3, 101, 110}             // X25519
+	oidECPublicKey            = asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}    // EC public key
+	oidPBES2                  = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 5, 13}
+	oidPBKDF2                 = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 5, 12}
+)
 
 // CMS-specific OIDs
 var (
@@ -139,7 +104,7 @@ type cmsRecipientInfo struct {
 
 // RecipientIdentifier can be IssuerAndSerialNumber or SubjectKeyIdentifier
 type recipientIdentifier struct {
-	IssuerAndSerial *issuerAndSerial `asn1:"optional"`
+	IssuerAndSerial issuerAndSerial `asn1:"optional"`
 	SubjectKeyId    []byte `asn1:"implicit,optional,tag:0"`
 }
 
@@ -150,8 +115,20 @@ type cmsEncryptedContentInfo struct {
 	EncryptedContent           []byte `asn1:"implicit,optional,tag:0"`
 }
 
-// Encode converts EncryptedData to CMS format
-func (f *CMSFormat) Encode(data *encryption.EncryptedData) ([]byte, error) {
+// issuerAndSerial represents the IssuerAndSerialNumber structure
+type issuerAndSerial struct {
+	Issuer       asn1.RawValue
+	SerialNumber int
+}
+
+// contentInfo represents the ContentInfo structure
+type contentInfo struct {
+	ContentType asn1.ObjectIdentifier
+	Content     asn1.RawValue `asn1:"explicit,optional,tag:0"`
+}
+
+// EncodeToCMS converts EncryptedData to CMS format
+func EncodeToCMS(data *EncryptedData) ([]byte, error) {
 	// Create the encrypted content info
 	encContent := cmsEncryptedContentInfo{
 		ContentType: oidData,
@@ -170,7 +147,7 @@ func (f *CMSFormat) Encode(data *encryption.EncryptedData) ([]byte, error) {
 		recipient := cmsRecipientInfo{
 			Version: 0,
 			RecipientIdentifier: recipientIdentifier{
-				IssuerAndSerial: &issuerAndSerial{
+				IssuerAndSerial: issuerAndSerial{
 					Issuer:       asn1.RawValue{},
 					SerialNumber: 1,
 				},
@@ -189,7 +166,7 @@ func (f *CMSFormat) Encode(data *encryption.EncryptedData) ([]byte, error) {
 		recipient := cmsRecipientInfo{
 			Version: 2, // Version 2 for CMS
 			RecipientIdentifier: recipientIdentifier{
-				IssuerAndSerial: &issuerAndSerial{
+				IssuerAndSerial: issuerAndSerial{
 					Issuer:       asn1.RawValue{},
 					SerialNumber: i + 2,
 				},
@@ -204,7 +181,28 @@ func (f *CMSFormat) Encode(data *encryption.EncryptedData) ([]byte, error) {
 		// Add key ID if available
 		if len(recip.KeyID) > 0 {
 			recipient.RecipientIdentifier.SubjectKeyId = recip.KeyID
-			recipient.RecipientIdentifier.IssuerAndSerial = nil
+			// Clear IssuerAndSerial when using SubjectKeyId
+			recipient.RecipientIdentifier.IssuerAndSerial = issuerAndSerial{}
+		}
+
+		// Handle ephemeral keys for ECDH/X25519
+		if len(recip.EphemeralKey) > 0 {
+			// Store ephemeral key in UkeyInfo field for key agreement algorithms
+			recipient.UkeyInfo = recip.EphemeralKey
+		}
+
+		// Handle additional key material (IV, Tag) for AES-GCM key wrapping
+		if len(recip.KeyIV) > 0 || len(recip.KeyTag) > 0 {
+			// Combine IV and Tag for storage in OtherInfo
+			keyMaterial := make([]byte, 0, len(recip.KeyIV)+len(recip.KeyTag))
+			keyMaterial = append(keyMaterial, recip.KeyIV...)
+			keyMaterial = append(keyMaterial, recip.KeyTag...)
+			recipient.OtherInfo = asn1.RawValue{
+				Class:      0,
+				Tag:        4, // OCTET STRING
+				IsCompound: false,
+				Bytes:      keyMaterial,
+			}
 		}
 
 		recipients = append(recipients, recipient)
@@ -250,8 +248,8 @@ func (f *CMSFormat) Encode(data *encryption.EncryptedData) ([]byte, error) {
 	return asn1.Marshal(content)
 }
 
-// Decode parses CMS format into EncryptedData
-func (f *CMSFormat) Decode(data []byte) (*encryption.EncryptedData, error) {
+// DecodeFromCMS parses CMS format into EncryptedData
+func DecodeFromCMS(data []byte) (*EncryptedData, error) {
 	// Parse ContentInfo
 	var content contentInfo
 	rest, err := asn1.Unmarshal(data, &content)
@@ -273,17 +271,17 @@ func (f *CMSFormat) Decode(data []byte) (*encryption.EncryptedData, error) {
 		return nil, fmt.Errorf("failed to unmarshal CMS enveloped data: %w", err)
 	}
 
-	result := &encryption.EncryptedData{
-		Format:     encryption.FormatCMS,
+	result := &EncryptedData{
+		Format:     FormatCMS,
 		Algorithm:  oidToAlgorithm(cms.EncryptedContentInfo.ContentEncryptionAlgorithm.Algorithm),
 		Data:       cms.EncryptedContentInfo.EncryptedContent,
-		Recipients: make([]*encryption.RecipientInfo, 0),
+		Recipients: make([]*RecipientInfo, 0),
 		Metadata:   make(map[string]interface{}),
 	}
 
 	// Extract recipient information
 	for _, recip := range cms.RecipientInfos {
-		recipInfo := &encryption.RecipientInfo{
+		recipInfo := &RecipientInfo{
 			EncryptedKey:           recip.EncryptedKey,
 			KeyEncryptionAlgorithm: oidToAlgorithm(recip.KeyEncryptionAlgorithm.Algorithm),
 		}
@@ -291,6 +289,24 @@ func (f *CMSFormat) Decode(data []byte) (*encryption.EncryptedData, error) {
 		// Extract key ID if available
 		if len(recip.RecipientIdentifier.SubjectKeyId) > 0 {
 			recipInfo.KeyID = recip.RecipientIdentifier.SubjectKeyId
+		}
+
+		// Extract ephemeral key for ECDH/X25519
+		if len(recip.UkeyInfo) > 0 {
+			recipInfo.EphemeralKey = recip.UkeyInfo
+		}
+
+		// Extract additional key material (IV, Tag) from OtherInfo
+		if len(recip.OtherInfo.Bytes) > 0 {
+			keyMaterial := recip.OtherInfo.Bytes
+			// For AES-GCM, we expect 12 bytes IV + 16 bytes Tag = 28 bytes total
+			if len(keyMaterial) >= 28 {
+				recipInfo.KeyIV = keyMaterial[:12]
+				recipInfo.KeyTag = keyMaterial[12:28]
+			} else if len(keyMaterial) >= 12 {
+				// If we only have IV
+				recipInfo.KeyIV = keyMaterial[:12]
+			}
 		}
 
 		result.Recipients = append(result.Recipients, recipInfo)
@@ -349,4 +365,42 @@ func ValidateCMS(data []byte) error {
 	}
 
 	return nil
+}
+
+// getAlgorithmOID returns the OID for an encryption algorithm
+func getAlgorithmOID(alg EncryptionAlgorithm) asn1.ObjectIdentifier {
+	switch alg {
+	case AlgorithmRSAOAEP:
+		return oidRSAEncryption
+	case AlgorithmECDH:
+		return oidECDH
+	case AlgorithmX25519:
+		return oidX25519
+	case AlgorithmAESGCM:
+		return oidAES256GCM
+	case AlgorithmEnvelope:
+		return oidEnvelopedData
+	default:
+		return oidData
+	}
+}
+
+// oidToAlgorithm converts an OID to an EncryptionAlgorithm
+func oidToAlgorithm(oid asn1.ObjectIdentifier) EncryptionAlgorithm {
+	switch {
+	case oid.Equal(oidRSAEncryption):
+		return AlgorithmRSAOAEP
+	case oid.Equal(oidECDH), oid.Equal(oidECPublicKey):
+		return AlgorithmECDH
+	case oid.Equal(oidX25519):
+		return AlgorithmX25519
+	case oid.Equal(oidAES256GCM):
+		return AlgorithmAESGCM
+	case oid.Equal(oidAES256CBC):
+		return AlgorithmAESGCM // Treat CBC as GCM for compatibility
+	case oid.Equal(oidEnvelopedData):
+		return AlgorithmEnvelope
+	default:
+		return ""
+	}
 }

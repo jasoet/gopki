@@ -11,7 +11,7 @@ The encryption example showcases:
 3. **Ed25519 + X25519 Encryption** - Modern elliptic curve encryption
 4. **Envelope Encryption** - Hybrid encryption for large data sets
 5. **Certificate-based Encryption** - PKI document encryption workflows
-6. **Format Support** - Raw, PKCS#7, and CMS output formats
+6. **Format Support** - CMS (RFC 5652) format encoding
 7. **Multi-Recipient Encryption** - Encrypting for multiple recipients
 
 ## Running the Examples
@@ -35,7 +35,7 @@ The examples will create an `output/` directory containing:
 
 - **Encrypted data files** in various formats
 - **Certificates** used for encryption
-- **Format demonstrations** showing Raw, PKCS#7, and CMS encoding
+- **Format demonstrations** showing CMS encoding
 
 ## Example Output Structure
 
@@ -47,8 +47,6 @@ examples/encryption/output/
 ├── envelope_encrypted.raw      # Large data envelope encryption
 ├── alice_cert.pem              # Certificate for document encryption
 ├── document_encrypted.bin      # Certificate-based encrypted document
-├── format_raw.bin              # Raw format example
-├── format_pkcs7.bin            # PKCS#7 format example
 ├── format_cms.bin              # CMS format example
 ├── alice_message.bin           # Multi-recipient: Alice's copy
 ├── bob_message.bin             # Multi-recipient: Bob's copy
@@ -70,13 +68,13 @@ The examples show how GoPKI automatically selects the appropriate encryption alg
 - **Small data** (≤190 bytes for RSA-2048) → Direct asymmetric encryption
 - **Large data** → Automatic envelope encryption for efficiency
 
-### 3. Format Flexibility
+### 3. Format Support
 
-Three output formats are supported:
+CMS (Cryptographic Message Syntax) format is supported:
 
-- **Raw**: Custom binary format with minimal overhead
-- **PKCS#7**: Standard ASN.1 format for broad compatibility
-- **CMS**: Advanced cryptographic message syntax
+- **CMS**: RFC 5652 standard format for enterprise PKI environments
+- **Standards compliance**: Compatible with OpenSSL and other PKI tools
+- **Advanced features**: Multi-recipient support, algorithm agility, extensible attributes
 
 ### 4. Security Features
 
@@ -122,14 +120,14 @@ decrypted, err := encryption.DecryptData(encrypted, keyPair, decryptOpts)
 ### Format Handling
 
 ```go
-// Encode in specific format
-encodedData, err := formats.Encode(encrypted, encryption.FormatPKCS7)
+// Encode to CMS format
+encodedData, err := encryption.EncodeData(encrypted)
 
-// Auto-detect format
-detectedFormat, err := formats.AutoDetectFormat(encodedData)
+// Decode from CMS format
+decodedData, err := encryption.DecodeData(encodedData)
 
-// Decode from format
-decodedData, err := formats.Decode(encodedData, detectedFormat)
+// Validate CMS format
+err := encryption.ValidateEncodedData(encodedData)
 ```
 
 ## Performance Considerations
@@ -137,7 +135,7 @@ decodedData, err := formats.Decode(encodedData, detectedFormat)
 - **RSA encryption** is limited by key size (~190 bytes for 2048-bit keys)
 - **Envelope encryption** is recommended for data >1KB
 - **ECDH/X25519** provide excellent performance for any data size
-- **Format overhead** varies: Raw < PKCS#7 < CMS
+- **CMS format** provides excellent standards compliance with minimal overhead
 
 ## Security Best Practices
 

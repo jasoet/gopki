@@ -121,12 +121,11 @@ const (
 )
 
 // EncryptionFormat represents the format of encrypted data
+// Currently only CMS (RFC 5652) format is supported
 type EncryptionFormat string
 
 const (
-	FormatRaw   EncryptionFormat = "raw"
-	FormatCMS   EncryptionFormat = "cms"
-	FormatPKCS7 EncryptionFormat = "pkcs7"
+	FormatCMS EncryptionFormat = "cms" // RFC 5652 Cryptographic Message Syntax
 )
 
 // EncryptedData represents encrypted data with its metadata
@@ -163,6 +162,13 @@ type RecipientInfo struct {
 	EncryptedKey []byte
 	// Key encryption algorithm
 	KeyEncryptionAlgorithm EncryptionAlgorithm
+	// Additional fields for ECDSA/Ed25519 support
+	// Ephemeral public key (for ECDH/X25519)
+	EphemeralKey []byte
+	// IV for key encryption (for AES-GCM)
+	KeyIV []byte
+	// Authentication tag for key encryption (for AES-GCM)
+	KeyTag []byte
 }
 
 // KDFParams contains key derivation function parameters
@@ -261,7 +267,7 @@ var (
 func DefaultEncryptOptions() EncryptOptions {
 	return EncryptOptions{
 		Algorithm:          AlgorithmEnvelope,
-		Format:             FormatRaw,
+		Format:             FormatCMS, // CMS is the only supported format
 		IncludeCertificate: false,
 		Recipients:         nil,
 		KDF:                nil,
@@ -305,8 +311,8 @@ func ValidateEncryptOptions(opts EncryptOptions) error {
 	}
 
 	switch opts.Format {
-	case FormatRaw, FormatCMS, FormatPKCS7:
-		// Valid formats
+	case FormatCMS:
+		// Valid format - only CMS is supported
 	default:
 		return ErrUnsupportedFormat
 	}
@@ -320,4 +326,27 @@ func ValidateDecryptOptions(opts DecryptOptions) error {
 		return ErrInvalidParameters
 	}
 	return nil
+}
+
+// EncodeData encodes EncryptedData to CMS format bytes
+// Since CMS is the only supported format, this is a convenience function
+func EncodeData(data *EncryptedData) ([]byte, error) {
+	if data == nil {
+		return nil, errors.New("encrypted data is nil")
+	}
+	return EncodeToCMS(data)
+}
+
+// DecodeData decodes CMS format bytes back to EncryptedData
+// Since CMS is the only supported format, this is a convenience function
+func DecodeData(data []byte) (*EncryptedData, error) {
+	if len(data) == 0 {
+		return nil, errors.New("data is empty")
+	}
+	return DecodeFromCMS(data)
+}
+
+// ValidateEncodedData validates that the data is in valid CMS format
+func ValidateEncodedData(data []byte) error {
+	return ValidateCMS(data)
 }

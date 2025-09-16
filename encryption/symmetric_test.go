@@ -18,7 +18,7 @@ func TestSymmetricEncryptor(t *testing.T) {
 
 		opts := EncryptOptions{
 			Algorithm: AlgorithmAESGCM,
-			Format:    FormatRaw,
+			Format:    FormatCMS,
 			Metadata:  make(map[string]interface{}),
 		}
 
@@ -65,7 +65,7 @@ func TestSymmetricEncryptor(t *testing.T) {
 
 				opts := EncryptOptions{
 					Algorithm: AlgorithmAESGCM,
-					Format:    FormatRaw,
+					Format:    FormatCMS,
 					Metadata:  make(map[string]interface{}),
 				}
 
@@ -102,7 +102,7 @@ func TestSymmetricEncryptor(t *testing.T) {
 
 		opts := EncryptOptions{
 			Algorithm: AlgorithmAESGCM,
-			Format:    FormatRaw,
+			Format:    FormatCMS,
 			Metadata:  make(map[string]interface{}),
 		}
 

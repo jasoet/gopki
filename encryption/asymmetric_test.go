@@ -19,7 +19,7 @@ func TestAsymmetricEncryptor(t *testing.T) {
 
 		opts := EncryptOptions{
 			Algorithm: AlgorithmRSAOAEP,
-			Format:    FormatRaw,
+			Format:    FormatCMS,
 			Metadata:  make(map[string]interface{}),
 		}
 
@@ -50,7 +50,7 @@ func TestAsymmetricEncryptor(t *testing.T) {
 
 		opts := EncryptOptions{
 			Algorithm: AlgorithmECDH,
-			Format:    FormatRaw,
+			Format:    FormatCMS,
 			Metadata:  make(map[string]interface{}),
 		}
 
@@ -93,7 +93,7 @@ func TestAsymmetricEncryptor(t *testing.T) {
 
 		opts := EncryptOptions{
 			Algorithm: AlgorithmX25519,
-			Format:    FormatRaw,
+			Format:    FormatCMS,
 			Metadata:  make(map[string]interface{}),
 		}
 
@@ -136,7 +136,7 @@ func TestAsymmetricEncryptor(t *testing.T) {
 
 		opts := EncryptOptions{
 			Algorithm: AlgorithmRSAOAEP,
-			Format:    FormatRaw,
+			Format:    FormatCMS,
 			Metadata:  make(map[string]interface{}),
 		}
 
@@ -163,7 +163,7 @@ func TestAsymmetricEncryptor(t *testing.T) {
 
 		opts := EncryptOptions{
 			Algorithm: AlgorithmRSAOAEP,
-			Format:    FormatRaw,
+			Format:    FormatCMS,
 			Metadata:  make(map[string]interface{}),
 		}
 
@@ -196,7 +196,7 @@ func TestAsymmetricEncryptor(t *testing.T) {
 
 		opts := EncryptOptions{
 			Algorithm: AlgorithmRSAOAEP,
-			Format:    FormatRaw,
+			Format:    FormatCMS,
 			Metadata:  make(map[string]interface{}),
 		}
 
@@ -209,7 +209,7 @@ func TestAsymmetricEncryptor(t *testing.T) {
 	t.Run("Unsupported Key Type", func(t *testing.T) {
 		opts := EncryptOptions{
 			Algorithm: AlgorithmRSAOAEP,
-			Format:    FormatRaw,
+			Format:    FormatCMS,
 			Metadata:  make(map[string]interface{}),
 		}
 
