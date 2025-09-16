@@ -1,3 +1,15 @@
+## [1.6.0](https://github.com/jasoet/gopki/compare/v1.5.1...v1.6.0) (2025-09-16)
+
+
+### ✨ Features
+
+* generify P12 functions to return typed KeyPair instead of any ([9573e8d](https://github.com/jasoet/gopki/commit/9573e8dd5a2fa748ca4b26eb70611be6087dacfb))
+
+
+### ♻️ Refactoring
+
+* **pkcs12:** move P12 keypair functions to pkcs12 package ([d609b24](https://github.com/jasoet/gopki/commit/d609b24d7299cdf13f5a9fd19f210a66d927f873))
+
 ## [1.5.1](https://github.com/jasoet/gopki/compare/v1.5.0...v1.5.1) (2025-09-16)
 
 
