@@ -1,3 +1,15 @@
+## [1.4.1](https://github.com/jasoet/gopki/compare/v1.4.0...v1.4.1) (2025-09-16)
+
+
+### 🐛 Bug Fixes
+
+* **formats:** correct package comment and add missing newline in raw.go ([56916ca](https://github.com/jasoet/gopki/commit/56916ca2f86606b2dab224e2fa4f3211097592cf))
+
+
+### 📚 Documentation
+
+* add comprehensive documentation for encryption, formats, and P12 packages ([b3fadf4](https://github.com/jasoet/gopki/commit/b3fadf41c272ebe65892d314ffdd5d62444b8c51)), closes [PKCS#7](https://github.com/jasoet/PKCS/issues/7)
+
 ## [1.4.0](https://github.com/jasoet/gopki/compare/v1.3.0...v1.4.0) (2025-09-16)
 
 
