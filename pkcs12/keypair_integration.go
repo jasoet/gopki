@@ -219,7 +219,7 @@ func FromP12KeyPair[T keypair.KeyPair](p12Data []byte, password string) (T, *x50
 	}
 
 	// Convert to keypair based on private key type
-	keyPair, err := createKeyPairFromPrivateKey(container.PrivateKey)
+	keyPair, err := createKeyPairFromPrivateKeyAny(container.PrivateKey)
 	if err != nil {
 		return zero, nil, nil, fmt.Errorf("failed to create key pair: %w", err)
 	}
@@ -275,7 +275,7 @@ func FromP12KeyPairFile[T keypair.KeyPair](filename, password string) (T, *x509.
 	}
 
 	// Convert to keypair based on private key type
-	keyPair, err := createKeyPairFromPrivateKey(container.PrivateKey)
+	keyPair, err := createKeyPairFromPrivateKeyAny(container.PrivateKey)
 	if err != nil {
 		return zero, nil, nil, fmt.Errorf("failed to create key pair: %w", err)
 	}
@@ -403,7 +403,7 @@ func ImportFromP12KeyPairWithValidation[T keypair.KeyPair](filename, password st
 	}
 
 	// Convert to keypair
-	keyPair, err := createKeyPairFromPrivateKey(container.PrivateKey)
+	keyPair, err := createKeyPairFromPrivateKeyAny(container.PrivateKey)
 	if err != nil {
 		return zero, nil, nil, fmt.Errorf("failed to create key pair: %w", err)
 	}
@@ -481,33 +481,23 @@ func ConvertP12KeyPairToPEM(p12File, password, privateKeyFile, certFile string) 
 	return nil
 }
 
-// Helper function to create key pair from private key
-func createKeyPairFromPrivateKey(privateKey any) (any, error) {
+// createKeyPairFromPrivateKeyAny creates a keypair from any private key type
+func createKeyPairFromPrivateKeyAny(privateKey GenericPrivateKey) (any, error) {
 	switch priv := privateKey.(type) {
-	case *algo.RSAKeyPair:
-		// Already a keypair, return as-is
-		return priv, nil
-	case *algo.ECDSAKeyPair:
-		// Already a keypair, return as-is
-		return priv, nil
-	case *algo.Ed25519KeyPair:
-		// Already a keypair, return as-is
-		return priv, nil
+	case *rsa.PrivateKey:
+		return createKeyPairFromPrivateKey(priv)
+	case *ecdsa.PrivateKey:
+		return createKeyPairFromPrivateKey(priv)
+	case ed25519.PrivateKey:
+		return createKeyPairFromPrivateKey(priv)
 	default:
-		// Try to create from standard crypto types
-		return createKeyPairFromStandardKey(privateKey)
+		return nil, fmt.Errorf("unsupported private key type for keypair creation: %T", privateKey)
 	}
 }
 
-// createKeyPairFromStandardKey creates a keypair from standard Go crypto types
-func createKeyPairFromStandardKey(privateKey any) (any, error) {
-	switch priv := privateKey.(type) {
-	case *algo.RSAKeyPair:
-		return priv, nil
-	case *algo.ECDSAKeyPair:
-		return priv, nil
-	case *algo.Ed25519KeyPair:
-		return priv, nil
+// Helper function to create key pair from private key
+func createKeyPairFromPrivateKey[T keypair.PrivateKey](privateKey T) (any, error) {
+	switch priv := any(privateKey).(type) {
 	case *rsa.PrivateKey:
 		return &algo.RSAKeyPair{
 			PrivateKey: priv,
@@ -528,6 +518,7 @@ func createKeyPairFromStandardKey(privateKey any) (any, error) {
 		return nil, fmt.Errorf("unsupported private key type for keypair creation: %T", privateKey)
 	}
 }
+
 
 // saveCertificateToPEM saves a certificate to a PEM file
 func saveCertificateToPEM(cert *x509.Certificate, filename string) error {

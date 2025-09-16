@@ -73,8 +73,6 @@
 package pkcs12
 
 import (
-	"crypto/ecdsa"
-	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -91,10 +89,19 @@ import (
 	"github.com/jasoet/gopki/keypair"
 )
 
+// GenericPrivateKey represents any private key type for functions that need to work with multiple key types dynamically
+type GenericPrivateKey any
+
+// GenericPublicKey represents any public key type for functions that need to work with multiple key types dynamically
+type GenericPublicKey any
+
+// GenericKeyPair represents any keypair type for functions that need to work with multiple keypair types dynamically
+type GenericKeyPair any
+
 // P12Container represents a PKCS#12 container with its contents
 type P12Container struct {
 	// Private key from the P12 file
-	PrivateKey any
+	PrivateKey GenericPrivateKey
 	// Primary certificate associated with the private key
 	Certificate *x509.Certificate
 	// Additional certificates (certificate chain)
@@ -245,20 +252,6 @@ func CreateP12[T keypair.PrivateKey](privateKey T, certificate *x509.Certificate
 	}
 }
 
-// CreateP12FileAny creates a PKCS#12 file from any private key type (wrapper for backward compatibility).
-// This function detects the private key type and calls the appropriate generic version.
-func CreateP12FileAny(filename string, privateKey any, certificate *x509.Certificate, caCerts []*x509.Certificate, opts CreateOptions) error {
-	switch priv := privateKey.(type) {
-	case *rsa.PrivateKey:
-		return CreateP12File(filename, priv, certificate, caCerts, opts)
-	case *ecdsa.PrivateKey:
-		return CreateP12File(filename, priv, certificate, caCerts, opts)
-	case ed25519.PrivateKey:
-		return CreateP12File(filename, priv, certificate, caCerts, opts)
-	default:
-		return fmt.Errorf("unsupported private key type: %T", privateKey)
-	}
-}
 
 // ParseP12 parses PKCS#12 data and returns the private key, certificate, and CA certificates
 func ParseP12(p12Data []byte, opts LoadOptions) (*P12Container, error) {

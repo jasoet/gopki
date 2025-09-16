@@ -58,7 +58,7 @@ func validateCertificateExpiration(cert *x509.Certificate) error {
 }
 
 // validateKeyPairMatch validates that the private key matches the certificate's public key
-func validateKeyPairMatch(privateKey any, publicKey any) error {
+func validateKeyPairMatch(privateKey GenericPrivateKey, publicKey GenericPublicKey) error {
 	switch priv := privateKey.(type) {
 	case *rsa.PrivateKey:
 		pub, ok := publicKey.(*rsa.PublicKey)
@@ -96,7 +96,7 @@ func validateKeyPairMatch(privateKey any, publicKey any) error {
 }
 
 // getPrivateKeyType returns a string description of the private key type
-func getPrivateKeyType(privateKey any) string {
+func getPrivateKeyType(privateKey GenericPrivateKey) string {
 	switch privateKey.(type) {
 	case *rsa.PrivateKey:
 		return "RSA"

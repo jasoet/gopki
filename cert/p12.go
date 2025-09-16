@@ -1,6 +1,9 @@
 package cert
 
 import (
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -107,7 +110,7 @@ func LoadCertificateChainFromP12(filename, password string) ([]*Certificate, err
 
 // SaveToP12 saves a certificate to PKCS#12 format (requires private key)
 // Note: This function requires a private key to create a valid P12 file
-func (c *Certificate) SaveToP12(privateKey any, filename, password string) error {
+func (c *Certificate) SaveToP12(privateKey pkcs12.GenericPrivateKey, filename, password string) error {
 	if c.Certificate == nil {
 		return fmt.Errorf("certificate is not initialized")
 	}
@@ -121,13 +124,22 @@ func (c *Certificate) SaveToP12(privateKey any, filename, password string) error
 		return fmt.Errorf("password is required")
 	}
 
-	// Create P12 file
+	// Create P12 file using type-specific approach
 	opts := pkcs12.DefaultCreateOptions(password)
-	return pkcs12.CreateP12FileAny(filename, privateKey, c.Certificate, nil, opts)
+	switch priv := privateKey.(type) {
+	case *rsa.PrivateKey:
+		return pkcs12.CreateP12File(filename, priv, c.Certificate, nil, opts)
+	case *ecdsa.PrivateKey:
+		return pkcs12.CreateP12File(filename, priv, c.Certificate, nil, opts)
+	case ed25519.PrivateKey:
+		return pkcs12.CreateP12File(filename, priv, c.Certificate, nil, opts)
+	default:
+		return fmt.Errorf("unsupported private key type: %T", privateKey)
+	}
 }
 
 // SaveToP12WithChain saves a certificate with a certificate chain to PKCS#12 format
-func (c *Certificate) SaveToP12WithChain(privateKey any, caCerts []*Certificate, filename, password string) error {
+func (c *Certificate) SaveToP12WithChain(privateKey pkcs12.GenericPrivateKey, caCerts []*Certificate, filename, password string) error {
 	if c.Certificate == nil {
 		return fmt.Errorf("certificate is not initialized")
 	}
@@ -149,10 +161,19 @@ func (c *Certificate) SaveToP12WithChain(privateKey any, caCerts []*Certificate,
 		}
 	}
 
-	// Create P12 file with chain
+	// Create P12 file with chain using type-specific approach
 	opts := pkcs12.DefaultCreateOptions(password)
 	opts.IncludeChain = true
-	return pkcs12.CreateP12FileAny(filename, privateKey, c.Certificate, x509CACerts, opts)
+	switch priv := privateKey.(type) {
+	case *rsa.PrivateKey:
+		return pkcs12.CreateP12File(filename, priv, c.Certificate, x509CACerts, opts)
+	case *ecdsa.PrivateKey:
+		return pkcs12.CreateP12File(filename, priv, c.Certificate, x509CACerts, opts)
+	case ed25519.PrivateKey:
+		return pkcs12.CreateP12File(filename, priv, c.Certificate, x509CACerts, opts)
+	default:
+		return fmt.Errorf("unsupported private key type: %T", privateKey)
+	}
 }
 
 // ExtractCertificatesFromP12 extracts all certificates from a P12 file and saves them as separate PEM files
