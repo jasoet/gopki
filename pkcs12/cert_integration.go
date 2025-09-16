@@ -1,4 +1,7 @@
-package cert
+// Package pkcs12 provides certificate integration utilities for PKCS#12 files.
+// This file contains functions for working with certificates and PKCS#12 format,
+// including loading certificates from P12 files and saving certificates to P12 format.
+package pkcs12
 
 import (
 	"crypto/ecdsa"
@@ -10,11 +13,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jasoet/gopki/pkcs12"
+	"github.com/jasoet/gopki/cert"
 )
 
-// FromP12 loads a certificate from PKCS#12 data
-func FromP12(p12Data []byte, password string) (*Certificate, []*x509.Certificate, error) {
+// FromP12Cert loads a certificate from PKCS#12 data and returns a GoPKI Certificate
+func FromP12Cert(p12Data []byte, password string) (*cert.Certificate, []*x509.Certificate, error) {
 	if len(p12Data) == 0 {
 		return nil, nil, fmt.Errorf("P12 data is required")
 	}
@@ -23,8 +26,8 @@ func FromP12(p12Data []byte, password string) (*Certificate, []*x509.Certificate
 	}
 
 	// Parse P12 data
-	opts := pkcs12.DefaultLoadOptions(password)
-	container, err := pkcs12.ParseP12(p12Data, opts)
+	opts := DefaultLoadOptions(password)
+	container, err := ParseP12(p12Data, opts)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to parse P12 data: %w", err)
 	}
@@ -34,15 +37,15 @@ func FromP12(p12Data []byte, password string) (*Certificate, []*x509.Certificate
 	}
 
 	// Wrap in GoPKI Certificate
-	goPKICert := &Certificate{
+	goPKICert := &cert.Certificate{
 		Certificate: container.Certificate,
 	}
 
 	return goPKICert, container.CACertificates, nil
 }
 
-// FromP12File loads a certificate from a PKCS#12 file
-func FromP12File(filename, password string) (*Certificate, []*x509.Certificate, error) {
+// FromP12CertFile loads a certificate from a PKCS#12 file and returns a GoPKI Certificate
+func FromP12CertFile(filename, password string) (*cert.Certificate, []*x509.Certificate, error) {
 	if filename == "" {
 		return nil, nil, fmt.Errorf("filename is required")
 	}
@@ -51,8 +54,8 @@ func FromP12File(filename, password string) (*Certificate, []*x509.Certificate, 
 	}
 
 	// Load P12 file
-	opts := pkcs12.DefaultLoadOptions(password)
-	container, err := pkcs12.LoadFromP12File(filename, opts)
+	opts := DefaultLoadOptions(password)
+	container, err := LoadFromP12File(filename, opts)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load P12 file: %w", err)
 	}
@@ -62,15 +65,15 @@ func FromP12File(filename, password string) (*Certificate, []*x509.Certificate, 
 	}
 
 	// Wrap in GoPKI Certificate
-	goPKICert := &Certificate{
+	goPKICert := &cert.Certificate{
 		Certificate: container.Certificate,
 	}
 
 	return goPKICert, container.CACertificates, nil
 }
 
-// LoadCertificateChainFromP12 loads the complete certificate chain from a P12 file
-func LoadCertificateChainFromP12(filename, password string) ([]*Certificate, error) {
+// LoadCertificateChainFromP12 loads the complete certificate chain from a P12 file as GoPKI Certificates
+func LoadCertificateChainFromP12(filename, password string) ([]*cert.Certificate, error) {
 	if filename == "" {
 		return nil, fmt.Errorf("filename is required")
 	}
@@ -79,24 +82,24 @@ func LoadCertificateChainFromP12(filename, password string) ([]*Certificate, err
 	}
 
 	// Load P12 file
-	opts := pkcs12.DefaultLoadOptions(password)
-	container, err := pkcs12.LoadFromP12File(filename, opts)
+	opts := DefaultLoadOptions(password)
+	container, err := LoadFromP12File(filename, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load P12 file: %w", err)
 	}
 
-	var certificates []*Certificate
+	var certificates []*cert.Certificate
 
 	// Add the main certificate
 	if container.Certificate != nil {
-		certificates = append(certificates, &Certificate{
+		certificates = append(certificates, &cert.Certificate{
 			Certificate: container.Certificate,
 		})
 	}
 
 	// Add CA certificates
 	for _, caCert := range container.CACertificates {
-		certificates = append(certificates, &Certificate{
+		certificates = append(certificates, &cert.Certificate{
 			Certificate: caCert,
 		})
 	}
@@ -108,10 +111,10 @@ func LoadCertificateChainFromP12(filename, password string) ([]*Certificate, err
 	return certificates, nil
 }
 
-// SaveToP12 saves a certificate to PKCS#12 format (requires private key)
+// SaveCertToP12 saves a certificate to PKCS#12 format (requires private key)
 // Note: This function requires a private key to create a valid P12 file
-func (c *Certificate) SaveToP12(privateKey pkcs12.GenericPrivateKey, filename, password string) error {
-	if c.Certificate == nil {
+func SaveCertToP12(certificate *cert.Certificate, privateKey GenericPrivateKey, filename, password string) error {
+	if certificate == nil || certificate.Certificate == nil {
 		return fmt.Errorf("certificate is not initialized")
 	}
 	if privateKey == nil {
@@ -125,22 +128,22 @@ func (c *Certificate) SaveToP12(privateKey pkcs12.GenericPrivateKey, filename, p
 	}
 
 	// Create P12 file using type-specific approach
-	opts := pkcs12.DefaultCreateOptions(password)
+	opts := DefaultCreateOptions(password)
 	switch priv := privateKey.(type) {
 	case *rsa.PrivateKey:
-		return pkcs12.CreateP12File(filename, priv, c.Certificate, nil, opts)
+		return CreateP12File(filename, priv, certificate.Certificate, nil, opts)
 	case *ecdsa.PrivateKey:
-		return pkcs12.CreateP12File(filename, priv, c.Certificate, nil, opts)
+		return CreateP12File(filename, priv, certificate.Certificate, nil, opts)
 	case ed25519.PrivateKey:
-		return pkcs12.CreateP12File(filename, priv, c.Certificate, nil, opts)
+		return CreateP12File(filename, priv, certificate.Certificate, nil, opts)
 	default:
 		return fmt.Errorf("unsupported private key type: %T", privateKey)
 	}
 }
 
-// SaveToP12WithChain saves a certificate with a certificate chain to PKCS#12 format
-func (c *Certificate) SaveToP12WithChain(privateKey pkcs12.GenericPrivateKey, caCerts []*Certificate, filename, password string) error {
-	if c.Certificate == nil {
+// SaveCertToP12WithChain saves a certificate with a certificate chain to PKCS#12 format
+func SaveCertToP12WithChain(certificate *cert.Certificate, privateKey GenericPrivateKey, caCerts []*cert.Certificate, filename, password string) error {
+	if certificate == nil || certificate.Certificate == nil {
 		return fmt.Errorf("certificate is not initialized")
 	}
 	if privateKey == nil {
@@ -162,15 +165,15 @@ func (c *Certificate) SaveToP12WithChain(privateKey pkcs12.GenericPrivateKey, ca
 	}
 
 	// Create P12 file with chain using type-specific approach
-	opts := pkcs12.DefaultCreateOptions(password)
+	opts := DefaultCreateOptions(password)
 	opts.IncludeChain = true
 	switch priv := privateKey.(type) {
 	case *rsa.PrivateKey:
-		return pkcs12.CreateP12File(filename, priv, c.Certificate, x509CACerts, opts)
+		return CreateP12File(filename, priv, certificate.Certificate, x509CACerts, opts)
 	case *ecdsa.PrivateKey:
-		return pkcs12.CreateP12File(filename, priv, c.Certificate, x509CACerts, opts)
+		return CreateP12File(filename, priv, certificate.Certificate, x509CACerts, opts)
 	case ed25519.PrivateKey:
-		return pkcs12.CreateP12File(filename, priv, c.Certificate, x509CACerts, opts)
+		return CreateP12File(filename, priv, certificate.Certificate, x509CACerts, opts)
 	default:
 		return fmt.Errorf("unsupported private key type: %T", privateKey)
 	}
@@ -189,8 +192,8 @@ func ExtractCertificatesFromP12(p12File, password, outputDir string) error {
 	}
 
 	// Load P12 file
-	opts := pkcs12.DefaultLoadOptions(password)
-	container, err := pkcs12.LoadFromP12File(p12File, opts)
+	opts := DefaultLoadOptions(password)
+	container, err := LoadFromP12File(p12File, opts)
 	if err != nil {
 		return fmt.Errorf("failed to load P12 file: %w", err)
 	}
@@ -229,19 +232,19 @@ func ValidateP12Certificate(filename, password string) (map[string]interface{}, 
 	}
 
 	// Load certificate from P12
-	certificate, caCerts, err := FromP12File(filename, password)
+	certificate, caCerts, err := FromP12CertFile(filename, password)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load certificate from P12: %w", err)
 	}
 
 	// Get certificate information
 	info := map[string]interface{}{
-		"subject":     certificate.Certificate.Subject.String(),
-		"issuer":      certificate.Certificate.Issuer.String(),
-		"not_before":  certificate.Certificate.NotBefore,
-		"not_after":   certificate.Certificate.NotAfter,
-		"serial":      certificate.Certificate.SerialNumber.String(),
-		"is_ca":       certificate.Certificate.IsCA,
+		"subject":      certificate.Certificate.Subject.String(),
+		"issuer":       certificate.Certificate.Issuer.String(),
+		"not_before":   certificate.Certificate.NotBefore,
+		"not_after":    certificate.Certificate.NotAfter,
+		"serial":       certificate.Certificate.SerialNumber.String(),
+		"is_ca":        certificate.Certificate.IsCA,
 		"chain_length": len(caCerts),
 	}
 
@@ -276,7 +279,7 @@ func ImportP12AndSavePEM(p12File, password, pemFile string) error {
 	}
 
 	// Load certificate from P12
-	certificate, _, err := FromP12File(p12File, password)
+	certificate, _, err := FromP12CertFile(p12File, password)
 	if err != nil {
 		return fmt.Errorf("failed to load certificate from P12: %w", err)
 	}
@@ -301,19 +304,19 @@ func CreateP12FromPEM(privateKeyFile, certFile, p12File, password string) error 
 	}
 
 	// Load private key
-	privateKey, err := loadPrivateKeyFromPEM(privateKeyFile)
+	privateKey, err := LoadPrivateKeyFromPEM(privateKeyFile)
 	if err != nil {
 		return fmt.Errorf("failed to load private key: %w", err)
 	}
 
 	// Load certificate from PEM file
-	certificate, err := loadCertificateFromPEMFile(certFile)
+	certificate, err := LoadCertificateFromPEMFile(certFile)
 	if err != nil {
 		return fmt.Errorf("failed to load certificate: %w", err)
 	}
 
 	// Create P12 file
-	return certificate.SaveToP12(privateKey, p12File, password)
+	return SaveCertToP12(certificate, privateKey, p12File, password)
 }
 
 // Helper function to save certificate as PEM
@@ -338,8 +341,8 @@ func saveCertificateAsPEM(cert *x509.Certificate, filename string) error {
 	return nil
 }
 
-// Helper function to load certificate from PEM file
-func loadCertificateFromPEMFile(filename string) (*Certificate, error) {
+// LoadCertificateFromPEMFile loads a certificate from PEM file and returns a GoPKI Certificate
+func LoadCertificateFromPEMFile(filename string) (*cert.Certificate, error) {
 	// Read PEM file
 	pemData, err := os.ReadFile(filename)
 	if err != nil {
@@ -353,20 +356,20 @@ func loadCertificateFromPEMFile(filename string) (*Certificate, error) {
 	}
 
 	// Parse certificate
-	cert, err := x509.ParseCertificate(block.Bytes)
+	parsedCert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse certificate: %w", err)
 	}
 
-	return &Certificate{
-		Certificate: cert,
+	return &cert.Certificate{
+		Certificate: parsedCert,
 		PEMData:     pemData,
-		DERData:     cert.Raw,
+		DERData:     parsedCert.Raw,
 	}, nil
 }
 
-// Helper function to load private key from PEM (simplified version)
-func loadPrivateKeyFromPEM(filename string) (any, error) {
+// LoadPrivateKeyFromPEM loads a private key from PEM file with generic return type
+func LoadPrivateKeyFromPEM(filename string) (GenericPrivateKey, error) {
 	// Read PEM file
 	pemData, err := os.ReadFile(filename)
 	if err != nil {
@@ -421,11 +424,11 @@ func (p P12CertificateUtils) ListCertificatesInP12(filename, password string) ([
 // VerifyP12CertificateChain verifies the certificate chain in a P12 file
 func (p P12CertificateUtils) VerifyP12CertificateChain(filename, password string) error {
 	// Load with chain validation enabled
-	opts := pkcs12.DefaultLoadOptions(password)
+	opts := DefaultLoadOptions(password)
 	opts.ValidateChain = true
 	opts.CheckExpiration = false // Don't check expiration for chain validation
 
-	_, err := pkcs12.LoadFromP12File(filename, opts)
+	_, err := LoadFromP12File(filename, opts)
 	if err != nil {
 		return fmt.Errorf("certificate chain verification failed: %w", err)
 	}
