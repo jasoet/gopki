@@ -1,3 +1,26 @@
+## [1.3.0](https://github.com/jasoet/gopki/compare/v1.2.0...v1.3.0) (2025-09-16)
+
+
+### ✨ Features
+
+* **encryption:** add comprehensive high-level encryption API with tests ([f044a5e](https://github.com/jasoet/gopki/commit/f044a5e8f7aacf93349e0cfd74c94e944c50c704))
+
+
+### 📚 Documentation
+
+* **signing:** add comprehensive godoc documentation to signing package ([a1bde00](https://github.com/jasoet/gopki/commit/a1bde000546228419dcd91a40d326013cf4baa55)), closes [PKCS#7](https://github.com/jasoet/PKCS/issues/7)
+
+
+### ♻️ Refactoring
+
+* enhance testing workflow and remove unused code ([62c6a92](https://github.com/jasoet/gopki/commit/62c6a927634d3997f82cb889f9929dc4c933a6a5))
+* **format:** enhance PEM package with comprehensive functionality and resolve circular imports ([aa6b7af](https://github.com/jasoet/gopki/commit/aa6b7af66934985006e07d778facf8fd4aa9c681))
+
+
+### 🔧 Miscellaneous
+
+* remove unused integration test file ([8e32cb6](https://github.com/jasoet/gopki/commit/8e32cb6c50aac2181e8bef6fd4e6fbd21214f0a3))
+
 ## [1.2.0](https://github.com/jasoet/gopki/compare/v1.1.1...v1.2.0) (2025-09-15)
 
 
