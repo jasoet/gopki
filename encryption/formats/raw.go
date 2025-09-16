@@ -1,4 +1,4 @@
-// File raw.go implements a custom binary format for encrypted data that provides
+// Package formats File raw.go implements a custom binary format for encrypted data that provides
 // compact representation with minimal overhead while maintaining all necessary metadata.
 //
 // The Raw format is designed for high-performance applications where minimal overhead
