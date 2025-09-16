@@ -1,24 +1,74 @@
-// Package pkcs12 provides utilities for creating and parsing PKCS#12 files.
-// PKCS#12 is a binary format for storing cryptographic objects including
-// private keys, certificates, and certificate chains in a single encrypted file.
+// Package pkcs12 provides comprehensive utilities for creating and parsing PKCS#12 files.
+//
+// PKCS#12 is a binary format defined in RFC 7292 for storing cryptographic objects
+// including private keys, certificates, and certificate chains in a single
+// password-protected file. This format is widely used for importing/exporting
+// certificates and private keys across different systems and applications.
 //
 // This package integrates with the existing GoPKI infrastructure to provide
-// convenient import/export functionality for certificates and key pairs.
+// convenient import/export functionality for certificates and key pairs while
+// maintaining compatibility with standard PKCS#12 implementations.
 //
 // Key features:
 //   - Create P12 files from certificates and private keys
 //   - Parse P12 files to extract certificates and private keys
 //   - Support for certificate chains and multiple certificates
-//   - Password protection and encryption
+//   - Password protection with configurable encryption algorithms
 //   - Type-safe integration with GoPKI keypair and certificate packages
+//   - Validation and verification of P12 contents
+//   - Quick utility functions for common operations
+//   - Test P12 generation for development and testing
+//
+// Supported algorithms:
+//   - RSA private keys (2048+ bits recommended)
+//   - ECDSA private keys (all standard curves)
+//   - Ed25519 private keys
+//   - X.509 certificates and certificate chains
+//
+// Security considerations:
+//   - P12 files are only as secure as their passwords
+//   - Use strong passwords for production P12 files
+//   - Protect P12 files during transmission and storage
+//   - Consider the sensitivity of private key material
 //
 // Example usage:
 //
-//	// Create a P12 file
-//	err := CreateP12File("signing.p12", "password", keyPair, certificate, chain)
+//	// Basic P12 creation and loading
+//	import (
+//		"crypto/rsa"
+//		"crypto/rand"
+//		"github.com/jasoet/gopki/pkcs12"
+//	)
 //
-//	// Load from a P12 file
-//	keyPair, cert, chain, err := LoadFromP12File("signing.p12", "password")
+//	// Generate a test P12 file
+//	err := pkcs12.GenerateTestP12("test.p12", "password123")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	// Load the P12 file
+//	container, err := pkcs12.LoadFromP12File("test.p12", pkcs12.DefaultLoadOptions("password123"))
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	// Access the contents
+//	fmt.Printf("Key type: %s\n", container.GetKeyType())
+//	fmt.Printf("Certificate subject: %s\n", container.Certificate.Subject)
+//
+//	// Create P12 from existing materials
+//	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+//	opts := pkcs12.DefaultCreateOptions("newPassword")
+//	err = pkcs12.CreateP12File("new.p12", privateKey, certificate, nil, opts)
+//
+//	// Quick operations
+//	container, err = pkcs12.QuickLoadP12("new.p12", "newPassword")
+//	err = pkcs12.QuickCreateP12("quick.p12", "password", privateKey, certificate)
+//
+// Integration with GoPKI:
+//   This package is designed to work seamlessly with other GoPKI packages.
+//   See the keypair/p12.go and cert/p12.go files for type-safe integration
+//   functions that leverage the GoPKI keypair and certificate abstractions.
 package pkcs12
 
 import (
@@ -71,7 +121,24 @@ type LoadOptions struct {
 	CheckExpiration bool
 }
 
-// DefaultCreateOptions returns default options for creating P12 files
+// DefaultCreateOptions returns sensible default options for creating P12 files.
+//
+// The default configuration provides good security and compatibility:
+//   - Includes certificate chain if provided
+//   - Uses modern encryption (not legacy mode)
+//   - No friendly name set
+//   - No extra CA certificates
+//
+// Parameters:
+//   - password: The password to encrypt the P12 file
+//
+// Returns:
+//   - CreateOptions: A struct with default settings for P12 creation
+//
+// Example:
+//
+//	opts := pkcs12.DefaultCreateOptions("strongPassword123")
+//	p12Data, err := pkcs12.CreateP12(privateKey, cert, nil, opts)
 func DefaultCreateOptions(password string) CreateOptions {
 	return CreateOptions{
 		Password:     password,
@@ -82,7 +149,24 @@ func DefaultCreateOptions(password string) CreateOptions {
 	}
 }
 
-// DefaultLoadOptions returns default options for loading P12 files
+// DefaultLoadOptions returns safe default options for loading P12 files.
+//
+// The default configuration is optimized for compatibility and speed:
+//   - No certificate chain validation (faster loading)
+//   - No certificate expiration checking
+//   - Basic password decryption only
+//
+// For production use, consider enabling validation options:
+//
+//	opts := pkcs12.DefaultLoadOptions("password")
+//	opts.ValidateChain = true      // Enable chain validation
+//	opts.CheckExpiration = true    // Check certificate expiration
+//
+// Parameters:
+//   - password: The password to decrypt the P12 file
+//
+// Returns:
+//   - LoadOptions: A struct with default settings for P12 loading
 func DefaultLoadOptions(password string) LoadOptions {
 	return LoadOptions{
 		Password:        password,
@@ -91,7 +175,36 @@ func DefaultLoadOptions(password string) LoadOptions {
 	}
 }
 
-// CreateP12 creates a PKCS#12 data from a private key, certificate, and optional chain
+// CreateP12 creates PKCS#12 binary data from a private key, certificate, and optional chain.
+//
+// This is the core function for creating P12 data. It accepts any private key type
+// supported by the underlying PKCS#12 library (RSA, ECDSA, Ed25519) and combines
+// it with the certificate and optional certificate chain into encrypted P12 data.
+//
+// Parameters:
+//   - privateKey: The private key (any supported type: *rsa.PrivateKey, *ecdsa.PrivateKey, ed25519.PrivateKey)
+//   - certificate: The X.509 certificate associated with the private key
+//   - caCerts: Optional certificate chain (can be nil)
+//   - opts: Creation options including password and encryption settings
+//
+// Returns:
+//   - []byte: The P12 binary data ready for saving or transmission
+//   - error: Any error that occurred during P12 creation
+//
+// Security notes:
+//   - The private key will be encrypted with the provided password
+//   - Use strong passwords as P12 security depends on password strength
+//   - The resulting data should be transmitted and stored securely
+//
+// Example:
+//
+//	opts := pkcs12.DefaultCreateOptions("securePassword")
+//	p12Data, err := pkcs12.CreateP12(privateKey, certificate, caCertChain, opts)
+//	if err != nil {
+//		log.Fatal("Failed to create P12:", err)
+//	}
+//	// Save to file or transmit securely
+//	os.WriteFile("certificate.p12", p12Data, 0600)
 func CreateP12(privateKey any, certificate *x509.Certificate, caCerts []*x509.Certificate, opts CreateOptions) ([]byte, error) {
 	if privateKey == nil {
 		return nil, fmt.Errorf("private key is required")
@@ -230,7 +343,27 @@ func (c *P12Container) Validate() error {
 	return nil
 }
 
-// QuickCreateP12 provides a simple interface for creating P12 files with default options
+// QuickCreateP12 provides a simple interface for creating P12 files with default options.
+//
+// This is a simplified wrapper around CreateP12File that uses default creation
+// options. It's perfect for development, testing, or simple use cases where
+// you don't need to customize the P12 creation settings.
+//
+// Parameters:
+//   - filename: Path where the P12 file will be created
+//   - password: Password to protect the P12 file
+//   - privateKey: The private key to include
+//   - certificate: The certificate to include
+//
+// Returns:
+//   - error: Any error that occurred during creation
+//
+// Example:
+//
+//	err := pkcs12.QuickCreateP12("my-cert.p12", "password123", privateKey, certificate)
+//	if err != nil {
+//		log.Fatal("Failed to create P12:", err)
+//	}
 func QuickCreateP12(filename, password string, privateKey any, certificate *x509.Certificate) error {
 	opts := DefaultCreateOptions(password)
 	return CreateP12File(filename, privateKey, certificate, nil, opts)

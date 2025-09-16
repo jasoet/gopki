@@ -1,3 +1,24 @@
+// File asymmetric.go provides direct asymmetric encryption implementations
+// for RSA-OAEP, ECDH key agreement, and X25519 key agreement protocols.
+//
+// This file implements the low-level asymmetric encryption algorithms that
+// are used by the higher-level encryption API. It provides specialized
+// encryption methods for each supported public key algorithm.
+//
+// Supported algorithms:
+//   - RSA-OAEP: Direct RSA encryption using OAEP padding with SHA-256
+//   - ECDH: Elliptic Curve Diffie-Hellman key agreement for ECDSA keys
+//   - X25519: Curve25519 key agreement for Ed25519 keys
+//
+// Data size limitations:
+//   - RSA-OAEP: Limited by key size (e.g., ~190 bytes for 2048-bit keys)
+//   - ECDH/X25519: No inherent size limit (uses AES-GCM for actual encryption)
+//
+// Security features:
+//   - RSA-OAEP provides semantic security and prevents padding oracle attacks
+//   - ECDH uses ephemeral key pairs for forward secrecy
+//   - X25519 provides high-performance elliptic curve key agreement
+//   - All methods use cryptographically secure random number generation
 package encryption
 
 import (
@@ -16,15 +37,70 @@ import (
 	"github.com/jasoet/gopki/keypair/algo"
 )
 
-// AsymmetricEncryptor provides asymmetric encryption operations
+// AsymmetricEncryptor provides asymmetric encryption operations for all supported
+// public key algorithms. It implements direct asymmetric encryption without the
+// overhead of envelope encryption, making it suitable for small data encryption.
+//
+// This encryptor supports:
+//   - RSA-OAEP encryption for RSA key pairs
+//   - ECDH key agreement with AES-GCM for ECDSA key pairs
+//   - X25519 key agreement with AES-GCM for Ed25519 key pairs
+//
+// Usage considerations:
+//   - RSA-OAEP has strict data size limitations based on key size
+//   - ECDH and X25519 can handle larger data through AES-GCM encryption
+//   - All algorithms provide semantic security and authentication
 type AsymmetricEncryptor struct{}
 
-// NewAsymmetricEncryptor creates a new asymmetric encryptor
+// NewAsymmetricEncryptor creates a new asymmetric encryptor instance.
+//
+// Returns:
+//   - *AsymmetricEncryptor: A new encryptor ready for asymmetric operations
+//
+// Example:
+//
+//	encryptor := NewAsymmetricEncryptor()
+//	encrypted, err := encryptor.EncryptWithRSA(data, rsaKeyPair, opts)
 func NewAsymmetricEncryptor() *AsymmetricEncryptor {
 	return &AsymmetricEncryptor{}
 }
 
-// EncryptWithRSA encrypts data using RSA-OAEP
+// EncryptWithRSA encrypts data using RSA-OAEP (Optimal Asymmetric Encryption Padding).
+//
+// This method provides direct RSA encryption using OAEP padding with SHA-256 hash
+// function. RSA-OAEP is semantically secure and prevents various padding oracle
+// attacks that affect older RSA padding schemes.
+//
+// Data size limitations:
+//   For a k-bit RSA key, the maximum plaintext size is approximately:
+//   - 2048-bit key: ~190 bytes
+//   - 3072-bit key: ~318 bytes
+//   - 4096-bit key: ~446 bytes
+//
+// Parameters:
+//   - data: The plaintext data to encrypt (must fit within RSA size limits)
+//   - keyPair: The RSA key pair (public key will be used for encryption)
+//   - opts: Encryption options (algorithm will be set to AlgorithmRSAOAEP)
+//
+// Returns:
+//   - *EncryptedData: Encrypted data with RSA-OAEP algorithm metadata
+//   - error: ErrDataTooLarge if data exceeds RSA capacity, or other encryption errors
+//
+// Security properties:
+//   - Semantic security: identical plaintexts produce different ciphertexts
+//   - Chosen ciphertext security under standard assumptions
+//   - Protection against padding oracle attacks
+//
+// Example:
+//
+//	rsaKeys, _ := algo.GenerateRSAKeyPair(2048)
+//	encryptor := NewAsymmetricEncryptor()
+//	data := []byte("small secret message")  // Must be ≤190 bytes for 2048-bit key
+//
+//	encrypted, err := encryptor.EncryptWithRSA(data, rsaKeys, opts)
+//	if err != nil {
+//		log.Fatal("RSA encryption failed:", err)
+//	}
 func (e *AsymmetricEncryptor) EncryptWithRSA(data []byte, keyPair *algo.RSAKeyPair, opts EncryptOptions) (*EncryptedData, error) {
 	if err := ValidateEncryptOptions(opts); err != nil {
 		return nil, err

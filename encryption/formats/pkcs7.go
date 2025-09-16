@@ -1,3 +1,48 @@
+// File pkcs7.go implements PKCS#7/CMS format support for encrypted data,
+// providing standards-compliant ASN.1 DER encoding for broad interoperability.
+//
+// PKCS#7 (Public Key Cryptography Standards #7) is a standard for cryptographic
+// message syntax that defines formats for digital signatures, encryption, and
+// other cryptographic operations. This implementation focuses on the encrypted
+// data and enveloped data content types.
+//
+// Standards compliance:
+//   - RFC 2315: PKCS #7 - Cryptographic Message Syntax Version 1.5
+//   - RFC 5652: Cryptographic Message Syntax (CMS) - successor to PKCS#7
+//   - ASN.1 DER encoding for binary compatibility
+//   - Standard OID assignments for algorithm identification
+//
+// Supported content types:
+//   - EncryptedData: Data encrypted with a symmetric key
+//   - EnvelopedData: Data encrypted with recipient-specific keys
+//   - Data: Plain data content (for metadata)
+//
+// Format characteristics:
+//   - ASN.1 DER-encoded structure
+//   - Self-describing with algorithm identifiers
+//   - Standardized recipient information encoding
+//   - Broad tool and library compatibility
+//   - Future-proof through standard evolution
+//
+// Interoperability:
+//   - Compatible with OpenSSL
+//   - Compatible with Windows CryptoAPI
+//   - Compatible with Java JCE
+//   - Compatible with .NET cryptographic libraries
+//   - Suitable for cross-platform data exchange
+//
+// Security considerations:
+//   - Algorithm identifiers are standardized and well-vetted
+//   - Structure provides clear separation of encrypted content and metadata
+//   - Supports modern cryptographic algorithms through OID extensions
+//   - Enables proper key management through recipient information
+//
+// Use cases:
+//   - Enterprise PKI environments
+//   - Standards-compliant encryption
+//   - Cross-platform data exchange
+//   - Integration with existing PKCS#7/CMS tools
+//   - Long-term archival with format stability
 package formats
 
 import (
@@ -10,10 +55,40 @@ import (
 	"github.com/jasoet/gopki/encryption"
 )
 
-// PKCS7Format handles PKCS#7/CMS format for encrypted data
+// PKCS7Format implements the Format interface for PKCS#7/CMS encrypted data.
+//
+// This format handler provides standards-compliant encoding and decoding of
+// encrypted data using ASN.1 DER encoding according to RFC 2315 (PKCS#7) and
+// RFC 5652 (CMS). It supports both EncryptedData and EnvelopedData content types.
+//
+// The implementation focuses on compatibility with existing PKCS#7/CMS tools
+// and libraries while maintaining the full functionality required by the
+// GoPKI encryption system.
+//
+// Supported algorithms (via OIDs):
+//   - RSA encryption (1.2.840.113549.1.1.1)
+//   - AES-256-CBC (2.16.840.1.101.3.4.1.42)
+//   - PBKDF2 (1.2.840.113549.1.5.12)
+//   - PBES2 (1.2.840.113549.1.5.13)
+//
+// Content types:
+//   - EncryptedData (1.2.840.113549.1.7.6): Symmetric key encrypted data
+//   - EnvelopedData (1.2.840.113549.1.7.3): Public key encrypted data
+//   - Data (1.2.840.113549.1.7.1): Plain data content
 type PKCS7Format struct{}
 
-// NewPKCS7Format creates a new PKCS#7 format handler
+// NewPKCS7Format creates a new PKCS#7 format handler instance.
+//
+// Returns:
+//   - *PKCS7Format: A new format handler ready for PKCS#7 operations
+//
+// Example:
+//
+//	format := NewPKCS7Format()
+//	encoded, err := format.Encode(encryptedData)
+//	if err != nil {
+//		log.Fatal("PKCS#7 encoding failed:", err)
+//	}
 func NewPKCS7Format() *PKCS7Format {
 	return &PKCS7Format{}
 }

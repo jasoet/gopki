@@ -1,32 +1,104 @@
-// Package encryption provides comprehensive data encryption and decryption functionality
-// using the existing keypair and certificate infrastructure. It supports multiple algorithms
-// (RSA, ECDSA with ECDH, Ed25519 with X25519) and various encryption formats.
+// Package encryption provides comprehensive, type-safe data encryption and decryption functionality
+// that seamlessly integrates with the GoPKI keypair and certificate infrastructure.
 //
-// The package follows the same type-safe design patterns as the keypair package,
-// using Go generics for compile-time type safety and consistency.
+// This package extends the GoPKI ecosystem by providing production-ready encryption capabilities
+// using the same type-safe design patterns. It supports multiple cryptographic algorithms,
+// various data sizes, and different output formats while maintaining compatibility with
+// existing PKI workflows.
 //
-// Supported encryption methods:
-//   - RSA-OAEP: Direct RSA encryption for small data
+// Key Features:
+//   - Type-safe encryption with Go generics integration
+//   - Multiple encryption algorithms with automatic selection
+//   - Support for both small and large data encryption
+//   - Certificate-based encryption workflows
+//   - Configurable output formats (Raw, PKCS#7, CMS)
+//   - Envelope encryption for large data sets
+//   - Comprehensive error handling and validation
+//
+// Supported Algorithms:
+//   - RSA-OAEP: Direct RSA encryption (recommended for keys ≥2048 bits)
 //   - ECDH + AES-GCM: ECDSA key agreement with symmetric encryption
 //   - X25519 + AES-GCM: Ed25519-based key agreement with symmetric encryption
-//   - Envelope Encryption: Hybrid approach for large data
+//   - AES-GCM: Direct symmetric encryption for envelope encryption
 //
-// Example usage:
+// Data Size Recommendations:
+//   - Small data (≤190 bytes for RSA-2048): Direct RSA-OAEP encryption
+//   - Medium data (≤8KB): ECDH/X25519 + AES-GCM
+//   - Large data (>8KB): Envelope encryption (recommended)
 //
-//	// Generate keys using existing infrastructure
+// Output Formats:
+//   - Raw: Binary format with magic bytes for format identification
+//   - PKCS#7: Standard ASN.1 DER-encoded format
+//   - CMS: Cryptographic Message Syntax format
+//
+// Security Considerations:
+//   - All encryption uses authenticated encryption (AES-GCM)
+//   - RSA-OAEP provides semantic security for RSA encryption
+//   - Key agreement protocols use ephemeral keys for forward secrecy
+//   - Random nonces and IVs are generated for each encryption operation
+//
+// Basic Usage Examples:
+//
+//	// Generate keys using existing GoPKI infrastructure
 //	rsaKeys, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
 //	if err != nil {
 //		log.Fatal(err)
 //	}
 //
-//	// Encrypt data
+//	// Simple data encryption
+//	data := []byte("sensitive information")
 //	encrypted, err := EncryptData(data, rsaKeys, DefaultEncryptOptions())
 //	if err != nil {
 //		log.Fatal(err)
 //	}
 //
-//	// Decrypt data
+//	// Decrypt the data
 //	decrypted, err := DecryptData(encrypted, rsaKeys, DefaultDecryptOptions())
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	// Large file encryption using envelope encryption
+//	opts := DefaultEncryptOptions()
+//	opts.UseEnvelopeEncryption = true
+//	opts.Format = FormatRaw
+//
+//	largeData := make([]byte, 1024*1024) // 1MB data
+//	encrypted, err = EncryptData(largeData, rsaKeys, opts)
+//
+// Certificate-based Encryption:
+//
+//	// Load certificate from file
+//	cert, err := cert.LoadCertificateFromFile("recipient.pem")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	// Encrypt for certificate recipient
+//	encrypted, err := EncryptForCertificate(data, cert, DefaultEncryptOptions())
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+// Advanced Usage with Custom Options:
+//
+//	// Create custom encryption options
+//	opts := EncryptOptions{
+//		Algorithm:             AlgorithmAuto,  // Auto-select based on key type
+//		UseEnvelopeEncryption: true,           // Use envelope encryption for large data
+//		Format:                FormatPKCS7,    // Use PKCS#7 output format
+//		KeyDerivationRounds:   100000,         // Custom KDF rounds
+//	}
+//
+//	// Encrypt with custom options
+//	encrypted, err := EncryptData(largeData, keyPair, opts)
+//
+// Integration with Other GoPKI Packages:
+//   This package is designed to work seamlessly with:
+//   - keypair: For key generation and management
+//   - cert: For certificate-based encryption workflows
+//   - pkcs12: For importing/exporting encrypted key stores
+//   - signing: For combined sign-then-encrypt workflows
 package encryption
 
 import (

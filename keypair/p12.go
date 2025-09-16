@@ -1,3 +1,57 @@
+// Package keypair provides PKCS#12 (P12) integration for the GoPKI keypair package.
+// This file implements P12 import/export functionality with type-safe operations
+// that integrate seamlessly with the existing keypair abstractions.
+//
+// P12 files (PKCS#12) are a standard format for storing cryptographic materials
+// including private keys, certificates, and certificate chains in a single
+// password-protected file. This implementation provides both generic and
+// algorithm-specific functions for maximum flexibility and type safety.
+//
+// Example usage:
+//
+//	// Generate a key pair
+//	keyPair, err := algo.GenerateRSAKeyPair(2048)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	// Create a self-signed certificate
+//	cert, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
+//		Subject: pkix.Name{CommonName: "example.com"},
+//		ValidFor: 365 * 24 * time.Hour,
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	// Export to P12 format
+//	p12Data, err := ToP12(keyPair, cert.Certificate, "password123")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	// Save to file
+//	err = ToP12File(keyPair, cert.Certificate, "keystore.p12", "password123")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	// Load from P12 file
+//	loadedKeyPair, loadedCert, caCerts, err := FromP12File("keystore.p12", "password123")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+// The package supports all key algorithms available in GoPKI:
+//   - RSA (2048+ bits recommended)
+//   - ECDSA (P-224, P-256, P-384, P-521)
+//   - Ed25519
+//
+// Type-safe algorithm-specific functions are provided for scenarios where
+// you know the exact key type:
+//   - ToP12RSA/FromP12RSA for RSA keys
+//   - ToP12ECDSA/FromP12ECDSA for ECDSA keys
+//   - ToP12Ed25519/FromP12Ed25519 for Ed25519 keys
 package keypair
 
 import (
@@ -11,7 +65,35 @@ import (
 	"github.com/jasoet/gopki/pkcs12"
 )
 
-// ToP12 exports a key pair to PKCS#12 format with the given certificate
+// ToP12 exports a key pair to PKCS#12 format with the given certificate.
+//
+// This generic function accepts any KeyPair type (RSA, ECDSA, or Ed25519) and
+// creates a password-protected P12 byte array containing the private key and
+// certificate. The function uses default P12 creation options which provide
+// good security for most use cases.
+//
+// Parameters:
+//   - keyPair: The keypair to export (must implement KeyPair interface)
+//   - certificate: The X.509 certificate associated with the key pair
+//   - password: Password to protect the P12 file (cannot be empty)
+//
+// Returns:
+//   - []byte: The P12 data that can be saved to a file or transmitted
+//   - error: Any error that occurred during the export process
+//
+// Example:
+//
+//	rsaKeys, _ := algo.GenerateRSAKeyPair(2048)
+//	cert, _ := cert.CreateSelfSignedCertificate(rsaKeys, request)
+//	p12Data, err := ToP12(rsaKeys, cert.Certificate, "securePassword")
+//	if err != nil {
+//		log.Fatal("Failed to create P12:", err)
+//	}
+//
+// Security considerations:
+//   - Use a strong password as P12 security depends on password strength
+//   - The resulting P12 data should be transmitted securely
+//   - Consider the sensitivity of the private key material
 func ToP12[T KeyPair](keyPair T, certificate *x509.Certificate, password string) ([]byte, error) {
 	if keyPair == nil {
 		return nil, fmt.Errorf("key pair is required")
@@ -41,7 +123,30 @@ func ToP12[T KeyPair](keyPair T, certificate *x509.Certificate, password string)
 	return pkcs12.CreateP12(privateKey, certificate, nil, opts)
 }
 
-// ToP12File exports a key pair and certificate to a PKCS#12 file
+// ToP12File exports a key pair and certificate to a PKCS#12 file.
+//
+// This is a convenience function that wraps ToP12 and writes the result
+// directly to a file. The file will be created with appropriate permissions
+// (0600) to protect the private key material.
+//
+// Parameters:
+//   - keyPair: The keypair to export (any KeyPair type)
+//   - certificate: The X.509 certificate associated with the key pair
+//   - filename: Path where the P12 file should be created
+//   - password: Password to protect the P12 file
+//
+// Returns:
+//   - error: Any error that occurred during export or file creation
+//
+// Example:
+//
+//	err := ToP12File(keyPair, cert.Certificate, "/path/to/keystore.p12", "password")
+//	if err != nil {
+//		log.Fatal("Failed to save P12 file:", err)
+//	}
+//
+// The function will create any necessary parent directories and set
+// restrictive file permissions to protect the private key.
 func ToP12File[T KeyPair](keyPair T, certificate *x509.Certificate, filename, password string) error {
 	if keyPair == nil {
 		return fmt.Errorf("key pair is required")
@@ -68,7 +173,38 @@ func ToP12File[T KeyPair](keyPair T, certificate *x509.Certificate, filename, pa
 	return pkcs12.CreateP12File(filename, privateKey, certificate, nil, opts)
 }
 
-// FromP12 loads a key pair from PKCS#12 data
+// FromP12 loads a key pair from PKCS#12 data.
+//
+// This function parses P12 binary data and extracts the private key, certificate,
+// and any CA certificates. The private key is automatically converted to the
+// appropriate GoPKI KeyPair type based on its algorithm.
+//
+// Parameters:
+//   - p12Data: The P12 binary data to parse
+//   - password: Password to decrypt the P12 data
+//
+// Returns:
+//   - any: The extracted key pair (will be *algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//   - *x509.Certificate: The main certificate from the P12
+//   - []*x509.Certificate: Any CA certificates included in the P12
+//   - error: Any error that occurred during parsing
+//
+// Example:
+//
+//	p12Data, _ := os.ReadFile("keystore.p12")
+//	keyPair, cert, caCerts, err := FromP12(p12Data, "password")
+//	if err != nil {
+//		log.Fatal("Failed to parse P12:", err)
+//	}
+//
+//	// Type assert to specific algorithm if needed
+//	if rsaKeys, ok := keyPair.(*algo.RSAKeyPair); ok {
+//		fmt.Printf("RSA key size: %d bits\n", rsaKeys.PrivateKey.N.BitLen())
+//	}
+//
+// The function automatically detects the key algorithm and returns the
+// appropriate GoPKI KeyPair type for seamless integration with other
+// GoPKI functions.
 func FromP12(p12Data []byte, password string) (any, *x509.Certificate, []*x509.Certificate, error) {
 	if len(p12Data) == 0 {
 		return nil, nil, nil, fmt.Errorf("P12 data is required")
@@ -119,18 +255,38 @@ func FromP12File(filename, password string) (any, *x509.Certificate, []*x509.Cer
 }
 
 // Type-specific P12 functions for better type safety
+//
+// The following functions provide algorithm-specific P12 operations with
+// compile-time type safety. Use these when you know the exact key algorithm
+// and want stronger type guarantees.
 
-// ToP12RSA exports an RSA key pair to PKCS#12 format
+// ToP12RSA exports an RSA key pair to PKCS#12 format.
+//
+// This is a type-safe wrapper around ToP12 specifically for RSA keys.
+// Use this when you have an RSA key pair and want compile-time type safety.
+//
+// Parameters:
+//   - keyPair: The RSA key pair to export
+//   - certificate: The X.509 certificate for the RSA key
+//   - password: Password to protect the P12 file
+//
+// Returns:
+//   - []byte: The P12 data containing the RSA key and certificate
+//   - error: Any error that occurred during export
 func ToP12RSA(keyPair *algo.RSAKeyPair, certificate *x509.Certificate, password string) ([]byte, error) {
 	return ToP12(keyPair, certificate, password)
 }
 
-// ToP12ECDSA exports an ECDSA key pair to PKCS#12 format
+// ToP12ECDSA exports an ECDSA key pair to PKCS#12 format.
+//
+// Type-safe wrapper for ECDSA keys supporting all curves (P-224, P-256, P-384, P-521).
 func ToP12ECDSA(keyPair *algo.ECDSAKeyPair, certificate *x509.Certificate, password string) ([]byte, error) {
 	return ToP12(keyPair, certificate, password)
 }
 
-// ToP12Ed25519 exports an Ed25519 key pair to PKCS#12 format
+// ToP12Ed25519 exports an Ed25519 key pair to PKCS#12 format.
+//
+// Type-safe wrapper for Ed25519 keys, providing modern elliptic curve cryptography.
 func ToP12Ed25519(keyPair *algo.Ed25519KeyPair, certificate *x509.Certificate, password string) ([]byte, error) {
 	return ToP12(keyPair, certificate, password)
 }

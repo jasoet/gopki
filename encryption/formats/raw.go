@@ -1,3 +1,57 @@
+// File raw.go implements a custom binary format for encrypted data that provides
+// compact representation with minimal overhead while maintaining all necessary metadata.
+//
+// The Raw format is designed for high-performance applications where minimal overhead
+// and fast encoding/decoding are priorities. It uses a well-defined binary structure
+// with magic bytes for format identification and version control for future evolution.
+//
+// Format structure (binary layout):
+//
+//	+===============================================+
+//	| Magic Bytes (4)     | "GOPK"                |
+//	| Version (1)         | 0x01                  |
+//	| Algorithm ID (1)    | 0x01-0x05             |
+//	| Timestamp (8)       | Unix timestamp        |
+//	| Data Length (4)     | Length of payload     |
+//	| Encrypted Data (N)  | Actual encrypted data |
+//	| IV Length (2)       | Length of IV          |
+//	| IV Data (N)         | Initialization Vector |
+//	| Tag Length (2)      | Length of auth tag    |
+//	| Tag Data (N)        | Authentication tag    |
+//	| Key Length (2)      | Length of encrypted key|
+//	| Encrypted Key (N)   | Encrypted symmetric key|
+//	| Metadata Length (4) | Length of JSON metadata|
+//	| Metadata (N)        | JSON-encoded metadata |
+//	+===============================================+
+//
+// Format characteristics:
+//   - Compact binary representation
+//   - Big-endian byte ordering for cross-platform compatibility
+//   - Magic bytes "GOPK" for format identification
+//   - Version byte for future format evolution
+//   - Variable-length fields with explicit length prefixes
+//   - JSON metadata for extensibility
+//   - Self-contained (includes all necessary decryption metadata)
+//
+// Performance characteristics:
+//   - Minimal encoding/decoding overhead
+//   - Efficient binary operations
+//   - No external dependencies for parsing
+//   - Suitable for high-throughput applications
+//   - Memory-efficient streaming support
+//
+// Use cases:
+//   - High-performance applications
+//   - Custom protocols
+//   - Embedded systems
+//   - Internal storage formats
+//   - Network protocols with bandwidth constraints
+//
+// Security considerations:
+//   - Format structure is not encrypted (metadata is visible)
+//   - Algorithm identification is in plaintext
+//   - Timestamp information is in plaintext
+//   - Consider these factors when choosing this format for sensitive applications
 package formats
 
 import (
@@ -11,10 +65,37 @@ import (
 	"github.com/jasoet/gopki/encryption"
 )
 
-// RawFormat handles the raw binary format for encrypted data
+// RawFormat implements the Format interface for the custom binary format.
+//
+// This format handler provides efficient encoding and decoding of encrypted data
+// using a compact binary representation. It's optimized for performance and
+// minimal overhead while maintaining all necessary metadata for decryption.
+//
+// The format is stateless and thread-safe, making it suitable for concurrent
+// operations. All encoding and decoding operations are performed in memory
+// with no external dependencies.
+//
+// Algorithm mapping:
+//   - 0x01: RSA-OAEP
+//   - 0x02: ECDH
+//   - 0x03: X25519
+//   - 0x04: AES-GCM
+//   - 0x05: Envelope
+//   - 0x00: Unknown/unsupported
 type RawFormat struct{}
 
-// NewRawFormat creates a new raw format handler
+// NewRawFormat creates a new raw format handler instance.
+//
+// Returns:
+//   - *RawFormat: A new format handler ready for encoding/decoding operations
+//
+// Example:
+//
+//	format := NewRawFormat()
+//	encoded, err := format.Encode(encryptedData)
+//	if err != nil {
+//		log.Fatal("Encoding failed:", err)
+//	}
 func NewRawFormat() *RawFormat {
 	return &RawFormat{}
 }
@@ -24,22 +105,55 @@ func (f *RawFormat) Name() string {
 	return string(encryption.FormatRaw)
 }
 
-// Encode converts EncryptedData to raw binary format
-// Format structure:
-// - Magic bytes (4): "GOPK"
-// - Version (1): 0x01
-// - Algorithm (1): algorithm identifier
-// - Timestamp (8): Unix timestamp
-// - Data length (4): length of encrypted data
-// - Data: encrypted data bytes
-// - IV length (2): length of IV (0 if no IV)
-// - IV: initialization vector bytes
-// - Tag length (2): length of tag (0 if no tag)
-// - Tag: authentication tag bytes
-// - Encrypted key length (2): length of encrypted key (0 if none)
-// - Encrypted key: encrypted symmetric key
-// - Metadata length (4): length of JSON metadata (0 if none)
-// - Metadata: JSON-encoded metadata
+// Encode converts EncryptedData to the custom raw binary format.
+//
+// This method serializes all components of the encrypted data structure into
+// a compact binary representation using big-endian byte ordering for cross-platform
+// compatibility. The format includes magic bytes for identification and a version
+// byte for future evolution.
+//
+// Binary format structure:
+//   - Magic bytes (4): "GOPK" - Format identification
+//   - Version (1): 0x01 - Format version for compatibility
+//   - Algorithm (1): Algorithm identifier (0x01-0x05)
+//   - Timestamp (8): Unix timestamp (big-endian int64)
+//   - Data length (4): Length of encrypted data (big-endian uint32)
+//   - Data (N): Encrypted data bytes
+//   - IV length (2): Length of IV (big-endian uint16, 0 if no IV)
+//   - IV (N): Initialization vector bytes
+//   - Tag length (2): Length of authentication tag (big-endian uint16, 0 if no tag)
+//   - Tag (N): Authentication tag bytes
+//   - Encrypted key length (2): Length of encrypted key (big-endian uint16, 0 if none)
+//   - Encrypted key (N): Encrypted symmetric key bytes
+//   - Metadata length (4): Length of JSON metadata (big-endian uint32, 0 if none)
+//   - Metadata (N): JSON-encoded metadata
+//
+// Parameters:
+//   - data: The encrypted data structure to encode (must not be nil)
+//
+// Returns:
+//   - []byte: Binary-encoded data ready for storage or transmission
+//   - error: Encoding errors including JSON marshaling failures
+//
+// Error conditions:
+//   - Nil input data
+//   - JSON marshaling failure for metadata
+//   - Binary write operations failure
+//
+// Example:
+//
+//	format := NewRawFormat()
+//	encryptedData := &encryption.EncryptedData{
+//		Algorithm: encryption.AlgorithmRSAOAEP,
+//		Data:      []byte("encrypted content"),
+//		Timestamp: time.Now(),
+//	}
+//
+//	encoded, err := format.Encode(encryptedData)
+//	if err != nil {
+//		log.Fatal("Failed to encode:", err)
+//	}
+//	fmt.Printf("Encoded %d bytes\n", len(encoded))
 func (f *RawFormat) Encode(data *encryption.EncryptedData) ([]byte, error) {
 	var buf bytes.Buffer
 

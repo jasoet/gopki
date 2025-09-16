@@ -1,3 +1,26 @@
+// File symmetric.go provides AES-GCM symmetric encryption operations used by
+// the asymmetric encryption implementations and envelope encryption.
+//
+// This file implements authenticated encryption using AES-GCM (Galois/Counter Mode),
+// which provides both confidentiality and authenticity in a single operation.
+// AES-GCM is the recommended authenticated encryption mode for new applications.
+//
+// Features:
+//   - AES-GCM authenticated encryption with 128, 192, or 256-bit keys
+//   - HKDF (HMAC-based Key Derivation Function) for key derivation
+//   - Automatic nonce generation for each encryption operation
+//   - Authentication tag verification during decryption
+//
+// Security properties:
+//   - Confidentiality: Data is encrypted with AES in counter mode
+//   - Authenticity: GMAC provides authentication of both data and AAD
+//   - Integrity: Any tampering with ciphertext is detected during decryption
+//   - Nonce misuse resistance: Each encryption uses a unique random nonce
+//
+// Performance characteristics:
+//   - High performance on modern processors with AES-NI instructions
+//   - Parallelizable encryption and decryption
+//   - Minimal overhead compared to AES-CTR + HMAC
 package encryption
 
 import (
@@ -12,15 +35,79 @@ import (
 	"golang.org/x/crypto/hkdf"
 )
 
-// SymmetricEncryptor provides symmetric encryption operations using AES-GCM
+// SymmetricEncryptor provides symmetric encryption operations using AES-GCM.
+//
+// This encryptor implements authenticated encryption using AES in Galois/Counter Mode,
+// which combines encryption and authentication in a single, efficient operation.
+// It's used internally by asymmetric encryption methods and envelope encryption.
+//
+// Supported key sizes:
+//   - 128-bit (16 bytes): AES-128-GCM
+//   - 192-bit (24 bytes): AES-192-GCM
+//   - 256-bit (32 bytes): AES-256-GCM (recommended)
+//
+// Security guarantees:
+//   - Authenticated encryption: provides both confidentiality and authenticity
+//   - Unique nonces: each encryption operation uses a fresh random nonce
+//   - Tag verification: decryption fails if data has been tampered with
 type SymmetricEncryptor struct{}
 
-// NewSymmetricEncryptor creates a new symmetric encryptor
+// NewSymmetricEncryptor creates a new symmetric encryptor instance.
+//
+// Returns:
+//   - *SymmetricEncryptor: A new encryptor ready for AES-GCM operations
+//
+// Example:
+//
+//	encryptor := NewSymmetricEncryptor()
+//	key := make([]byte, 32)  // 256-bit key
+//	rand.Read(key)
+//	encrypted, err := encryptor.EncryptAESGCM(data, key, opts)
 func NewSymmetricEncryptor() *SymmetricEncryptor {
 	return &SymmetricEncryptor{}
 }
 
-// EncryptAESGCM encrypts data using AES-GCM with the provided key
+// EncryptAESGCM encrypts data using AES-GCM authenticated encryption with the provided key.
+//
+// This method implements authenticated encryption using AES in Galois/Counter Mode.
+// It automatically generates a unique nonce for each encryption operation and
+// includes the authentication tag in the output for integrity verification.
+//
+// Key requirements:
+//   - Must be exactly 16, 24, or 32 bytes for AES-128, AES-192, or AES-256
+//   - Should be cryptographically random or derived using a secure KDF
+//   - Must not be reused across different encryption contexts
+//
+// Parameters:
+//   - data: The plaintext data to encrypt (no size limitations)
+//   - key: The AES encryption key (16, 24, or 32 bytes)
+//   - opts: Encryption options (algorithm will be set to AlgorithmAESGCM)
+//
+// Returns:
+//   - *EncryptedData: Encrypted data containing nonce + ciphertext + auth tag
+//   - error: Invalid key size or encryption failure
+//
+// Security properties:
+//   - Semantic security: identical plaintexts produce different ciphertexts
+//   - Authentication: tampering with ciphertext is detected during decryption
+//   - Nonce uniqueness: each encryption uses a fresh 96-bit random nonce
+//
+// Performance:
+//   - Efficient on hardware with AES-NI instructions
+//   - Suitable for encrypting data of any size
+//   - Lower overhead than separate encryption + MAC operations
+//
+// Example:
+//
+//	encryptor := NewSymmetricEncryptor()
+//	key := make([]byte, 32)  // 256-bit key
+//	rand.Read(key)
+//
+//	data := []byte("sensitive data to encrypt")
+//	encrypted, err := encryptor.EncryptAESGCM(data, key, opts)
+//	if err != nil {
+//		log.Fatal("AES-GCM encryption failed:", err)
+//	}
 func (e *SymmetricEncryptor) EncryptAESGCM(data []byte, key []byte, opts EncryptOptions) (*EncryptedData, error) {
 	if err := ValidateEncryptOptions(opts); err != nil {
 		return nil, err

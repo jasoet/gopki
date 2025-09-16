@@ -1,3 +1,35 @@
+// File envelope.go implements hybrid envelope encryption for efficient encryption
+// of large data sets using a combination of symmetric and asymmetric cryptography.
+//
+// Envelope encryption (also known as hybrid encryption) is a cryptographic technique
+// that combines the speed of symmetric encryption with the key distribution benefits
+// of asymmetric encryption. It's the recommended approach for encrypting large amounts
+// of data or when you need to encrypt for multiple recipients.
+//
+// How envelope encryption works:
+//   1. Generate a random symmetric encryption key (Data Encryption Key - DEK)
+//   2. Encrypt the actual data with the DEK using AES-GCM
+//   3. Encrypt the DEK with the recipient's public key (Key Encryption Key - KEK)
+//   4. Return both the encrypted data and the encrypted DEK
+//
+// Advantages:
+//   - Efficient for large data (no size limitations)
+//   - Can encrypt for multiple recipients by encrypting DEK with each recipient's key
+//   - Provides perfect forward secrecy when using ephemeral keys
+//   - Scales well with data size (only DEK encryption time scales with recipients)
+//
+// Security properties:
+//   - Data confidentiality through AES-GCM symmetric encryption
+//   - Key confidentiality through asymmetric encryption of the DEK
+//   - Data integrity and authenticity through AES-GCM authentication
+//   - Fresh DEK for each encryption operation
+//
+// Use cases:
+//   - Encrypting files larger than RSA key size limits
+//   - Multi-recipient encryption scenarios
+//   - Cloud storage encryption
+//   - Secure messaging systems
+//   - Database field encryption
 package encryption
 
 import (
@@ -12,16 +44,43 @@ import (
 	"github.com/jasoet/gopki/keypair/algo"
 )
 
-// EnvelopeEncryptor implements hybrid envelope encryption
-// It encrypts data with a symmetric key (AES-GCM) and then encrypts the symmetric key
-// with the recipient's public key. This approach combines the efficiency of symmetric
-// encryption with the key distribution benefits of asymmetric encryption.
+// EnvelopeEncryptor implements hybrid envelope encryption combining the efficiency
+// of symmetric encryption with the key distribution benefits of asymmetric encryption.
+//
+// This encryptor automatically:
+//   - Generates a fresh AES-256 Data Encryption Key (DEK) for each operation
+//   - Encrypts the actual data with AES-GCM using the DEK
+//   - Encrypts the DEK with the recipient's public key using appropriate asymmetric algorithm
+//   - Combines both encrypted components into a single EncryptedData structure
+//
+// The encryptor supports all GoPKI key types:
+//   - RSA keys: DEK encrypted with RSA-OAEP
+//   - ECDSA keys: DEK encrypted using ECDH key agreement + AES-GCM
+//   - Ed25519 keys: DEK encrypted using X25519 key agreement + AES-GCM
+//
+// Performance characteristics:
+//   - Encryption time scales linearly with data size (through AES-GCM)
+//   - Key encryption time is constant regardless of data size
+//   - Memory usage is proportional to data size (streaming possible)
+//   - Optimal for data larger than ~1KB
 type EnvelopeEncryptor struct {
 	asymmetric *AsymmetricEncryptor
 	symmetric  *SymmetricEncryptor
 }
 
-// NewEnvelopeEncryptor creates a new envelope encryptor
+// NewEnvelopeEncryptor creates a new envelope encryptor instance.
+//
+// The encryptor is initialized with both asymmetric and symmetric encryptors
+// to handle the hybrid encryption process efficiently.
+//
+// Returns:
+//   - *EnvelopeEncryptor: A new encryptor ready for envelope encryption operations
+//
+// Example:
+//
+//	encryptor := NewEnvelopeEncryptor()
+//	largeData := make([]byte, 1024*1024)  // 1MB data
+//	encrypted, err := encryptor.Encrypt(largeData, keyPair, opts)
 func NewEnvelopeEncryptor() *EnvelopeEncryptor {
 	return &EnvelopeEncryptor{
 		asymmetric: NewAsymmetricEncryptor(),
@@ -29,7 +88,57 @@ func NewEnvelopeEncryptor() *EnvelopeEncryptor {
 	}
 }
 
-// Encrypt encrypts data using envelope encryption (hybrid approach)
+// Encrypt encrypts data using envelope encryption (hybrid approach) for efficient
+// handling of data of any size with any supported key type.
+//
+// This method implements the complete envelope encryption workflow:
+//   1. Generates a fresh 256-bit AES key (Data Encryption Key - DEK)
+//   2. Encrypts the plaintext data with AES-GCM using the DEK
+//   3. Encrypts the DEK using the appropriate asymmetric algorithm for the key type
+//   4. Combines encrypted data and encrypted DEK into a single structure
+//
+// Algorithm selection is automatic based on key type:
+//   - RSA keys: DEK encrypted with RSA-OAEP
+//   - ECDSA keys: DEK encrypted via ECDH key agreement + AES-GCM
+//   - Ed25519 keys: DEK encrypted via X25519 key agreement + AES-GCM
+//
+// Parameters:
+//   - data: The plaintext data to encrypt (any size supported)
+//   - keyPair: The recipient's key pair (public key used for DEK encryption)
+//   - opts: Encryption options (algorithm will be set to AlgorithmEnvelope)
+//
+// Returns:
+//   - *EncryptedData: Encrypted data with envelope algorithm and combined payload
+//   - error: Any error during DEK generation, data encryption, or key encryption
+//
+// Performance benefits:
+//   - No data size limitations (unlike direct RSA encryption)
+//   - Linear scaling with data size (O(n) instead of O(n²) for repeated asymmetric encryption)
+//   - Efficient memory usage (can be adapted for streaming)
+//   - Fast decryption (single DEK decryption + fast AES-GCM data decryption)
+//
+// Security properties:
+//   - Fresh DEK for each encryption ensures semantic security
+//   - AES-GCM provides authenticated encryption of data
+//   - Asymmetric encryption protects DEK confidentiality
+//   - No key reuse across different encryption operations
+//
+// Example:
+//
+//	encryptor := NewEnvelopeEncryptor()
+//
+//	// Works with any key type
+//	rsaKeys, _ := algo.GenerateRSAKeyPair(2048)
+//	ecdsaKeys, _ := algo.GenerateECDSAKeyPair(algo.P256)
+//
+//	// Encrypt large data efficiently
+//	largeFile := make([]byte, 10*1024*1024)  // 10MB file
+//	encrypted, err := encryptor.Encrypt(largeFile, rsaKeys, opts)
+//	if err != nil {
+//		log.Fatal("Envelope encryption failed:", err)
+//	}
+//
+//	// The encrypted data contains both the encrypted file and encrypted DEK
 func (e *EnvelopeEncryptor) Encrypt(data []byte, keyPair any, opts EncryptOptions) (*EncryptedData, error) {
 	if err := ValidateEncryptOptions(opts); err != nil {
 		return nil, err

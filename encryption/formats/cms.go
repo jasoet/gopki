@@ -1,3 +1,48 @@
+// File cms.go implements Cryptographic Message Syntax (CMS) format support for
+// encrypted data, providing advanced features and extensibility beyond PKCS#7.
+//
+// CMS (Cryptographic Message Syntax) is defined in RFC 5652 as the successor to
+// PKCS#7. It provides enhanced features including better algorithm agility,
+// authenticated encryption, and extensible attribute systems.
+//
+// Standards compliance:
+//   - RFC 5652: Cryptographic Message Syntax (CMS)
+//   - RFC 5083: Cryptographic Message Syntax (CMS) Authenticated-Enveloped-Data Content Type
+//   - RFC 5084: Using AES-CCM and AES-GCM Authenticated Encryption in the Cryptographic Message Syntax
+//   - RFC 8933: Update to the Cryptographic Message Syntax (CMS) for Algorithm Identifier Protection
+//
+// Enhanced features over PKCS#7:
+//   - Authenticated encryption support (AuthEnvelopedData)
+//   - Algorithm agility and protection
+//   - Extended originator information
+//   - Unprotected attributes for metadata
+//   - Better support for modern cryptographic algorithms
+//   - Enhanced recipient information structures
+//
+// Supported content types:
+//   - EnvelopedData: Traditional public key encrypted data
+//   - AuthEnvelopedData: Authenticated encryption with AEAD algorithms
+//   - EncryptedData: Symmetric key encrypted data with enhanced attributes
+//
+// Format characteristics:
+//   - ASN.1 DER-encoded structure
+//   - Forward compatibility through extensible attributes
+//   - Enhanced algorithm identification and protection
+//   - Support for complex PKI scenarios
+//   - Designed for long-term evolution
+//
+// Security enhancements:
+//   - Algorithm identifier protection against downgrade attacks
+//   - Authenticated encryption modes for confidentiality and integrity
+//   - Enhanced key management through recipient information
+//   - Support for modern AEAD (Authenticated Encryption with Associated Data) algorithms
+//
+// Use cases:
+//   - Advanced PKI environments requiring modern cryptography
+//   - Applications requiring authenticated encryption
+//   - Long-term secure archival with format evolution
+//   - Integration with next-generation cryptographic systems
+//   - Multi-recipient scenarios with complex requirements
 package formats
 
 import (
@@ -10,11 +55,46 @@ import (
 	"github.com/jasoet/gopki/encryption"
 )
 
-// CMSFormat handles CMS (Cryptographic Message Syntax) format for encrypted data
-// CMS is the successor to PKCS#7 and provides additional features
+// CMSFormat implements the Format interface for Cryptographic Message Syntax (CMS).
+//
+// This format handler provides advanced cryptographic message formatting according
+// to RFC 5652 and related standards. It extends beyond PKCS#7 capabilities with
+// support for modern cryptographic algorithms, authenticated encryption, and
+// enhanced attribute systems.
+//
+// The implementation supports:
+//   - EnvelopedData for traditional public key encryption
+//   - AuthEnvelopedData for authenticated encryption
+//   - Enhanced recipient information encoding
+//   - Originator information for complex PKI scenarios
+//   - Unprotected attributes for extensible metadata
+//   - Algorithm identifier protection
+//
+// Version support:
+//   - CMS v1: Basic enveloped data
+//   - CMS v2: Enhanced features and attributes
+//   - CMS v3: Algorithm identifier protection
+//   - CMS v4: Modern AEAD support
+//
+// This format is particularly suitable for:
+//   - Enterprise PKI environments
+//   - Applications requiring standards compliance
+//   - Long-term secure archival
+//   - Multi-recipient encryption scenarios
 type CMSFormat struct{}
 
-// NewCMSFormat creates a new CMS format handler
+// NewCMSFormat creates a new CMS format handler instance.
+//
+// Returns:
+//   - *CMSFormat: A new format handler ready for CMS operations
+//
+// Example:
+//
+//	format := NewCMSFormat()
+//	encoded, err := format.Encode(encryptedData)
+//	if err != nil {
+//		log.Fatal("CMS encoding failed:", err)
+//	}
 func NewCMSFormat() *CMSFormat {
 	return &CMSFormat{}
 }

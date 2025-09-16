@@ -6,17 +6,89 @@ import (
 	"github.com/jasoet/gopki/keypair/algo"
 )
 
-// EncryptData is a high-level function that encrypts data using the most appropriate method
-// based on the key pair type. It automatically selects between direct asymmetric encryption
-// (for small data with RSA) or envelope encryption (for larger data or ECDSA/Ed25519 keys).
+// EncryptData is a high-level, type-safe function that encrypts data using the most
+// appropriate method based on the key pair type and data size.
+//
+// This function provides intelligent algorithm selection:
+//   - RSA keys: Uses direct RSA-OAEP for small data, envelope encryption for large data
+//   - ECDSA keys: Uses ECDH key agreement with AES-GCM encryption
+//   - Ed25519 keys: Uses X25519 key agreement with AES-GCM encryption
+//
+// The function automatically handles:
+//   - Algorithm selection based on key type
+//   - Data size optimization (envelope encryption for efficiency)
+//   - Format encoding (Raw, PKCS#7, or CMS)
+//   - Security parameter generation (nonces, IVs, ephemeral keys)
+//
+// Type Parameters:
+//   - T: Must be a keypair.KeyPair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//
+// Parameters:
+//   - data: The data to encrypt (any size supported)
+//   - keyPair: The key pair to use for encryption (public key will be extracted)
+//   - opts: Encryption options controlling algorithm, format, and other parameters
+//
+// Returns:
+//   - *EncryptedData: Encrypted data with metadata for decryption
+//   - error: Any error that occurred during encryption
+//
+// Example:
+//
+//	// Generate RSA key pair
+//	rsaKeys, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+//
+//	// Encrypt data with default options
+//	data := []byte("confidential information")
+//	encrypted, err := EncryptData(data, rsaKeys, DefaultEncryptOptions())
+//	if err != nil {
+//		log.Fatal("Encryption failed:", err)
+//	}
+//
+//	// The function automatically uses envelope encryption for efficiency
 func EncryptData[T keypair.KeyPair](data []byte, keyPair T, opts EncryptOptions) (*EncryptedData, error) {
 	// Use envelope encryption by default for consistency and efficiency
 	envelope := NewEnvelopeEncryptor()
 	return envelope.Encrypt(data, keyPair, opts)
 }
 
-// DecryptData is a high-level function that decrypts data using the appropriate method
-// based on the encryption algorithm specified in the encrypted data.
+// DecryptData is a high-level, type-safe function that decrypts data using the appropriate
+// method based on the encryption algorithm specified in the encrypted data.
+//
+// This function automatically determines the decryption method by examining the
+// encrypted data's algorithm field and applies the correct decryption process.
+// It handles all supported encryption algorithms transparently.
+//
+// Supported decryption algorithms:
+//   - AlgorithmRSAOAEP: Direct RSA-OAEP decryption
+//   - AlgorithmECDH: ECDH key agreement with AES-GCM decryption
+//   - AlgorithmX25519: X25519 key agreement with AES-GCM decryption
+//   - AlgorithmEnvelope: Envelope decryption (hybrid approach)
+//
+// Type Parameters:
+//   - T: Must be a keypair.KeyPair type matching the encryption key
+//
+// Parameters:
+//   - encrypted: The encrypted data to decrypt (contains algorithm metadata)
+//   - keyPair: The key pair used for encryption (private key will be used)
+//   - opts: Decryption options for validation and processing
+//
+// Returns:
+//   - []byte: The decrypted plaintext data
+//   - error: Any error that occurred during decryption
+//
+// Example:
+//
+//	// Decrypt previously encrypted data
+//	decrypted, err := DecryptData(encrypted, rsaKeys, DefaultDecryptOptions())
+//	if err != nil {
+//		log.Fatal("Decryption failed:", err)
+//	}
+//	fmt.Printf("Decrypted: %s\n", string(decrypted))
+//
+// Security considerations:
+//   - The function validates the encrypted data format and integrity
+//   - All decryption methods include authentication verification
+//   - Private key material is properly protected during decryption
 func DecryptData[T keypair.KeyPair](encrypted *EncryptedData, keyPair T, opts DecryptOptions) ([]byte, error) {
 	switch encrypted.Algorithm {
 	case AlgorithmRSAOAEP, AlgorithmECDH, AlgorithmX25519:
