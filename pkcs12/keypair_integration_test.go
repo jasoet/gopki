@@ -19,7 +19,7 @@ func TestToP12KeyPairFunctions(t *testing.T) {
 	password := "test123"
 
 	// Helper function to create certificate
-	createCertificate := func(keyPair GenericKeyPair) *x509.Certificate {
+	createCertificate := func(keyPair keypair.GenericKeyPair) *x509.Certificate {
 		template := &x509.Certificate{
 			Subject: pkix.Name{
 				CommonName:   "Test Certificate",
@@ -194,7 +194,7 @@ func TestFromP12KeyPairFunctions(t *testing.T) {
 	password := "test123"
 
 	// Helper function to create certificate using x509 directly
-	createSelfSignedCertificate := func(keyPair GenericKeyPair) *x509.Certificate {
+	createSelfSignedCertificate := func(keyPair keypair.GenericKeyPair) *x509.Certificate {
 		template := &x509.Certificate{
 			Subject: pkix.Name{
 				CommonName:   "Test Certificate",
@@ -438,7 +438,7 @@ func TestImportFromP12KeyPairWithValidation(t *testing.T) {
 	password := "test123"
 
 	// Helper function to create certificate
-	createValidationCertificate := func(keyPair GenericKeyPair) *x509.Certificate {
+	createValidationCertificate := func(keyPair keypair.GenericKeyPair) *x509.Certificate {
 		template := &x509.Certificate{
 			Subject: pkix.Name{
 				CommonName:   "Validation Test",

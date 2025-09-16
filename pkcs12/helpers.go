@@ -7,6 +7,8 @@ import (
 	"crypto/x509"
 	"fmt"
 	"time"
+
+	"github.com/jasoet/gopki/keypair"
 )
 
 // validateCertificateChain validates that the certificate chain is properly ordered and valid
@@ -58,7 +60,7 @@ func validateCertificateExpiration(cert *x509.Certificate) error {
 }
 
 // validateKeyPairMatch validates that the private key matches the certificate's public key
-func validateKeyPairMatch(privateKey GenericPrivateKey, publicKey GenericPublicKey) error {
+func validateKeyPairMatch(privateKey keypair.GenericPrivateKey, publicKey keypair.GenericPublicKey) error {
 	switch priv := privateKey.(type) {
 	case *rsa.PrivateKey:
 		pub, ok := publicKey.(*rsa.PublicKey)
@@ -96,7 +98,7 @@ func validateKeyPairMatch(privateKey GenericPrivateKey, publicKey GenericPublicK
 }
 
 // getPrivateKeyType returns a string description of the private key type
-func getPrivateKeyType(privateKey GenericPrivateKey) string {
+func getPrivateKeyType(privateKey keypair.GenericPrivateKey) string {
 	switch privateKey.(type) {
 	case *rsa.PrivateKey:
 		return "RSA"

@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 
 	"github.com/jasoet/gopki/cert"
+	"github.com/jasoet/gopki/keypair"
 )
 
 // FromP12Cert loads a certificate from PKCS#12 data and returns a GoPKI Certificate
@@ -113,7 +114,7 @@ func LoadCertificateChainFromP12(filename, password string) ([]*cert.Certificate
 
 // SaveCertToP12 saves a certificate to PKCS#12 format (requires private key)
 // Note: This function requires a private key to create a valid P12 file
-func SaveCertToP12(certificate *cert.Certificate, privateKey GenericPrivateKey, filename, password string) error {
+func SaveCertToP12(certificate *cert.Certificate, privateKey keypair.GenericPrivateKey, filename, password string) error {
 	if certificate == nil || certificate.Certificate == nil {
 		return fmt.Errorf("certificate is not initialized")
 	}
@@ -142,7 +143,7 @@ func SaveCertToP12(certificate *cert.Certificate, privateKey GenericPrivateKey, 
 }
 
 // SaveCertToP12WithChain saves a certificate with a certificate chain to PKCS#12 format
-func SaveCertToP12WithChain(certificate *cert.Certificate, privateKey GenericPrivateKey, caCerts []*cert.Certificate, filename, password string) error {
+func SaveCertToP12WithChain(certificate *cert.Certificate, privateKey keypair.GenericPrivateKey, caCerts []*cert.Certificate, filename, password string) error {
 	if certificate == nil || certificate.Certificate == nil {
 		return fmt.Errorf("certificate is not initialized")
 	}
@@ -369,7 +370,7 @@ func LoadCertificateFromPEMFile(filename string) (*cert.Certificate, error) {
 }
 
 // LoadPrivateKeyFromPEM loads a private key from PEM file with generic return type
-func LoadPrivateKeyFromPEM(filename string) (GenericPrivateKey, error) {
+func LoadPrivateKeyFromPEM(filename string) (keypair.GenericPrivateKey, error) {
 	// Read PEM file
 	pemData, err := os.ReadFile(filename)
 	if err != nil {

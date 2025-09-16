@@ -56,6 +56,15 @@ type PrivateKey interface {
 	*rsa.PrivateKey | *ecdsa.PrivateKey | ed25519.PrivateKey
 }
 
+// GenericPrivateKey represents any private key type for functions that need to work with multiple key types dynamically
+type GenericPrivateKey any
+
+// GenericPublicKey represents any public key type for functions that need to work with multiple key types dynamically
+type GenericPublicKey any
+
+// GenericKeyPair represents any keypair type for functions that need to work with multiple keypair types dynamically
+type GenericKeyPair any
+
 // PEM represents PEM-encoded key data as a byte slice.
 // PEM format uses Base64 encoding with headers for text-based key storage.
 type PEM []byte

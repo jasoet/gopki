@@ -482,7 +482,7 @@ func ConvertP12KeyPairToPEM(p12File, password, privateKeyFile, certFile string) 
 }
 
 // createKeyPairFromPrivateKeyAny creates a keypair from any private key type
-func createKeyPairFromPrivateKeyAny(privateKey GenericPrivateKey) (any, error) {
+func createKeyPairFromPrivateKeyAny(privateKey keypair.GenericPrivateKey) (any, error) {
 	switch priv := privateKey.(type) {
 	case *rsa.PrivateKey:
 		return createKeyPairFromPrivateKey(priv)

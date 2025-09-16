@@ -89,19 +89,10 @@ import (
 	"github.com/jasoet/gopki/keypair"
 )
 
-// GenericPrivateKey represents any private key type for functions that need to work with multiple key types dynamically
-type GenericPrivateKey any
-
-// GenericPublicKey represents any public key type for functions that need to work with multiple key types dynamically
-type GenericPublicKey any
-
-// GenericKeyPair represents any keypair type for functions that need to work with multiple keypair types dynamically
-type GenericKeyPair any
-
 // P12Container represents a PKCS#12 container with its contents
 type P12Container struct {
 	// Private key from the P12 file
-	PrivateKey GenericPrivateKey
+	PrivateKey keypair.GenericPrivateKey
 	// Primary certificate associated with the private key
 	Certificate *x509.Certificate
 	// Additional certificates (certificate chain)
