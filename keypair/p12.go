@@ -60,6 +60,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
+	"os"
 
 	"github.com/jasoet/gopki/keypair/algo"
 	"github.com/jasoet/gopki/pkcs12"
@@ -175,16 +176,19 @@ func ToP12File[T KeyPair](keyPair T, certificate *x509.Certificate, filename, pa
 
 // FromP12 loads a key pair from PKCS#12 data.
 //
-// This function parses P12 binary data and extracts the private key, certificate,
+// This generic function parses P12 binary data and extracts the private key, certificate,
 // and any CA certificates. The private key is automatically converted to the
 // appropriate GoPKI KeyPair type based on its algorithm.
+//
+// Type Parameters:
+//   - T: The expected KeyPair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
 //
 // Parameters:
 //   - p12Data: The P12 binary data to parse
 //   - password: Password to decrypt the P12 data
 //
 // Returns:
-//   - any: The extracted key pair (will be *algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//   - T: The extracted key pair of the specified type
 //   - *x509.Certificate: The main certificate from the P12
 //   - []*x509.Certificate: Any CA certificates included in the P12
 //   - error: Any error that occurred during parsing
@@ -192,66 +196,100 @@ func ToP12File[T KeyPair](keyPair T, certificate *x509.Certificate, filename, pa
 // Example:
 //
 //	p12Data, _ := os.ReadFile("keystore.p12")
-//	keyPair, cert, caCerts, err := FromP12(p12Data, "password")
+//	keyPair, cert, caCerts, err := FromP12[*algo.RSAKeyPair](p12Data, "password")
 //	if err != nil {
 //		log.Fatal("Failed to parse P12:", err)
 //	}
-//
-//	// Type assert to specific algorithm if needed
-//	if rsaKeys, ok := keyPair.(*algo.RSAKeyPair); ok {
-//		fmt.Printf("RSA key size: %d bits\n", rsaKeys.PrivateKey.N.BitLen())
-//	}
+//	fmt.Printf("RSA key size: %d bits\n", keyPair.PrivateKey.N.BitLen())
 //
 // The function automatically detects the key algorithm and returns the
 // appropriate GoPKI KeyPair type for seamless integration with other
 // GoPKI functions.
-func FromP12(p12Data []byte, password string) (any, *x509.Certificate, []*x509.Certificate, error) {
+func FromP12[T KeyPair](p12Data []byte, password string) (T, *x509.Certificate, []*x509.Certificate, error) {
+	var zero T
 	if len(p12Data) == 0 {
-		return nil, nil, nil, fmt.Errorf("P12 data is required")
+		return zero, nil, nil, fmt.Errorf("P12 data is required")
 	}
 	if password == "" {
-		return nil, nil, nil, fmt.Errorf("password is required")
+		return zero, nil, nil, fmt.Errorf("password is required")
 	}
 
 	// Parse P12 data
 	opts := pkcs12.DefaultLoadOptions(password)
 	container, err := pkcs12.ParseP12(p12Data, opts)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to parse P12 data: %w", err)
+		return zero, nil, nil, fmt.Errorf("failed to parse P12 data: %w", err)
 	}
 
 	// Convert to keypair based on private key type
 	keyPair, err := createKeyPairFromPrivateKey(container.PrivateKey)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create key pair: %w", err)
+		return zero, nil, nil, fmt.Errorf("failed to create key pair: %w", err)
 	}
 
-	return keyPair, container.Certificate, container.CACertificates, nil
+	// Type assert to the expected type
+	typedKeyPair, ok := keyPair.(T)
+	if !ok {
+		return zero, nil, nil, fmt.Errorf("expected key pair type %T, got %T", zero, keyPair)
+	}
+
+	return typedKeyPair, container.Certificate, container.CACertificates, nil
 }
 
-// FromP12File loads a key pair from a PKCS#12 file
-func FromP12File(filename, password string) (any, *x509.Certificate, []*x509.Certificate, error) {
+// FromP12File loads a key pair from a PKCS#12 file.
+//
+// This generic function loads P12 file and extracts the private key, certificate,
+// and any CA certificates. The private key is automatically converted to the
+// appropriate GoPKI KeyPair type based on its algorithm.
+//
+// Type Parameters:
+//   - T: The expected KeyPair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//
+// Parameters:
+//   - filename: Path to the P12 file to load
+//   - password: Password to decrypt the P12 file
+//
+// Returns:
+//   - T: The extracted key pair of the specified type
+//   - *x509.Certificate: The main certificate from the P12
+//   - []*x509.Certificate: Any CA certificates included in the P12
+//   - error: Any error that occurred during loading
+//
+// Example:
+//
+//	keyPair, cert, caCerts, err := FromP12File[*algo.RSAKeyPair]("keystore.p12", "password")
+//	if err != nil {
+//		log.Fatal("Failed to load P12 file:", err)
+//	}
+func FromP12File[T KeyPair](filename, password string) (T, *x509.Certificate, []*x509.Certificate, error) {
+	var zero T
 	if filename == "" {
-		return nil, nil, nil, fmt.Errorf("filename is required")
+		return zero, nil, nil, fmt.Errorf("filename is required")
 	}
 	if password == "" {
-		return nil, nil, nil, fmt.Errorf("password is required")
+		return zero, nil, nil, fmt.Errorf("password is required")
 	}
 
 	// Load P12 file
 	opts := pkcs12.DefaultLoadOptions(password)
 	container, err := pkcs12.LoadFromP12File(filename, opts)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to load P12 file: %w", err)
+		return zero, nil, nil, fmt.Errorf("failed to load P12 file: %w", err)
 	}
 
 	// Convert to keypair based on private key type
 	keyPair, err := createKeyPairFromPrivateKey(container.PrivateKey)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create key pair: %w", err)
+		return zero, nil, nil, fmt.Errorf("failed to create key pair: %w", err)
 	}
 
-	return keyPair, container.Certificate, container.CACertificates, nil
+	// Type assert to the expected type
+	typedKeyPair, ok := keyPair.(T)
+	if !ok {
+		return zero, nil, nil, fmt.Errorf("expected key pair type %T, got %T", zero, keyPair)
+	}
+
+	return typedKeyPair, container.Certificate, container.CACertificates, nil
 }
 
 // Type-specific P12 functions for better type safety
@@ -293,47 +331,17 @@ func ToP12Ed25519(keyPair *algo.Ed25519KeyPair, certificate *x509.Certificate, p
 
 // FromP12RSA loads an RSA key pair from PKCS#12 data
 func FromP12RSA(p12Data []byte, password string) (*algo.RSAKeyPair, *x509.Certificate, []*x509.Certificate, error) {
-	keyPair, cert, caCerts, err := FromP12(p12Data, password)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	rsaKeyPair, ok := keyPair.(*algo.RSAKeyPair)
-	if !ok {
-		return nil, nil, nil, fmt.Errorf("expected RSA key pair, got %T", keyPair)
-	}
-
-	return rsaKeyPair, cert, caCerts, nil
+	return FromP12[*algo.RSAKeyPair](p12Data, password)
 }
 
 // FromP12ECDSA loads an ECDSA key pair from PKCS#12 data
 func FromP12ECDSA(p12Data []byte, password string) (*algo.ECDSAKeyPair, *x509.Certificate, []*x509.Certificate, error) {
-	keyPair, cert, caCerts, err := FromP12(p12Data, password)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	ecdsaKeyPair, ok := keyPair.(*algo.ECDSAKeyPair)
-	if !ok {
-		return nil, nil, nil, fmt.Errorf("expected ECDSA key pair, got %T", keyPair)
-	}
-
-	return ecdsaKeyPair, cert, caCerts, nil
+	return FromP12[*algo.ECDSAKeyPair](p12Data, password)
 }
 
 // FromP12Ed25519 loads an Ed25519 key pair from PKCS#12 data
 func FromP12Ed25519(p12Data []byte, password string) (*algo.Ed25519KeyPair, *x509.Certificate, []*x509.Certificate, error) {
-	keyPair, cert, caCerts, err := FromP12(p12Data, password)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	ed25519KeyPair, ok := keyPair.(*algo.Ed25519KeyPair)
-	if !ok {
-		return nil, nil, nil, fmt.Errorf("expected Ed25519 key pair, got %T", keyPair)
-	}
-
-	return ed25519KeyPair, cert, caCerts, nil
+	return FromP12[*algo.Ed25519KeyPair](p12Data, password)
 }
 
 // Helper function to create key pair from private key
@@ -415,8 +423,32 @@ func ExportKeyPairWithChain[T KeyPair](keyPair T, certificate *x509.Certificate,
 	return pkcs12.CreateP12File(filename, privateKey, certificate, caCerts, opts)
 }
 
-// ImportFromP12WithValidation imports a key pair from P12 with comprehensive validation
-func ImportFromP12WithValidation(filename, password string) (any, *x509.Certificate, []*x509.Certificate, error) {
+// ImportFromP12WithValidation imports a key pair from P12 with comprehensive validation.
+//
+// This generic function loads P12 file with comprehensive validation including
+// certificate chain validation and expiration checking.
+//
+// Type Parameters:
+//   - T: The expected KeyPair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//
+// Parameters:
+//   - filename: Path to the P12 file to load
+//   - password: Password to decrypt the P12 file
+//
+// Returns:
+//   - T: The extracted key pair of the specified type
+//   - *x509.Certificate: The main certificate from the P12
+//   - []*x509.Certificate: Any CA certificates included in the P12
+//   - error: Any error that occurred during loading or validation
+//
+// Example:
+//
+//	keyPair, cert, caCerts, err := ImportFromP12WithValidation[*algo.RSAKeyPair]("keystore.p12", "password")
+//	if err != nil {
+//		log.Fatal("Failed to load and validate P12 file:", err)
+//	}
+func ImportFromP12WithValidation[T KeyPair](filename, password string) (T, *x509.Certificate, []*x509.Certificate, error) {
+	var zero T
 	// Load with validation enabled
 	opts := pkcs12.DefaultLoadOptions(password)
 	opts.ValidateChain = true
@@ -424,24 +456,55 @@ func ImportFromP12WithValidation(filename, password string) (any, *x509.Certific
 
 	container, err := pkcs12.LoadFromP12File(filename, opts)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to load and validate P12: %w", err)
+		return zero, nil, nil, fmt.Errorf("failed to load and validate P12: %w", err)
 	}
 
 	// Convert to keypair
 	keyPair, err := createKeyPairFromPrivateKey(container.PrivateKey)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create key pair: %w", err)
+		return zero, nil, nil, fmt.Errorf("failed to create key pair: %w", err)
 	}
 
-	return keyPair, container.Certificate, container.CACertificates, nil
+	// Type assert to the expected type
+	typedKeyPair, ok := keyPair.(T)
+	if !ok {
+		return zero, nil, nil, fmt.Errorf("expected key pair type %T, got %T", zero, keyPair)
+	}
+
+	return typedKeyPair, container.Certificate, container.CACertificates, nil
 }
 
-// ConvertP12ToPEM converts a P12 file to separate PEM files
+// ConvertP12ToPEM converts a P12 file to separate PEM files.
+// This function automatically detects the key pair type in the P12 file.
 func ConvertP12ToPEM(p12File, password, privateKeyFile, certFile string) error {
-	// Load from P12
-	keyPair, cert, _, err := FromP12File(p12File, password)
+	// Read P12 file
+	p12Data, err := os.ReadFile(p12File)
 	if err != nil {
-		return fmt.Errorf("failed to load P12: %w", err)
+		return fmt.Errorf("failed to read P12 file: %w", err)
+	}
+
+	// Try each key pair type until one works
+	var keyPair any
+	var cert *x509.Certificate
+
+	// Try RSA first
+	if rsaKeyPair, rsaCert, _, rsaErr := FromP12RSA(p12Data, password); rsaErr == nil {
+		keyPair = rsaKeyPair
+		cert = rsaCert
+	} else {
+		// Try ECDSA
+		if ecdsaKeyPair, ecdsaCert, _, ecdsaErr := FromP12ECDSA(p12Data, password); ecdsaErr == nil {
+			keyPair = ecdsaKeyPair
+			cert = ecdsaCert
+		} else {
+			// Try Ed25519
+			if ed25519KeyPair, ed25519Cert, _, ed25519Err := FromP12Ed25519(p12Data, password); ed25519Err == nil {
+				keyPair = ed25519KeyPair
+				cert = ed25519Cert
+			} else {
+				return fmt.Errorf("failed to load P12 with any key type - RSA: %v, ECDSA: %v, Ed25519: %v", rsaErr, ecdsaErr, ed25519Err)
+			}
+		}
 	}
 
 	// Save as PEM files
