@@ -221,6 +221,8 @@ examples/keypair/output/
 examples/keypair/exmples/
 examples/signing/output/
 examples/signing/examples/
+examples/encryption/output/
+examples/encryption/examples/
 *.pem
 format_output/
 
@@ -228,6 +230,8 @@ format_output/
 examples/keypair/keypair
 examples/signing/signing
 examples/certificates/certificates
+examples/encryption/encryption
+
 
 # Node.js / Semantic Release
 node_modules/

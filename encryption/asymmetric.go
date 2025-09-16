@@ -28,7 +28,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
-	"crypto/x509"
 	"fmt"
 	"time"
 
@@ -186,10 +185,7 @@ func (e *AsymmetricEncryptor) EncryptWithECDSA(data []byte, keyPair *algo.ECDSAK
 	}
 
 	// Include ephemeral public key for recipient
-	ephemeralPublicKeyBytes, err := x509.MarshalPKIXPublicKey(ephemeralPrivateKey.PublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal ephemeral public key: %w", err)
-	}
+	ephemeralPublicKeyBytes := ephemeralPrivateKey.PublicKey().Bytes()
 
 	return &EncryptedData{
 		Algorithm:    AlgorithmECDH,
@@ -219,20 +215,11 @@ func (e *AsymmetricEncryptor) DecryptWithECDSA(encrypted *EncryptedData, keyPair
 		return nil, fmt.Errorf("failed to convert ECDSA private key to ECDH: %w", err)
 	}
 
-	// Parse ephemeral public key
-	ephemeralPublicKeyInterface, err := x509.ParsePKIXPublicKey(encrypted.EncryptedKey)
+	// Parse ephemeral public key from ECDH bytes
+	curve := ecdhPrivateKey.Curve()
+	ephemeralECDHKey, err := curve.NewPublicKey(encrypted.EncryptedKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ephemeral public key: %w", err)
-	}
-
-	ephemeralECDSAKey, ok := ephemeralPublicKeyInterface.(*ecdsa.PublicKey)
-	if !ok {
-		return nil, fmt.Errorf("ephemeral key is not ECDSA public key")
-	}
-
-	ephemeralECDHKey, err := ephemeralECDSAKey.ECDH()
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert ephemeral ECDSA key to ECDH: %w", err)
 	}
 
 	// Perform ECDH key agreement
