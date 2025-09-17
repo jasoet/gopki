@@ -10,7 +10,7 @@ import (
 )
 
 // ECDSAKeyPair represents a generated ECDSA key pair containing both private and public keys.
-// The public key is derived from the private key to ensure mathematical relationship.
+// The public key is derived from the private key to ensure a mathematical relationship.
 type ECDSAKeyPair struct {
 	PrivateKey *ecdsa.PrivateKey // The ECDSA private key
 	PublicKey  *ecdsa.PublicKey  // The corresponding ECDSA public key
@@ -103,7 +103,7 @@ func GenerateECDSAKeyPair(curve ECDSACurve) (*ECDSAKeyPair, error) {
 //   - []byte: PEM-encoded private key data
 //   - error: Error if marshaling or encoding fails
 //
-// The returned PEM block will have type "PRIVATE KEY" and contain the
+// The returned PEM block will have the type "PRIVATE KEY" and contain the
 // PKCS#8 encoded private key data.
 //
 // Example:
