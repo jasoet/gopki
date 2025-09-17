@@ -22,6 +22,7 @@ package keypair
 import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
@@ -67,6 +68,984 @@ type GenericPublicKey any
 
 // GenericKeyPair represents any keypair type for functions that need to work with multiple keypair types dynamically
 type GenericKeyPair any
+
+// KeyPairManager provides type-safe operations for cryptographic key pairs.
+// It encapsulates a key pair and provides methods for format conversion, validation,
+// comparison, and file I/O operations while maintaining type safety through generics.
+//
+// Type parameter:
+//   - K: KeyPair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//
+// Example usage:
+//
+//	// Generate an RSA key pair manager
+//	manager, err := Generate[algo.KeySize, *algo.RSAKeyPair](algo.KeySize2048)
+//
+//	// Extract keys
+//	privateKey := manager.PrivateKey()
+//	publicKey := manager.PublicKey()
+//
+//	// Convert to formats
+//	privatePEM, publicPEM, err := manager.ToPEM()
+//
+//	// Save to files
+//	err = manager.SaveToPEM("private.pem", "public.pem")
+type KeyPairManager[K KeyPair] struct {
+	keyPair K
+}
+
+// KeyInfo contains metadata about a cryptographic key pair.
+// This information is useful for identifying key properties and ensuring
+// compatibility with different cryptographic operations.
+type KeyInfo struct {
+	Algorithm string // "RSA", "ECDSA", "Ed25519"
+	KeySize   int    // Bits for RSA, curve size for ECDSA, 256 for Ed25519
+	Curve     string // For ECDSA: "P-256", "P-384", "P-521", etc. Empty for RSA and Ed25519
+}
+
+// NewKeyPairManager creates a new KeyPairManager instance from an existing key pair.
+// This constructor wraps an existing key pair to provide the manager's functionality.
+//
+// Type parameter:
+//   - K: KeyPair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//
+// Parameters:
+//   - keyPair: The key pair to wrap in the manager
+//
+// Returns a new KeyPairManager instance.
+//
+// Example:
+//
+//	rsaKeyPair, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
+//	manager := NewKeyPairManager(rsaKeyPair)
+func NewKeyPairManager[K KeyPair](keyPair K) *KeyPairManager[K] {
+	return &KeyPairManager[K]{
+		keyPair: keyPair,
+	}
+}
+
+// Generate creates a new KeyPairManager with a freshly generated key pair.
+// This factory method generates a key pair using the specified parameters and wraps it in a manager.
+//
+// Type parameters:
+//   - T: Parameter type (algo.KeySize, algo.ECDSACurve, or algo.Ed25519Config)
+//   - K: KeyPair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//
+// Parameters:
+//   - param: Algorithm-specific parameter (key size, curve, or config)
+//
+// Returns a new KeyPairManager instance or an error if generation fails.
+//
+// Examples:
+//
+//	// Generate RSA key pair manager
+//	rsaManager, err := Generate[algo.KeySize, *algo.RSAKeyPair](algo.KeySize2048)
+//
+//	// Generate ECDSA key pair manager
+//	ecdsaManager, err := Generate[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
+//
+//	// Generate Ed25519 key pair manager
+//	ed25519Manager, err := Generate[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
+func Generate[T Param, K KeyPair](param T) (*KeyPairManager[K], error) {
+	switch par := any(param).(type) {
+	case algo.KeySize:
+		kp, err := algo.GenerateRSAKeyPair(par)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate RSA key pair: %w", err)
+		}
+		return NewKeyPairManager(any(kp).(K)), nil
+	case algo.ECDSACurve:
+		kp, err := algo.GenerateECDSAKeyPair(par)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate ECDSA key pair: %w", err)
+		}
+		return NewKeyPairManager(any(kp).(K)), nil
+	case algo.Ed25519Config:
+		kp, err := algo.GenerateEd25519KeyPair()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate Ed25519 key pair: %w", err)
+		}
+		return NewKeyPairManager(any(kp).(K)), nil
+	default:
+		return nil, fmt.Errorf("unsupported parameter type")
+	}
+}
+
+// KeyPair returns the underlying key pair managed by this instance.
+//
+// Returns the key pair of type K.
+//
+// Example:
+//
+//	keyPair := manager.KeyPair()
+func (m *KeyPairManager[K]) KeyPair() K {
+	return m.keyPair
+}
+
+// PrivateKey extracts the private key from the managed key pair.
+// The returned type is determined by the key pair type and returned as interface{}.
+// Use type assertion to convert to the specific key type you need.
+//
+// Returns the private key as interface{} or nil if extraction fails.
+//
+// Example:
+//
+//	privateKey := manager.PrivateKey()
+//	if rsaKey, ok := privateKey.(*rsa.PrivateKey); ok {
+//		// Use RSA private key
+//	}
+func (m *KeyPairManager[K]) PrivateKey() interface{} {
+	switch kp := any(m.keyPair).(type) {
+	case *algo.RSAKeyPair:
+		return kp.PrivateKey
+	case *algo.ECDSAKeyPair:
+		return kp.PrivateKey
+	case *algo.Ed25519KeyPair:
+		return kp.PrivateKey
+	}
+	return nil
+}
+
+// PublicKey extracts the public key from the managed key pair.
+// The returned type is determined by the key pair type and returned as interface{}.
+// Use type assertion to convert to the specific key type you need.
+//
+// Returns the public key as interface{} or nil if extraction fails.
+//
+// Example:
+//
+//	publicKey := manager.PublicKey()
+//	if rsaKey, ok := publicKey.(*rsa.PublicKey); ok {
+//		// Use RSA public key
+//	}
+func (m *KeyPairManager[K]) PublicKey() interface{} {
+	switch kp := any(m.keyPair).(type) {
+	case *algo.RSAKeyPair:
+		return kp.PublicKey
+	case *algo.ECDSAKeyPair:
+		return kp.PublicKey
+	case *algo.Ed25519KeyPair:
+		return kp.PublicKey
+	}
+	return nil
+}
+
+// ToPEM converts the managed key pair to PEM format, returning both private and public keys.
+// This method provides a convenient way to get both keys in PEM format in a single call.
+//
+// Returns:
+//   - privateKey: PEM-encoded private key in PKCS#8 format
+//   - publicKey: PEM-encoded public key in PKIX format
+//   - error: Error if conversion fails
+//
+// Example:
+//
+//	privatePEM, publicPEM, err := manager.ToPEM()
+//	if err != nil {
+//		log.Printf("Failed to convert to PEM: %v", err)
+//	}
+func (m *KeyPairManager[K]) ToPEM() (privateKey, publicKey format.PEM, err error) {
+	switch kp := any(m.keyPair).(type) {
+	case *algo.RSAKeyPair:
+		privateKey, err = PrivateKeyToPEM(kp.PrivateKey)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to convert RSA private key to PEM: %w", err)
+		}
+		publicKey, err = PublicKeyToPEM(&kp.PrivateKey.PublicKey)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to convert RSA public key to PEM: %w", err)
+		}
+	case *algo.ECDSAKeyPair:
+		privateKey, err = PrivateKeyToPEM(kp.PrivateKey)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to convert ECDSA private key to PEM: %w", err)
+		}
+		publicKey, err = PublicKeyToPEM(&kp.PrivateKey.PublicKey)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to convert ECDSA public key to PEM: %w", err)
+		}
+	case *algo.Ed25519KeyPair:
+		privateKey, err = PrivateKeyToPEM(kp.PrivateKey)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to convert Ed25519 private key to PEM: %w", err)
+		}
+		publicKey, err = PublicKeyToPEM(kp.PublicKey)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to convert Ed25519 public key to PEM: %w", err)
+		}
+	default:
+		return nil, nil, fmt.Errorf("unsupported key pair type")
+	}
+
+	return privateKey, publicKey, nil
+}
+
+// ToDER converts the managed key pair to DER format, returning both private and public keys.
+// This method provides a convenient way to get both keys in DER format in a single call.
+//
+// Returns:
+//   - privateKey: DER-encoded private key in PKCS#8 format
+//   - publicKey: DER-encoded public key in PKIX format
+//   - error: Error if conversion fails
+//
+// Example:
+//
+//	privateDER, publicDER, err := manager.ToDER()
+//	if err != nil {
+//		log.Printf("Failed to convert to DER: %v", err)
+//	}
+func (m *KeyPairManager[K]) ToDER() (privateKey, publicKey format.DER, err error) {
+	switch kp := any(m.keyPair).(type) {
+	case *algo.RSAKeyPair:
+		privateKey, err = PrivateKeyToDER(kp.PrivateKey)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to convert RSA private key to DER: %w", err)
+		}
+		publicKey, err = PublicKeyToDER(&kp.PrivateKey.PublicKey)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to convert RSA public key to DER: %w", err)
+		}
+	case *algo.ECDSAKeyPair:
+		privateKey, err = PrivateKeyToDER(kp.PrivateKey)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to convert ECDSA private key to DER: %w", err)
+		}
+		publicKey, err = PublicKeyToDER(&kp.PrivateKey.PublicKey)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to convert ECDSA public key to DER: %w", err)
+		}
+	case *algo.Ed25519KeyPair:
+		privateKey, err = PrivateKeyToDER(kp.PrivateKey)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to convert Ed25519 private key to DER: %w", err)
+		}
+		publicKey, err = PublicKeyToDER(kp.PublicKey)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to convert Ed25519 public key to DER: %w", err)
+		}
+	default:
+		return nil, nil, fmt.Errorf("unsupported key pair type")
+	}
+
+	return privateKey, publicKey, nil
+}
+
+// ToSSH converts the managed key pair to SSH format, returning both private and public keys.
+// This method provides a convenient way to get both keys in SSH format in a single call.
+//
+// Parameters:
+//   - comment: Optional comment to include in the SSH keys (commonly username@hostname)
+//   - passphrase: Optional passphrase for private key encryption (empty string for unencrypted)
+//
+// Returns:
+//   - privateKey: SSH-encoded private key in OpenSSH format
+//   - publicKey: SSH-encoded public key in authorized_keys format
+//   - error: Error if conversion fails
+//
+// Example:
+//
+//	privateSSH, publicSSH, err := manager.ToSSH("user@host", "passphrase")
+//	if err != nil {
+//		log.Printf("Failed to convert to SSH: %v", err)
+//	}
+func (m *KeyPairManager[K]) ToSSH(comment, passphrase string) (privateKey, publicKey format.SSH, err error) {
+	switch kp := any(m.keyPair).(type) {
+	case *algo.RSAKeyPair:
+		privateKey, err = PrivateKeyToSSH(kp.PrivateKey, comment, passphrase)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to convert RSA private key to SSH: %w", err)
+		}
+		publicKey, err = PublicKeyToSSH(&kp.PrivateKey.PublicKey, comment)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to convert RSA public key to SSH: %w", err)
+		}
+	case *algo.ECDSAKeyPair:
+		privateKey, err = PrivateKeyToSSH(kp.PrivateKey, comment, passphrase)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to convert ECDSA private key to SSH: %w", err)
+		}
+		publicKey, err = PublicKeyToSSH(&kp.PrivateKey.PublicKey, comment)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to convert ECDSA public key to SSH: %w", err)
+		}
+	case *algo.Ed25519KeyPair:
+		privateKey, err = PrivateKeyToSSH(kp.PrivateKey, comment, passphrase)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to convert Ed25519 private key to SSH: %w", err)
+		}
+		publicKey, err = PublicKeyToSSH(kp.PublicKey, comment)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to convert Ed25519 public key to SSH: %w", err)
+		}
+	default:
+		return "", "", fmt.Errorf("unsupported key pair type")
+	}
+
+	return privateKey, publicKey, nil
+}
+
+// LoadFromPEM creates a new KeyPairManager by loading a private key from a PEM file.
+// The public key is automatically derived from the private key.
+//
+// Type parameter:
+//   - K: KeyPair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//
+// Parameters:
+//   - privateKeyFile: Path to the PEM-encoded private key file
+//
+// Returns a new KeyPairManager instance or an error if loading fails.
+//
+// Example:
+//
+//	manager, err := LoadFromPEM[*algo.RSAKeyPair]("private.pem")
+//	if err != nil {
+//		log.Printf("Failed to load key pair: %v", err)
+//	}
+func LoadFromPEM[K KeyPair](privateKeyFile string) (*KeyPairManager[K], error) {
+	// Read private key file
+	privateData, err := os.ReadFile(privateKeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read private key file %s: %w", privateKeyFile, err)
+	}
+
+	return LoadFromPEMData[K](format.PEM(privateData))
+}
+
+// LoadFromDER creates a new KeyPairManager by loading a private key from a DER file.
+// The public key is automatically derived from the private key.
+//
+// Type parameter:
+//   - K: KeyPair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//
+// Parameters:
+//   - privateKeyFile: Path to the DER-encoded private key file
+//
+// Returns a new KeyPairManager instance or an error if loading fails.
+//
+// Example:
+//
+//	manager, err := LoadFromDER[*algo.ECDSAKeyPair]("private.der")
+//	if err != nil {
+//		log.Printf("Failed to load key pair: %v", err)
+//	}
+func LoadFromDER[K KeyPair](privateKeyFile string) (*KeyPairManager[K], error) {
+	// Read private key file
+	privateData, err := os.ReadFile(privateKeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read private key file %s: %w", privateKeyFile, err)
+	}
+
+	return LoadFromDERData[K](format.DER(privateData))
+}
+
+// LoadFromSSH creates a new KeyPairManager by loading a private key from an SSH file.
+// The public key is automatically derived from the private key.
+//
+// Type parameter:
+//   - K: KeyPair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//
+// Parameters:
+//   - privateKeyFile: Path to the SSH-encoded private key file
+//   - passphrase: Passphrase for encrypted private keys (empty string for unencrypted)
+//
+// Returns a new KeyPairManager instance or an error if loading fails.
+//
+// Example:
+//
+//	manager, err := LoadFromSSH[*algo.Ed25519KeyPair]("id_ed25519", "passphrase")
+//	if err != nil {
+//		log.Printf("Failed to load key pair: %v", err)
+//	}
+func LoadFromSSH[K KeyPair](privateKeyFile string, passphrase string) (*KeyPairManager[K], error) {
+	// Read private key file
+	privateData, err := os.ReadFile(privateKeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read private key file %s: %w", privateKeyFile, err)
+	}
+
+	return LoadFromSSHData[K](format.SSH(privateData), passphrase)
+}
+
+// LoadFromPEMData creates a new KeyPairManager by parsing private key data in PEM format.
+// The public key is automatically derived from the private key.
+//
+// Type parameter:
+//   - K: KeyPair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//
+// Parameters:
+//   - privateKeyPEM: PEM-encoded private key data
+//
+// Returns a new KeyPairManager instance or an error if parsing fails.
+//
+// Example:
+//
+//	manager, err := LoadFromPEMData[*algo.RSAKeyPair](pemData)
+//	if err != nil {
+//		log.Printf("Failed to load key pair: %v", err)
+//	}
+func LoadFromPEMData[K KeyPair](privateKeyPEM format.PEM) (*KeyPairManager[K], error) {
+	var zero K
+
+	// Parse private key to determine type
+	block, _ := pem.Decode(privateKeyPEM)
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode private key PEM")
+	}
+
+	privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
+	}
+
+	// Reconstruct KeyPair based on private key type
+	switch priv := privateKey.(type) {
+	case *rsa.PrivateKey:
+		keyPair := &algo.RSAKeyPair{
+			PrivateKey: priv,
+			PublicKey:  &priv.PublicKey,
+		}
+		if result, ok := any(keyPair).(K); ok {
+			return NewKeyPairManager(result), nil
+		}
+	case *ecdsa.PrivateKey:
+		keyPair := &algo.ECDSAKeyPair{
+			PrivateKey: priv,
+			PublicKey:  &priv.PublicKey,
+		}
+		if result, ok := any(keyPair).(K); ok {
+			return NewKeyPairManager(result), nil
+		}
+	case ed25519.PrivateKey:
+		keyPair := &algo.Ed25519KeyPair{
+			PrivateKey: priv,
+			PublicKey:  priv.Public().(ed25519.PublicKey),
+		}
+		if result, ok := any(keyPair).(K); ok {
+			return NewKeyPairManager(result), nil
+		}
+	}
+
+	return nil, fmt.Errorf("key type mismatch or unsupported key type: expected %T", zero)
+}
+
+// LoadFromDERData creates a new KeyPairManager by parsing private key data in DER format.
+// The public key is automatically derived from the private key.
+//
+// Type parameter:
+//   - K: KeyPair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//
+// Parameters:
+//   - privateKeyDER: DER-encoded private key data
+//
+// Returns a new KeyPairManager instance or an error if parsing fails.
+//
+// Example:
+//
+//	manager, err := LoadFromDERData[*algo.ECDSAKeyPair](derData)
+//	if err != nil {
+//		log.Printf("Failed to load key pair: %v", err)
+//	}
+func LoadFromDERData[K KeyPair](privateKeyDER format.DER) (*KeyPairManager[K], error) {
+	var zero K
+
+	// Parse private key to determine type
+	privateKey, err := x509.ParsePKCS8PrivateKey(privateKeyDER)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
+	}
+
+	// Reconstruct KeyPair based on private key type
+	switch priv := privateKey.(type) {
+	case *rsa.PrivateKey:
+		keyPair := &algo.RSAKeyPair{
+			PrivateKey: priv,
+			PublicKey:  &priv.PublicKey,
+		}
+		if result, ok := any(keyPair).(K); ok {
+			return NewKeyPairManager(result), nil
+		}
+	case *ecdsa.PrivateKey:
+		keyPair := &algo.ECDSAKeyPair{
+			PrivateKey: priv,
+			PublicKey:  &priv.PublicKey,
+		}
+		if result, ok := any(keyPair).(K); ok {
+			return NewKeyPairManager(result), nil
+		}
+	case ed25519.PrivateKey:
+		keyPair := &algo.Ed25519KeyPair{
+			PrivateKey: priv,
+			PublicKey:  priv.Public().(ed25519.PublicKey),
+		}
+		if result, ok := any(keyPair).(K); ok {
+			return NewKeyPairManager(result), nil
+		}
+	}
+
+	return nil, fmt.Errorf("key type mismatch or unsupported key type: expected %T", zero)
+}
+
+// LoadFromSSHData creates a new KeyPairManager by parsing private key data in SSH format.
+// The public key is automatically derived from the private key.
+//
+// Type parameter:
+//   - K: KeyPair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//
+// Parameters:
+//   - privateKeySSH: SSH-encoded private key data
+//   - passphrase: Passphrase for encrypted private keys (empty string for unencrypted)
+//
+// Returns a new KeyPairManager instance or an error if parsing fails.
+//
+// Example:
+//
+//	manager, err := LoadFromSSHData[*algo.Ed25519KeyPair](sshData, "passphrase")
+//	if err != nil {
+//		log.Printf("Failed to load key pair: %v", err)
+//	}
+func LoadFromSSHData[K KeyPair](privateKeySSH format.SSH, passphrase string) (*KeyPairManager[K], error) {
+	var zero K
+	var privateKey interface{}
+	var err error
+
+	// Parse private key to determine type
+	if passphrase == "" {
+		privateKey, err = ssh.ParseRawPrivateKey([]byte(privateKeySSH))
+	} else {
+		privateKey, err = ssh.ParseRawPrivateKeyWithPassphrase([]byte(privateKeySSH), []byte(passphrase))
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse SSH private key: %w", err)
+	}
+
+	// Reconstruct KeyPair based on private key type
+	switch priv := privateKey.(type) {
+	case *rsa.PrivateKey:
+		keyPair := &algo.RSAKeyPair{
+			PrivateKey: priv,
+			PublicKey:  &priv.PublicKey,
+		}
+		if result, ok := any(keyPair).(K); ok {
+			return NewKeyPairManager(result), nil
+		}
+	case *ecdsa.PrivateKey:
+		keyPair := &algo.ECDSAKeyPair{
+			PrivateKey: priv,
+			PublicKey:  &priv.PublicKey,
+		}
+		if result, ok := any(keyPair).(K); ok {
+			return NewKeyPairManager(result), nil
+		}
+	case ed25519.PrivateKey:
+		keyPair := &algo.Ed25519KeyPair{
+			PrivateKey: priv,
+			PublicKey:  priv.Public().(ed25519.PublicKey),
+		}
+		if result, ok := any(keyPair).(K); ok {
+			return NewKeyPairManager(result), nil
+		}
+	}
+
+	return nil, fmt.Errorf("key type mismatch or unsupported key type: expected %T", zero)
+}
+
+// GetInfo returns metadata about the managed key pair.
+// This includes algorithm type, key size, and curve information for ECDSA keys.
+//
+// Returns KeyInfo struct with algorithm details or an error if analysis fails.
+//
+// Example:
+//
+//	info, err := manager.GetInfo()
+//	if err != nil {
+//		log.Printf("Failed to get key info: %v", err)
+//	}
+//	fmt.Printf("Algorithm: %s, KeySize: %d", info.Algorithm, info.KeySize)
+func (m *KeyPairManager[K]) GetInfo() (KeyInfo, error) {
+	switch kp := any(m.keyPair).(type) {
+	case *algo.RSAKeyPair:
+		return KeyInfo{
+			Algorithm: "RSA",
+			KeySize:   kp.PrivateKey.Size() * 8, // Convert bytes to bits
+			Curve:     "",
+		}, nil
+	case *algo.ECDSAKeyPair:
+		var curve string
+		var keySize int
+
+		switch kp.PrivateKey.Curve {
+		case elliptic.P224():
+			curve = "P-224"
+			keySize = 224
+		case elliptic.P256():
+			curve = "P-256"
+			keySize = 256
+		case elliptic.P384():
+			curve = "P-384"
+			keySize = 384
+		case elliptic.P521():
+			curve = "P-521"
+			keySize = 521
+		default:
+			curve = "Unknown"
+			keySize = kp.PrivateKey.Curve.Params().BitSize
+		}
+
+		return KeyInfo{
+			Algorithm: "ECDSA",
+			KeySize:   keySize,
+			Curve:     curve,
+		}, nil
+	case *algo.Ed25519KeyPair:
+		return KeyInfo{
+			Algorithm: "Ed25519",
+			KeySize:   256, // Ed25519 keys are always 256 bits
+			Curve:     "",
+		}, nil
+	default:
+		return KeyInfo{}, fmt.Errorf("unsupported key pair type")
+	}
+}
+
+// Validate verifies the mathematical relationship between the private and public keys.
+// This ensures the key pair is valid and the public key correctly derives from the private key.
+//
+// Returns nil if the key pair is valid, or an error describing the validation failure.
+//
+// Example:
+//
+//	err := manager.Validate()
+//	if err != nil {
+//		log.Printf("Key pair validation failed: %v", err)
+//	}
+func (m *KeyPairManager[K]) Validate() error {
+	switch kp := any(m.keyPair).(type) {
+	case *algo.RSAKeyPair:
+		// Verify RSA key pair relationship
+		if kp.PrivateKey.PublicKey.N.Cmp(kp.PublicKey.N) != 0 {
+			return fmt.Errorf("RSA public key N does not match private key")
+		}
+		if kp.PrivateKey.PublicKey.E != kp.PublicKey.E {
+			return fmt.Errorf("RSA public key E does not match private key")
+		}
+		// Verify RSA private key components
+		if err := kp.PrivateKey.Validate(); err != nil {
+			return fmt.Errorf("RSA private key validation failed: %w", err)
+		}
+	case *algo.ECDSAKeyPair:
+		// Verify ECDSA key pair relationship
+		if kp.PrivateKey.PublicKey.X.Cmp(kp.PublicKey.X) != 0 {
+			return fmt.Errorf("ECDSA public key X does not match private key")
+		}
+		if kp.PrivateKey.PublicKey.Y.Cmp(kp.PublicKey.Y) != 0 {
+			return fmt.Errorf("ECDSA public key Y does not match private key")
+		}
+		if kp.PrivateKey.PublicKey.Curve != kp.PublicKey.Curve {
+			return fmt.Errorf("ECDSA public key curve does not match private key")
+		}
+		// Verify the key is on the curve
+		if !kp.PrivateKey.PublicKey.Curve.IsOnCurve(kp.PublicKey.X, kp.PublicKey.Y) {
+			return fmt.Errorf("ECDSA public key is not on the specified curve")
+		}
+	case *algo.Ed25519KeyPair:
+		// Verify Ed25519 key pair relationship
+		derivedPublic := kp.PrivateKey.Public().(ed25519.PublicKey)
+		if !derivedPublic.Equal(kp.PublicKey) {
+			return fmt.Errorf("Ed25519 public key does not match private key")
+		}
+	default:
+		return fmt.Errorf("unsupported key pair type")
+	}
+
+	return nil
+}
+
+// ValidatePrivateKey checks the validity and security standards of the private key.
+// This includes verifying key size meets minimum security requirements.
+//
+// Returns nil if the private key is valid and secure, or an error describing the issue.
+//
+// Example:
+//
+//	err := manager.ValidatePrivateKey()
+//	if err != nil {
+//		log.Printf("Private key validation failed: %v", err)
+//	}
+func (m *KeyPairManager[K]) ValidatePrivateKey() error {
+	switch kp := any(m.keyPair).(type) {
+	case *algo.RSAKeyPair:
+		// Check minimum key size (2048 bits)
+		keySize := kp.PrivateKey.Size() * 8
+		if keySize < 2048 {
+			return fmt.Errorf("RSA key size %d bits is below minimum security requirement of 2048 bits", keySize)
+		}
+		// Validate RSA private key components
+		if err := kp.PrivateKey.Validate(); err != nil {
+			return fmt.Errorf("RSA private key validation failed: %w", err)
+		}
+	case *algo.ECDSAKeyPair:
+		// Check that private key is not zero
+		if kp.PrivateKey.D == nil || kp.PrivateKey.D.Sign() == 0 {
+			return fmt.Errorf("ECDSA private key is zero or nil")
+		}
+		// Check that private key is within valid range for the curve
+		n := kp.PrivateKey.Curve.Params().N
+		if kp.PrivateKey.D.Cmp(n) >= 0 {
+			return fmt.Errorf("ECDSA private key is outside valid range for curve")
+		}
+	case *algo.Ed25519KeyPair:
+		// Ed25519 keys are always 64 bytes (512 bits) for private key
+		if len(kp.PrivateKey) != ed25519.PrivateKeySize {
+			return fmt.Errorf("Ed25519 private key has invalid size: expected %d bytes, got %d",
+				ed25519.PrivateKeySize, len(kp.PrivateKey))
+		}
+	default:
+		return fmt.Errorf("unsupported key pair type")
+	}
+
+	return nil
+}
+
+// CompareWith compares two key managers for mathematical equality.
+// This method compares both the private and public keys to determine if they are identical.
+//
+// Parameters:
+//   - other: Another KeyPairManager to compare with
+//
+// Returns:
+//   - bool: true if both key pairs are mathematically identical, false otherwise
+//
+// Example:
+//
+//	isEqual := manager1.CompareWith(manager2)
+//	if isEqual {
+//		fmt.Println("Key pairs are identical")
+//	}
+func (m *KeyPairManager[K]) CompareWith(other *KeyPairManager[K]) bool {
+	return m.ComparePrivateKeys(other) && m.ComparePublicKeys(other)
+}
+
+// ComparePrivateKeys compares only the private keys of two key managers.
+// This method determines if the private keys are mathematically identical.
+//
+// Parameters:
+//   - other: Another KeyPairManager to compare private keys with
+//
+// Returns:
+//   - bool: true if private keys are identical, false otherwise
+//
+// Example:
+//
+//	arePrivateKeysEqual := manager1.ComparePrivateKeys(manager2)
+func (m *KeyPairManager[K]) ComparePrivateKeys(other *KeyPairManager[K]) bool {
+	switch kp1 := any(m.keyPair).(type) {
+	case *algo.RSAKeyPair:
+		if kp2, ok := any(other.keyPair).(*algo.RSAKeyPair); ok {
+			return kp1.PrivateKey.Equal(kp2.PrivateKey)
+		}
+	case *algo.ECDSAKeyPair:
+		if kp2, ok := any(other.keyPair).(*algo.ECDSAKeyPair); ok {
+			return kp1.PrivateKey.Equal(kp2.PrivateKey)
+		}
+	case *algo.Ed25519KeyPair:
+		if kp2, ok := any(other.keyPair).(*algo.Ed25519KeyPair); ok {
+			return kp1.PrivateKey.Equal(kp2.PrivateKey)
+		}
+	}
+	return false
+}
+
+// ComparePublicKeys compares only the public keys of two key managers.
+// This method determines if the public keys are mathematically identical.
+//
+// Parameters:
+//   - other: Another KeyPairManager to compare public keys with
+//
+// Returns:
+//   - bool: true if public keys are identical, false otherwise
+//
+// Example:
+//
+//	arePublicKeysEqual := manager1.ComparePublicKeys(manager2)
+func (m *KeyPairManager[K]) ComparePublicKeys(other *KeyPairManager[K]) bool {
+	switch kp1 := any(m.keyPair).(type) {
+	case *algo.RSAKeyPair:
+		if kp2, ok := any(other.keyPair).(*algo.RSAKeyPair); ok {
+			return kp1.PublicKey.Equal(kp2.PublicKey)
+		}
+	case *algo.ECDSAKeyPair:
+		if kp2, ok := any(other.keyPair).(*algo.ECDSAKeyPair); ok {
+			return kp1.PublicKey.Equal(kp2.PublicKey)
+		}
+	case *algo.Ed25519KeyPair:
+		if kp2, ok := any(other.keyPair).(*algo.Ed25519KeyPair); ok {
+			return kp1.PublicKey.Equal(kp2.PublicKey)
+		}
+	}
+	return false
+}
+
+// Clone creates a new KeyPairManager with the same key pair.
+// This method creates a shallow copy of the KeyPairManager, sharing the same underlying key pair data.
+//
+// Returns:
+//   - *KeyPairManager[K]: A new KeyPairManager instance with the same key pair
+//
+// Note: This creates a shallow copy. The underlying cryptographic keys are shared between instances.
+// If you need a deep copy with new cryptographic material, generate a new key pair instead.
+//
+// Example:
+//
+//	clonedManager := manager.Clone()
+//	// clonedManager and manager share the same key pair data
+func (m *KeyPairManager[K]) Clone() *KeyPairManager[K] {
+	return &KeyPairManager[K]{
+		keyPair: m.keyPair,
+	}
+}
+
+// IsValid checks if the KeyPairManager is properly initialized.
+// This method verifies that the KeyPairManager contains a valid key pair.
+//
+// Returns:
+//   - bool: true if the manager is initialized with a valid key pair, false otherwise
+//
+// This method checks:
+//   - KeyPairManager is not nil
+//   - Key pair is not nil
+//   - Key pair contains valid private and public keys
+//
+// Example:
+//
+//	if manager.IsValid() {
+//		fmt.Println("Manager is ready to use")
+//	} else {
+//		fmt.Println("Manager is not properly initialized")
+//	}
+func (m *KeyPairManager[K]) IsValid() bool {
+	if m == nil {
+		return false
+	}
+
+	switch kp := any(m.keyPair).(type) {
+	case *algo.RSAKeyPair:
+		return kp != nil && kp.PrivateKey != nil && kp.PublicKey != nil
+	case *algo.ECDSAKeyPair:
+		return kp != nil && kp.PrivateKey != nil && kp.PublicKey != nil
+	case *algo.Ed25519KeyPair:
+		return kp != nil && len(kp.PrivateKey) == ed25519.PrivateKeySize && len(kp.PublicKey) == ed25519.PublicKeySize
+	default:
+		return false
+	}
+}
+
+// SaveToPEM saves the managed key pair to separate PEM files.
+// This method provides a convenient way to save both keys to files in PEM format.
+//
+// Parameters:
+//   - privateFile: Path where the private key will be saved
+//   - publicFile: Path where the public key will be saved
+//
+// File permissions:
+//   - Private key files: 0600 (readable/writable by owner only)
+//   - Public key files: 0600 (for consistency)
+//   - Directories: 0700 (accessible by owner only)
+//
+// Example:
+//
+//	err := manager.SaveToPEM("private.pem", "public.pem")
+//	if err != nil {
+//		log.Printf("Failed to save key pair: %v", err)
+//	}
+func (m *KeyPairManager[K]) SaveToPEM(privateFile, publicFile string) error {
+	privateKeyPEM, publicKeyPEM, err := m.ToPEM()
+	if err != nil {
+		return fmt.Errorf("failed to convert keys to PEM: %w", err)
+	}
+
+	if err := savePEMToFile(privateKeyPEM, privateFile); err != nil {
+		return fmt.Errorf("failed to save private key: %w", err)
+	}
+
+	if err := savePEMToFile(publicKeyPEM, publicFile); err != nil {
+		return fmt.Errorf("failed to save public key: %w", err)
+	}
+
+	return nil
+}
+
+// SaveToDER saves the managed key pair to separate DER files.
+// This method provides a convenient way to save both keys to files in DER format.
+//
+// Parameters:
+//   - privateFile: Path where the private key will be saved
+//   - publicFile: Path where the public key will be saved
+//
+// File permissions:
+//   - Private key files: 0600 (readable/writable by owner only)
+//   - Public key files: 0600 (for consistency)
+//   - Directories: 0700 (accessible by owner only)
+//
+// Example:
+//
+//	err := manager.SaveToDER("private.der", "public.der")
+//	if err != nil {
+//		log.Printf("Failed to save key pair: %v", err)
+//	}
+func (m *KeyPairManager[K]) SaveToDER(privateFile, publicFile string) error {
+	privateKeyDER, publicKeyDER, err := m.ToDER()
+	if err != nil {
+		return fmt.Errorf("failed to convert keys to DER: %w", err)
+	}
+
+	if err := saveDERToFile(privateKeyDER, privateFile); err != nil {
+		return fmt.Errorf("failed to save private key: %w", err)
+	}
+
+	if err := saveDERToFile(publicKeyDER, publicFile); err != nil {
+		return fmt.Errorf("failed to save public key: %w", err)
+	}
+
+	return nil
+}
+
+// SaveToSSH saves the managed key pair to separate SSH files.
+// This method provides a convenient way to save both keys to files in SSH format.
+//
+// Parameters:
+//   - privateFile: Path where the private key will be saved
+//   - publicFile: Path where the public key will be saved
+//   - comment: Optional comment to include in the SSH keys (commonly username@hostname)
+//   - passphrase: Optional passphrase for private key encryption (empty string for unencrypted)
+//
+// File permissions:
+//   - Private key files: 0600 (readable/writable by owner only)
+//   - Public key files: 0600 (for consistency)
+//   - Directories: 0700 (accessible by owner only)
+//
+// Example:
+//
+//	err := manager.SaveToSSH("id_rsa", "id_rsa.pub", "user@host", "passphrase")
+//	if err != nil {
+//		log.Printf("Failed to save key pair: %v", err)
+//	}
+func (m *KeyPairManager[K]) SaveToSSH(privateFile, publicFile string, comment, passphrase string) error {
+	privateKeySSH, publicKeySSH, err := m.ToSSH(comment, passphrase)
+	if err != nil {
+		return fmt.Errorf("failed to convert keys to SSH: %w", err)
+	}
+
+	if err := saveSSHToFile(privateKeySSH, privateFile); err != nil {
+		return fmt.Errorf("failed to save private key: %w", err)
+	}
+
+	if err := saveSSHToFile(publicKeySSH, publicFile); err != nil {
+		return fmt.Errorf("failed to save public key: %w", err)
+	}
+
+	return nil
+}
 
 // PrivateKeyToPEM converts a private key to PEM-encoded format.
 // The key is marshaled using PKCS#8 format for maximum compatibility.
@@ -259,75 +1238,6 @@ func PublicKeyToSSH[T PublicKey](publicKey T, comment string) (format.SSH, error
 	return format.SSH(sshStr), nil
 }
 
-// PrivateKeyFromPEM parses a private key from PEM-encoded data.
-// The function expects PKCS#8 format and returns the appropriate private key type.
-//
-// Type parameter:
-//   - T: Expected private key type (*rsa.PrivateKey, *ecdsa.PrivateKey, or ed25519.PrivateKey)
-//
-// Parameters:
-//   - pemData: PEM-encoded private key data
-//
-// Returns the parsed private key or an error if parsing fails or type assertion fails.
-//
-// Example:
-//
-//	rsaPrivKey, err := PrivateKeyFromPEM[*rsa.PrivateKey](pemData)
-//	if err != nil {
-//		log.Printf("Failed to parse private key: %v", err)
-//	}
-func PrivateKeyFromPEM[T PrivateKey](pemData format.PEM) (T, error) {
-	var zero T
-
-	block, _ := pem.Decode(pemData)
-	if block == nil {
-		return zero, fmt.Errorf("failed to decode PEM block")
-	}
-
-	privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-	if err != nil {
-		return zero, fmt.Errorf("failed to parse PKCS8 private key: %w", err)
-	}
-
-	if typedKey, ok := privateKey.(T); ok {
-		return typedKey, nil
-	}
-
-	return zero, fmt.Errorf("private key type mismatch: expected %T, got %T", zero, privateKey)
-}
-
-// PrivateKeyFromDER parses a private key from DER-encoded data.
-// The function expects PKCS#8 format and returns the appropriate private key type.
-//
-// Type parameter:
-//   - T: Expected private key type (*rsa.PrivateKey, *ecdsa.PrivateKey, or ed25519.PrivateKey)
-//
-// Parameters:
-//   - derData: DER-encoded private key data
-//
-// Returns the parsed private key or an error if parsing fails or type assertion fails.
-//
-// Example:
-//
-//	ecdsaPrivKey, err := PrivateKeyFromDER[*ecdsa.PrivateKey](derData)
-//	if err != nil {
-//		log.Printf("Failed to parse private key: %v", err)
-//	}
-func PrivateKeyFromDER[T PrivateKey](derData format.DER) (T, error) {
-	var zero T
-
-	privateKey, err := x509.ParsePKCS8PrivateKey(derData)
-	if err != nil {
-		return zero, fmt.Errorf("failed to parse PKCS8 private key: %w", err)
-	}
-
-	if typedKey, ok := privateKey.(T); ok {
-		return typedKey, nil
-	}
-
-	return zero, fmt.Errorf("private key type mismatch: expected %T, got %T", zero, privateKey)
-}
-
 // PrivateKeyFromSSH parses a private key from SSH-encoded data.
 // The function handles OpenSSH format with optional passphrase decryption.
 //
@@ -482,54 +1392,6 @@ func PublicKeyFromSSH[T PublicKey](sshData format.SSH) (T, error) {
 	}
 
 	return zero, fmt.Errorf("public key type mismatch: expected %T, got %T", zero, cryptoPublicKey)
-}
-
-// GenerateKeyPair generates a cryptographic key pair using type-safe generic constraints.
-// The function supports RSA, ECDSA, and Ed25519 algorithms with compile-time type safety.
-//
-// Type parameters:
-//   - T: Parameter type (algo.KeySize, algo.ECDSACurve, or algo.Ed25519Config)
-//   - K: Key pair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
-//
-// Parameters:
-//   - param: Algorithm-specific parameter (key size, curve, or config)
-//
-// Returns the generated key pair or an error if generation fails.
-//
-// Examples:
-//
-//	// RSA key pair with 2048-bit key size
-//	rsaKeys, err := GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
-//
-//	// ECDSA key pair with P-256 curve
-//	ecdsaKeys, err := GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
-//
-//	// Ed25519 key pair
-//	ed25519Keys, err := GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
-func GenerateKeyPair[T Param, K KeyPair](param T) (K, error) {
-	var zero K
-	switch par := any(param).(type) {
-	case algo.KeySize:
-		kp, err := algo.GenerateRSAKeyPair(par)
-		if err != nil {
-			return zero, fmt.Errorf("failed to generate RSA key pair: %w", err)
-		}
-		return any(kp).(K), nil
-	case algo.ECDSACurve:
-		kp, err := algo.GenerateECDSAKeyPair(par)
-		if err != nil {
-			return zero, fmt.Errorf("failed to generate ECDSA key pair: %w", err)
-		}
-		return any(kp).(K), nil
-	case algo.Ed25519Config:
-		kp, err := algo.GenerateEd25519KeyPair()
-		if err != nil {
-			return zero, fmt.Errorf("failed to generate Ed25519 key pair: %w", err)
-		}
-		return any(kp).(K), nil
-	default:
-		return zero, fmt.Errorf("unsupported parameter type")
-	}
 }
 
 // GetPublicKey extracts the public key from a private key with type safety.
