@@ -90,8 +90,10 @@ type GenericKeyPair any
 //
 //	// Save to files
 //	err = manager.SaveToPEM("private.pem", "public.pem")
-type Manager[K KeyPair] struct {
-	keyPair K
+type Manager[K KeyPair, P PrivateKey, B PublicKey] struct {
+	keyPair    K
+	privateKey P
+	publicKey  B
 }
 
 // KeyInfo contains metadata about a cryptographic key pair.
@@ -118,9 +120,11 @@ type KeyInfo struct {
 //
 //	rsaKeyPair, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
 //	manager := NewManager(rsaKeyPair)
-func NewManager[K KeyPair](keyPair K) *Manager[K] {
-	return &Manager[K]{
-		keyPair: keyPair,
+func NewManager[K KeyPair, P PrivateKey, B PublicKey](keyPair K, privateKey P, publicKey B) *Manager[K, P, B] {
+	return &Manager[K, P, B]{
+		keyPair:    keyPair,
+		privateKey: privateKey,
+		publicKey:  publicKey,
 	}
 }
 
@@ -146,7 +150,7 @@ func NewManager[K KeyPair](keyPair K) *Manager[K] {
 //
 //	// Generate Ed25519 key pair manager
 //	ed25519Manager, err := Generate[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
-func Generate[T Param, K KeyPair](param T) (*Manager[K], error) {
+func Generate[T Param, K KeyPair, P PrivateKey, B PublicKey](param T) (*Manager[K, P, B], error) {
 	switch par := any(param).(type) {
 	case algo.KeySize:
 		kp, err := algo.GenerateRSAKeyPair(par)
@@ -178,7 +182,7 @@ func Generate[T Param, K KeyPair](param T) (*Manager[K], error) {
 // Example:
 //
 //	keyPair := manager.KeyPair()
-func (m *Manager[K]) KeyPair() K {
+func (m *Manager[K, P, B]) KeyPair() K {
 	return m.keyPair
 }
 
@@ -194,14 +198,14 @@ func (m *Manager[K]) KeyPair() K {
 //	if rsaKey, ok := privateKey.(*rsa.PrivateKey); ok {
 //		// Use RSA private key
 //	}
-func (m *Manager[K]) PrivateKey() interface{} {
+func (m *Manager[K, P, B]) PrivateKey() P {
 	switch kp := any(m.keyPair).(type) {
 	case *algo.RSAKeyPair:
-		return kp.PrivateKey
+		return any(kp.PrivateKey).(P)
 	case *algo.ECDSAKeyPair:
-		return kp.PrivateKey
+		return any(kp.PrivateKey).(P)
 	case *algo.Ed25519KeyPair:
-		return kp.PrivateKey
+		return any(kp.PrivateKey).(P)
 	}
 	return nil
 }
@@ -218,14 +222,14 @@ func (m *Manager[K]) PrivateKey() interface{} {
 //	if rsaKey, ok := publicKey.(*rsa.PublicKey); ok {
 //		// Use RSA public key
 //	}
-func (m *Manager[K]) PublicKey() interface{} {
+func (m *Manager[K, P, B]) PublicKey() B {
 	switch kp := any(m.keyPair).(type) {
 	case *algo.RSAKeyPair:
-		return kp.PublicKey
+		return any(kp.PublicKey).(B)
 	case *algo.ECDSAKeyPair:
-		return kp.PublicKey
+		return any(kp.PublicKey).(B)
 	case *algo.Ed25519KeyPair:
-		return kp.PublicKey
+		return any(kp.PublicKey).(B)
 	}
 	return nil
 }
@@ -244,7 +248,7 @@ func (m *Manager[K]) PublicKey() interface{} {
 //	if err != nil {
 //		log.Printf("Failed to convert to PEM: %v", err)
 //	}
-func (m *Manager[K]) ToPEM() (privateKey, publicKey format.PEM, err error) {
+func (m *Manager[K, P, B]) ToPEM() (privateKey, publicKey format.PEM, err error) {
 	switch kp := any(m.keyPair).(type) {
 	case *algo.RSAKeyPair:
 		privateKey, err = PrivateKeyToPEM(kp.PrivateKey)
@@ -294,7 +298,7 @@ func (m *Manager[K]) ToPEM() (privateKey, publicKey format.PEM, err error) {
 //	if err != nil {
 //		log.Printf("Failed to convert to DER: %v", err)
 //	}
-func (m *Manager[K]) ToDER() (privateKey, publicKey format.DER, err error) {
+func (m *Manager[K, P, B]) ToDER() (privateKey, publicKey format.DER, err error) {
 	switch kp := any(m.keyPair).(type) {
 	case *algo.RSAKeyPair:
 		privateKey, err = PrivateKeyToDER(kp.PrivateKey)
@@ -348,7 +352,7 @@ func (m *Manager[K]) ToDER() (privateKey, publicKey format.DER, err error) {
 //	if err != nil {
 //		log.Printf("Failed to convert to SSH: %v", err)
 //	}
-func (m *Manager[K]) ToSSH(comment, passphrase string) (privateKey, publicKey format.SSH, err error) {
+func (m *Manager[K, P, B]) ToSSH(comment, passphrase string) (privateKey, publicKey format.SSH, err error) {
 	switch kp := any(m.keyPair).(type) {
 	case *algo.RSAKeyPair:
 		privateKey, err = PrivateKeyToSSH(kp.PrivateKey, comment, passphrase)
@@ -483,7 +487,7 @@ func LoadFromSSH[K KeyPair](privateKeyFile string, passphrase string) (*Manager[
 //	if err != nil {
 //		log.Printf("Failed to load key pair: %v", err)
 //	}
-func LoadFromPEMData[K KeyPair](privateKeyPEM format.PEM) (*Manager[K], error) {
+func LoadFromPEMData[K KeyPair, P PrivateKey, B PublicKey](privateKeyPEM format.PEM) (*Manager[K], error) {
 	var zero K
 
 	// Parse private key to determine type
@@ -662,7 +666,7 @@ func LoadFromSSHData[K KeyPair](privateKeySSH format.SSH, passphrase string) (*M
 //		log.Printf("Failed to get key info: %v", err)
 //	}
 //	fmt.Printf("Algorithm: %s, KeySize: %d", info.Algorithm, info.KeySize)
-func (m *Manager[K]) GetInfo() (KeyInfo, error) {
+func (m *Manager[K, P, B]) GetInfo() (KeyInfo, error) {
 	switch kp := any(m.keyPair).(type) {
 	case *algo.RSAKeyPair:
 		return KeyInfo{
@@ -719,7 +723,7 @@ func (m *Manager[K]) GetInfo() (KeyInfo, error) {
 //	if err != nil {
 //		log.Printf("Key pair validation failed: %v", err)
 //	}
-func (m *Manager[K]) Validate() error {
+func (m *Manager[K, P, B]) Validate() error {
 	switch kp := any(m.keyPair).(type) {
 	case *algo.RSAKeyPair:
 		// Verify RSA key pair relationship
@@ -772,7 +776,7 @@ func (m *Manager[K]) Validate() error {
 //	if err != nil {
 //		log.Printf("Private key validation failed: %v", err)
 //	}
-func (m *Manager[K]) ValidatePrivateKey() error {
+func (m *Manager[K, P, B]) ValidatePrivateKey() error {
 	switch kp := any(m.keyPair).(type) {
 	case *algo.RSAKeyPair:
 		// Check minimum key size (2048 bits)
@@ -822,7 +826,7 @@ func (m *Manager[K]) ValidatePrivateKey() error {
 //	if isEqual {
 //		fmt.Println("Key pairs are identical")
 //	}
-func (m *Manager[K]) CompareWith(other *Manager[K]) bool {
+func (m *Manager[K, P, B]) CompareWith(other *Manager[K, P, B]) bool {
 	return m.ComparePrivateKeys(other) && m.ComparePublicKeys(other)
 }
 
@@ -838,7 +842,7 @@ func (m *Manager[K]) CompareWith(other *Manager[K]) bool {
 // Example:
 //
 //	arePrivateKeysEqual := manager1.ComparePrivateKeys(manager2)
-func (m *Manager[K]) ComparePrivateKeys(other *Manager[K]) bool {
+func (m *Manager[K, P, B]) ComparePrivateKeys(other *Manager[K, P, B]) bool {
 	switch kp1 := any(m.keyPair).(type) {
 	case *algo.RSAKeyPair:
 		if kp2, ok := any(other.keyPair).(*algo.RSAKeyPair); ok {
@@ -868,7 +872,7 @@ func (m *Manager[K]) ComparePrivateKeys(other *Manager[K]) bool {
 // Example:
 //
 //	arePublicKeysEqual := manager1.ComparePublicKeys(manager2)
-func (m *Manager[K]) ComparePublicKeys(other *Manager[K]) bool {
+func (m *Manager[K, P, B]) ComparePublicKeys(other *Manager[K, P, B]) bool {
 	switch kp1 := any(m.keyPair).(type) {
 	case *algo.RSAKeyPair:
 		if kp2, ok := any(other.keyPair).(*algo.RSAKeyPair); ok {
@@ -899,8 +903,8 @@ func (m *Manager[K]) ComparePublicKeys(other *Manager[K]) bool {
 //
 //	clonedManager := manager.Clone()
 //	// clonedManager and manager share the same key pair data
-func (m *Manager[K]) Clone() *Manager[K] {
-	return &Manager[K]{
+func (m *Manager[K, P, B]) Clone() *Manager[K, P, B] {
+	return &Manager[K, P, B]{
 		keyPair: m.keyPair,
 	}
 }
@@ -923,7 +927,7 @@ func (m *Manager[K]) Clone() *Manager[K] {
 //	} else {
 //		fmt.Println("Manager is not properly initialized")
 //	}
-func (m *Manager[K]) IsValid() bool {
+func (m *Manager[K, P, B]) IsValid() bool {
 	if m == nil {
 		return false
 	}
@@ -958,7 +962,7 @@ func (m *Manager[K]) IsValid() bool {
 //	if err != nil {
 //		log.Printf("Failed to save key pair: %v", err)
 //	}
-func (m *Manager[K]) SaveToPEM(privateFile, publicFile string) error {
+func (m *Manager[K, P, B]) SaveToPEM(privateFile, publicFile string) error {
 	privateKeyPEM, publicKeyPEM, err := m.ToPEM()
 	if err != nil {
 		return fmt.Errorf("failed to convert keys to PEM: %w", err)
@@ -993,7 +997,7 @@ func (m *Manager[K]) SaveToPEM(privateFile, publicFile string) error {
 //	if err != nil {
 //		log.Printf("Failed to save key pair: %v", err)
 //	}
-func (m *Manager[K]) SaveToDER(privateFile, publicFile string) error {
+func (m *Manager[K, P, B]) SaveToDER(privateFile, publicFile string) error {
 	privateKeyDER, publicKeyDER, err := m.ToDER()
 	if err != nil {
 		return fmt.Errorf("failed to convert keys to DER: %w", err)
@@ -1030,7 +1034,7 @@ func (m *Manager[K]) SaveToDER(privateFile, publicFile string) error {
 //	if err != nil {
 //		log.Printf("Failed to save key pair: %v", err)
 //	}
-func (m *Manager[K]) SaveToSSH(privateFile, publicFile string, comment, passphrase string) error {
+func (m *Manager[K, P, B]) SaveToSSH(privateFile, publicFile string, comment, passphrase string) error {
 	privateKeySSH, publicKeySSH, err := m.ToSSH(comment, passphrase)
 	if err != nil {
 		return fmt.Errorf("failed to convert keys to SSH: %w", err)
