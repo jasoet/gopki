@@ -633,6 +633,14 @@ func LoadFromSSHData[K KeyPair, P PrivateKey, B PublicKey](privateKeySSH format.
 		if result, ok := any(keyPair).(K); ok {
 			return NewManager(result, any(priv).(P), any(priv.Public().(ed25519.PublicKey)).(B)), nil
 		}
+	case *ed25519.PrivateKey:
+		keyPair := &algo.Ed25519KeyPair{
+			PrivateKey: *priv,
+			PublicKey:  priv.Public().(ed25519.PublicKey),
+		}
+		if result, ok := any(keyPair).(K); ok {
+			return NewManager(result, any(*priv).(P), any(priv.Public().(ed25519.PublicKey)).(B)), nil
+		}
 	}
 
 	return nil, fmt.Errorf("key type mismatch or unsupported key type: expected %T", zero)
