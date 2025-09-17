@@ -5,6 +5,7 @@ import (
 	"crypto/elliptic"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -351,6 +352,416 @@ func BenchmarkECDSAKeyPair_PEMOperations(b *testing.B) {
 			_, err := ECDSAKeyPairFromPEM(pemData)
 			if err != nil {
 				b.Fatalf("PEM reconstruction failed: %v", err)
+			}
+		}
+	})
+}
+
+// DER Format Tests
+
+func TestECDSAKeyPair_PrivateKeyToDER(t *testing.T) {
+	curves := []ECDSACurve{P224, P256, P384, P521}
+
+	for _, curve := range curves {
+		t.Run(fmt.Sprintf("%s", curve.Curve().Params().Name), func(t *testing.T) {
+			keyPair, err := GenerateECDSAKeyPair(curve)
+			assert.NoError(t, err)
+
+			derData, err := keyPair.PrivateKeyToDER()
+			assert.NoError(t, err)
+			assert.NotEmpty(t, derData)
+
+			// Verify we can parse the DER back to a private key
+			parsedKey, err := x509.ParsePKCS8PrivateKey(derData)
+			assert.NoError(t, err)
+
+			ecdsaKey, ok := parsedKey.(*ecdsa.PrivateKey)
+			assert.True(t, ok, "Parsed key should be ECDSA")
+			assert.Equal(t, keyPair.PrivateKey.Curve, ecdsaKey.Curve)
+
+			// Verify DER is more compact than PEM
+			pemData, err := keyPair.PrivateKeyToPEM()
+			assert.NoError(t, err)
+			assert.True(t, len(derData) < len(pemData), "DER should be more compact than PEM")
+		})
+	}
+}
+
+func TestECDSAKeyPair_PublicKeyToDER(t *testing.T) {
+	keyPair, err := GenerateECDSAKeyPair(P256)
+	assert.NoError(t, err)
+
+	derData, err := keyPair.PublicKeyToDER()
+	assert.NoError(t, err)
+	assert.NotEmpty(t, derData)
+
+	// Verify we can parse the DER back to a public key
+	parsedKey, err := x509.ParsePKIXPublicKey(derData)
+	assert.NoError(t, err)
+
+	ecdsaKey, ok := parsedKey.(*ecdsa.PublicKey)
+	assert.True(t, ok, "Parsed key should be ECDSA")
+	assert.Equal(t, keyPair.PublicKey.Curve, ecdsaKey.Curve)
+
+	// Verify DER is more compact than PEM
+	pemData, err := keyPair.PublicKeyToPEM()
+	assert.NoError(t, err)
+	assert.True(t, len(derData) < len(pemData), "DER should be more compact than PEM")
+}
+
+func TestECDSAKeyPairFromDER_Success(t *testing.T) {
+	curves := []ECDSACurve{P224, P256, P384, P521}
+
+	for _, curve := range curves {
+		t.Run(fmt.Sprintf("%s", curve.Curve().Params().Name), func(t *testing.T) {
+			// Generate original key pair
+			originalKeyPair, err := GenerateECDSAKeyPair(curve)
+			assert.NoError(t, err)
+
+			// Convert to DER
+			derData, err := originalKeyPair.PrivateKeyToDER()
+			assert.NoError(t, err)
+
+			// Reconstruct from DER
+			reconstructedKeyPair, err := ECDSAKeyPairFromDER(derData)
+			assert.NoError(t, err)
+			assert.NotNil(t, reconstructedKeyPair)
+
+			// Verify the keys match
+			assert.Equal(t, originalKeyPair.PrivateKey.Curve, reconstructedKeyPair.PrivateKey.Curve)
+			assert.Equal(t, originalKeyPair.PrivateKey.D, reconstructedKeyPair.PrivateKey.D)
+			assert.Equal(t, originalKeyPair.PublicKey.X, reconstructedKeyPair.PublicKey.X)
+			assert.Equal(t, originalKeyPair.PublicKey.Y, reconstructedKeyPair.PublicKey.Y)
+			assert.Equal(t, &reconstructedKeyPair.PrivateKey.PublicKey, reconstructedKeyPair.PublicKey)
+
+			// Verify key is on curve
+			assert.True(t, reconstructedKeyPair.PrivateKey.Curve.IsOnCurve(reconstructedKeyPair.PublicKey.X, reconstructedKeyPair.PublicKey.Y))
+		})
+	}
+}
+
+func TestECDSAKeyPairFromDER_InvalidDER(t *testing.T) {
+	tests := []struct {
+		name    string
+		derData []byte
+		errMsg  string
+	}{
+		{
+			name:    "InvalidDERData",
+			derData: []byte("invalid der data"),
+			errMsg:  "failed to parse DER private key",
+		},
+		{
+			name:    "EmptyData",
+			derData: []byte{},
+			errMsg:  "failed to parse DER private key",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			keyPair, err := ECDSAKeyPairFromDER(tt.derData)
+
+			assert.Error(t, err)
+			assert.Nil(t, keyPair)
+			assert.Contains(t, err.Error(), tt.errMsg)
+		})
+	}
+}
+
+func TestECDSAKeyPair_DERRoundTrip(t *testing.T) {
+	curves := []ECDSACurve{P224, P256, P384, P521}
+
+	for _, curve := range curves {
+		t.Run(fmt.Sprintf("%s", curve.Curve().Params().Name), func(t *testing.T) {
+			// Generate original key pair
+			original, err := GenerateECDSAKeyPair(curve)
+			assert.NoError(t, err)
+
+			// Convert to DER and back
+			privateDER, err := original.PrivateKeyToDER()
+			assert.NoError(t, err)
+
+			publicDER, err := original.PublicKeyToDER()
+			assert.NoError(t, err)
+
+			// Reconstruct from private key DER
+			reconstructed, err := ECDSAKeyPairFromDER(privateDER)
+			assert.NoError(t, err)
+
+			// Verify private keys match
+			assert.Equal(t, original.PrivateKey.Curve, reconstructed.PrivateKey.Curve)
+			assert.Equal(t, original.PrivateKey.D, reconstructed.PrivateKey.D)
+
+			// Verify public keys match
+			assert.Equal(t, original.PublicKey.X, reconstructed.PublicKey.X)
+			assert.Equal(t, original.PublicKey.Y, reconstructed.PublicKey.Y)
+
+			// Verify reconstructed public key DER matches original
+			reconstructedPublicDER, err := reconstructed.PublicKeyToDER()
+			assert.NoError(t, err)
+			assert.Equal(t, publicDER, reconstructedPublicDER)
+		})
+	}
+}
+
+// SSH Format Tests
+
+func TestECDSAKeyPair_PublicKeyToSSH(t *testing.T) {
+	// P224 is not supported by SSH, only test P256, P384, P521
+	curves := []ECDSACurve{P256, P384, P521}
+
+	for _, curve := range curves {
+		t.Run(fmt.Sprintf("%s", curve.Curve().Params().Name), func(t *testing.T) {
+			keyPair, err := GenerateECDSAKeyPair(curve)
+			assert.NoError(t, err)
+
+			// Test with comment
+			sshData, err := keyPair.PublicKeyToSSH("user@example.com")
+			assert.NoError(t, err)
+			assert.NotEmpty(t, sshData)
+
+			// Verify SSH format starts with ECDSA prefix (format varies by curve)
+			assert.True(t, strings.HasPrefix(sshData, "ecdsa-sha2-"), "SSH key should start with ecdsa-sha2- prefix")
+			assert.Contains(t, sshData, "user@example.com", "SSH key should contain comment")
+			assert.Equal(t, 3, len(strings.Fields(sshData)), "SSH key should have 3 parts")
+
+			// Test without comment
+			sshDataNoComment, err := keyPair.PublicKeyToSSH("")
+			assert.NoError(t, err)
+			assert.Equal(t, 2, len(strings.Fields(sshDataNoComment)), "SSH key without comment should have 2 parts")
+			assert.True(t, strings.HasPrefix(sshDataNoComment, "ecdsa-sha2-"))
+		})
+	}
+}
+
+func TestECDSAKeyPair_PublicKeyToSSH_UnsupportedCurve(t *testing.T) {
+	// P224 is not supported by SSH
+	keyPair, err := GenerateECDSAKeyPair(P224)
+	assert.NoError(t, err)
+
+	_, err = keyPair.PublicKeyToSSH("user@example.com")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "only P-256, P-384 and P-521 EC keys are supported")
+}
+
+func TestECDSAKeyPair_PrivateKeyToSSH(t *testing.T) {
+	keyPair, err := GenerateECDSAKeyPair(P256)
+	assert.NoError(t, err)
+
+	// Test unencrypted SSH private key
+	sshData, err := keyPair.PrivateKeyToSSH("test-key", "")
+	assert.NoError(t, err)
+	assert.NotEmpty(t, sshData)
+	assert.Contains(t, sshData, "-----BEGIN OPENSSH PRIVATE KEY-----")
+	assert.Contains(t, sshData, "-----END OPENSSH PRIVATE KEY-----")
+
+	// Test encrypted SSH private key
+	passphrase := "test-passphrase-123"
+	sshEncrypted, err := keyPair.PrivateKeyToSSH("encrypted-key", passphrase)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, sshEncrypted)
+	assert.Contains(t, sshEncrypted, "-----BEGIN OPENSSH PRIVATE KEY-----")
+	assert.True(t, len(sshEncrypted) > len(sshData), "Encrypted key should be larger")
+}
+
+func TestECDSAKeyPairFromSSH_Success(t *testing.T) {
+	// P224 is not supported by SSH, only test P256, P384, P521
+	curves := []ECDSACurve{P256, P384, P521}
+
+	for _, curve := range curves {
+		t.Run(fmt.Sprintf("%s", curve.Curve().Params().Name), func(t *testing.T) {
+			// Generate original key pair
+			originalKeyPair, err := GenerateECDSAKeyPair(curve)
+			assert.NoError(t, err)
+
+			// Test unencrypted SSH round-trip
+			sshData, err := originalKeyPair.PrivateKeyToSSH("test-key", "")
+			assert.NoError(t, err)
+
+			reconstructed, err := ECDSAKeyPairFromSSH(sshData, "")
+			assert.NoError(t, err)
+			assert.NotNil(t, reconstructed)
+			assert.Equal(t, originalKeyPair.PrivateKey.Curve, reconstructed.PrivateKey.Curve)
+
+			// Test encrypted SSH round-trip
+			passphrase := "test-passphrase-123"
+			sshEncrypted, err := originalKeyPair.PrivateKeyToSSH("encrypted-key", passphrase)
+			assert.NoError(t, err)
+
+			reconstructedEncrypted, err := ECDSAKeyPairFromSSH(sshEncrypted, passphrase)
+			assert.NoError(t, err)
+			assert.NotNil(t, reconstructedEncrypted)
+			assert.Equal(t, originalKeyPair.PrivateKey.Curve, reconstructedEncrypted.PrivateKey.Curve)
+		})
+	}
+}
+
+func TestECDSAKeyPairFromSSH_UnsupportedCurve(t *testing.T) {
+	// P224 is not supported by SSH
+	keyPair, err := GenerateECDSAKeyPair(P224)
+	assert.NoError(t, err)
+
+	_, err = keyPair.PrivateKeyToSSH("test-key", "")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unhandled elliptic curve P-224")
+}
+
+func TestECDSAKeyPairFromSSH_InvalidSSH(t *testing.T) {
+	tests := []struct {
+		name       string
+		sshData    string
+		passphrase string
+		errMsg     string
+	}{
+		{
+			name:       "InvalidSSHData",
+			sshData:    "invalid ssh data",
+			passphrase: "",
+			errMsg:     "failed to parse SSH private key",
+		},
+		{
+			name: "WrongPassphrase",
+			sshData: func() string {
+				keyPair, _ := GenerateECDSAKeyPair(P256)
+				sshData, _ := keyPair.PrivateKeyToSSH("test", "correct-passphrase")
+				return sshData
+			}(),
+			passphrase: "wrong-passphrase",
+			errMsg:     "failed to parse SSH private key",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			keyPair, err := ECDSAKeyPairFromSSH(tt.sshData, tt.passphrase)
+
+			assert.Error(t, err)
+			assert.Nil(t, keyPair)
+			assert.Contains(t, err.Error(), tt.errMsg)
+		})
+	}
+}
+
+func TestECDSAKeyPair_SSHRoundTrip(t *testing.T) {
+	keyPair, err := GenerateECDSAKeyPair(P256)
+	assert.NoError(t, err)
+
+	// Test unencrypted round-trip
+	sshPrivate, err := keyPair.PrivateKeyToSSH("test-key", "")
+	assert.NoError(t, err)
+
+	sshPublic, err := keyPair.PublicKeyToSSH("test@example.com")
+	assert.NoError(t, err)
+
+	// Reconstruct from SSH private key
+	reconstructed, err := ECDSAKeyPairFromSSH(sshPrivate, "")
+	assert.NoError(t, err)
+
+	// Verify keys match
+	assert.Equal(t, keyPair.PrivateKey.Curve, reconstructed.PrivateKey.Curve)
+	assert.Equal(t, keyPair.PrivateKey.D, reconstructed.PrivateKey.D)
+
+	// Verify public key can be reconstructed correctly
+	reconstructedPublic, err := reconstructed.PublicKeyToSSH("test@example.com")
+	assert.NoError(t, err)
+	assert.Equal(t, sshPublic, reconstructedPublic)
+}
+
+// Cross-Format Tests
+
+func TestECDSAKeyPair_CrossFormatCompatibility(t *testing.T) {
+	// Generate original key pair
+	original, err := GenerateECDSAKeyPair(P256)
+	assert.NoError(t, err)
+
+	// Test PEM -> DER -> SSH -> PEM conversion chain
+	t.Run("PEM->DER->SSH->PEM", func(t *testing.T) {
+		// PEM to DER
+		pemData, err := original.PrivateKeyToPEM()
+		assert.NoError(t, err)
+
+		keyFromPEM, err := ECDSAKeyPairFromPEM(pemData)
+		assert.NoError(t, err)
+
+		derData, err := keyFromPEM.PrivateKeyToDER()
+		assert.NoError(t, err)
+
+		// DER to SSH
+		keyFromDER, err := ECDSAKeyPairFromDER(derData)
+		assert.NoError(t, err)
+
+		sshData, err := keyFromDER.PrivateKeyToSSH("test", "")
+		assert.NoError(t, err)
+
+		// SSH back to PEM
+		keyFromSSH, err := ECDSAKeyPairFromSSH(sshData, "")
+		assert.NoError(t, err)
+
+		finalPEM, err := keyFromSSH.PrivateKeyToPEM()
+		assert.NoError(t, err)
+
+		// Verify final result matches original
+		finalKey, err := ECDSAKeyPairFromPEM(finalPEM)
+		assert.NoError(t, err)
+		assert.Equal(t, original.PrivateKey.Curve, finalKey.PrivateKey.Curve)
+		assert.Equal(t, original.PrivateKey.D, finalKey.PrivateKey.D)
+	})
+}
+
+// Enhanced Benchmarks
+
+func BenchmarkECDSAKeyPair_AllFormats(b *testing.B) {
+	keyPair, err := GenerateECDSAKeyPair(P256)
+	if err != nil {
+		b.Fatalf("Key generation failed: %v", err)
+	}
+
+	// DER operations
+	b.Run("PrivateKeyToDER", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, err := keyPair.PrivateKeyToDER()
+			if err != nil {
+				b.Fatalf("DER conversion failed: %v", err)
+			}
+		}
+	})
+
+	derData, _ := keyPair.PrivateKeyToDER()
+	b.Run("ECDSAKeyPairFromDER", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, err := ECDSAKeyPairFromDER(derData)
+			if err != nil {
+				b.Fatalf("DER reconstruction failed: %v", err)
+			}
+		}
+	})
+
+	// SSH operations
+	b.Run("PrivateKeyToSSH", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, err := keyPair.PrivateKeyToSSH("bench", "")
+			if err != nil {
+				b.Fatalf("SSH conversion failed: %v", err)
+			}
+		}
+	})
+
+	sshData, _ := keyPair.PrivateKeyToSSH("bench", "")
+	b.Run("ECDSAKeyPairFromSSH", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, err := ECDSAKeyPairFromSSH(sshData, "")
+			if err != nil {
+				b.Fatalf("SSH reconstruction failed: %v", err)
+			}
+		}
+	})
+
+	b.Run("PublicKeyToSSH", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, err := keyPair.PublicKeyToSSH("bench@example.com")
+			if err != nil {
+				b.Fatalf("SSH public conversion failed: %v", err)
 			}
 		}
 	})

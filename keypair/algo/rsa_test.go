@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -319,6 +320,388 @@ func BenchmarkRSAKeyPair_PEMOperations(b *testing.B) {
 			_, err := RSAKeyPairFromPEM(pemData)
 			if err != nil {
 				b.Fatalf("PEM reconstruction failed: %v", err)
+			}
+		}
+	})
+}
+
+// DER Format Tests
+
+func TestRSAKeyPair_PrivateKeyToDER(t *testing.T) {
+	keySizes := []KeySize{KeySize2048, KeySize3072, KeySize4096}
+
+	for _, keySize := range keySizes {
+		t.Run(fmt.Sprintf("%d-bit", keySize.Bits()), func(t *testing.T) {
+			keyPair, err := GenerateRSAKeyPair(keySize)
+			assert.NoError(t, err)
+
+			derData, err := keyPair.PrivateKeyToDER()
+			assert.NoError(t, err)
+			assert.NotEmpty(t, derData)
+
+			// Verify we can parse the DER back to a private key
+			parsedKey, err := x509.ParsePKCS8PrivateKey(derData)
+			assert.NoError(t, err)
+
+			rsaKey, ok := parsedKey.(*rsa.PrivateKey)
+			assert.True(t, ok, "Parsed key should be RSA")
+			assert.Equal(t, keyPair.PrivateKey.Size(), rsaKey.Size())
+
+			// Verify DER is more compact than PEM
+			pemData, err := keyPair.PrivateKeyToPEM()
+			assert.NoError(t, err)
+			assert.True(t, len(derData) < len(pemData), "DER should be more compact than PEM")
+		})
+	}
+}
+
+func TestRSAKeyPair_PublicKeyToDER(t *testing.T) {
+	keyPair, err := GenerateRSAKeyPair(KeySize2048)
+	assert.NoError(t, err)
+
+	derData, err := keyPair.PublicKeyToDER()
+	assert.NoError(t, err)
+	assert.NotEmpty(t, derData)
+
+	// Verify we can parse the DER back to a public key
+	parsedKey, err := x509.ParsePKIXPublicKey(derData)
+	assert.NoError(t, err)
+
+	rsaKey, ok := parsedKey.(*rsa.PublicKey)
+	assert.True(t, ok, "Parsed key should be RSA")
+	assert.Equal(t, keyPair.PublicKey.Size(), rsaKey.Size())
+
+	// Verify DER is more compact than PEM
+	pemData, err := keyPair.PublicKeyToPEM()
+	assert.NoError(t, err)
+	assert.True(t, len(derData) < len(pemData), "DER should be more compact than PEM")
+}
+
+func TestRSAKeyPairFromDER_Success(t *testing.T) {
+	keySizes := []KeySize{KeySize2048, KeySize3072, KeySize4096}
+
+	for _, keySize := range keySizes {
+		t.Run(fmt.Sprintf("%d-bit", keySize.Bits()), func(t *testing.T) {
+			// Generate original key pair
+			originalKeyPair, err := GenerateRSAKeyPair(keySize)
+			assert.NoError(t, err)
+
+			// Convert to DER
+			derData, err := originalKeyPair.PrivateKeyToDER()
+			assert.NoError(t, err)
+
+			// Reconstruct from DER
+			reconstructedKeyPair, err := RSAKeyPairFromDER(derData)
+			assert.NoError(t, err)
+			assert.NotNil(t, reconstructedKeyPair)
+
+			// Verify the keys match
+			assert.Equal(t, originalKeyPair.PrivateKey.Size(), reconstructedKeyPair.PrivateKey.Size())
+			assert.Equal(t, originalKeyPair.PublicKey.Size(), reconstructedKeyPair.PublicKey.Size())
+			assert.Equal(t, &reconstructedKeyPair.PrivateKey.PublicKey, reconstructedKeyPair.PublicKey)
+
+			// Verify key validation
+			assert.NoError(t, reconstructedKeyPair.PrivateKey.Validate())
+		})
+	}
+}
+
+func TestRSAKeyPairFromDER_InvalidDER(t *testing.T) {
+	tests := []struct {
+		name    string
+		derData []byte
+		errMsg  string
+	}{
+		{
+			name:    "InvalidDERData",
+			derData: []byte("invalid der data"),
+			errMsg:  "failed to parse DER private key",
+		},
+		{
+			name:    "EmptyData",
+			derData: []byte{},
+			errMsg:  "failed to parse DER private key",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			keyPair, err := RSAKeyPairFromDER(tt.derData)
+
+			assert.Error(t, err)
+			assert.Nil(t, keyPair)
+			assert.Contains(t, err.Error(), tt.errMsg)
+		})
+	}
+}
+
+func TestRSAKeyPair_DERRoundTrip(t *testing.T) {
+	keySizes := []KeySize{KeySize2048, KeySize3072, KeySize4096}
+
+	for _, keySize := range keySizes {
+		t.Run(fmt.Sprintf("%d-bit", keySize.Bits()), func(t *testing.T) {
+			// Generate original key pair
+			original, err := GenerateRSAKeyPair(keySize)
+			assert.NoError(t, err)
+
+			// Convert to DER and back
+			privateDER, err := original.PrivateKeyToDER()
+			assert.NoError(t, err)
+
+			publicDER, err := original.PublicKeyToDER()
+			assert.NoError(t, err)
+
+			// Reconstruct from private key DER
+			reconstructed, err := RSAKeyPairFromDER(privateDER)
+			assert.NoError(t, err)
+
+			// Verify private keys match
+			assert.Equal(t, original.PrivateKey.Size(), reconstructed.PrivateKey.Size())
+
+			// Verify public keys match
+			assert.Equal(t, original.PublicKey.Size(), reconstructed.PublicKey.Size())
+
+			// Verify reconstructed public key DER matches original
+			reconstructedPublicDER, err := reconstructed.PublicKeyToDER()
+			assert.NoError(t, err)
+			assert.Equal(t, publicDER, reconstructedPublicDER)
+		})
+	}
+}
+
+// SSH Format Tests
+
+func TestRSAKeyPair_PublicKeyToSSH(t *testing.T) {
+	keySizes := []KeySize{KeySize2048, KeySize3072, KeySize4096}
+
+	for _, keySize := range keySizes {
+		t.Run(fmt.Sprintf("%d-bit", keySize.Bits()), func(t *testing.T) {
+			keyPair, err := GenerateRSAKeyPair(keySize)
+			assert.NoError(t, err)
+
+			// Test with comment
+			sshData, err := keyPair.PublicKeyToSSH("user@example.com")
+			assert.NoError(t, err)
+			assert.NotEmpty(t, sshData)
+
+			// Verify SSH format
+			assert.True(t, strings.HasPrefix(sshData, "ssh-rsa "), "SSH key should start with 'ssh-rsa '")
+			assert.Contains(t, sshData, "user@example.com", "SSH key should contain comment")
+			assert.Equal(t, 3, len(strings.Fields(sshData)), "SSH key should have 3 parts")
+
+			// Test without comment
+			sshDataNoComment, err := keyPair.PublicKeyToSSH("")
+			assert.NoError(t, err)
+			assert.Equal(t, 2, len(strings.Fields(sshDataNoComment)), "SSH key without comment should have 2 parts")
+			assert.True(t, strings.HasPrefix(sshDataNoComment, "ssh-rsa "))
+		})
+	}
+}
+
+func TestRSAKeyPair_PrivateKeyToSSH(t *testing.T) {
+	keyPair, err := GenerateRSAKeyPair(KeySize2048)
+	assert.NoError(t, err)
+
+	// Test unencrypted SSH private key
+	sshData, err := keyPair.PrivateKeyToSSH("test-key", "")
+	assert.NoError(t, err)
+	assert.NotEmpty(t, sshData)
+	assert.Contains(t, sshData, "-----BEGIN OPENSSH PRIVATE KEY-----")
+	assert.Contains(t, sshData, "-----END OPENSSH PRIVATE KEY-----")
+
+	// Test encrypted SSH private key
+	passphrase := "test-passphrase-123"
+	sshEncrypted, err := keyPair.PrivateKeyToSSH("encrypted-key", passphrase)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, sshEncrypted)
+	assert.Contains(t, sshEncrypted, "-----BEGIN OPENSSH PRIVATE KEY-----")
+	assert.True(t, len(sshEncrypted) > len(sshData), "Encrypted key should be larger")
+}
+
+func TestRSAKeyPairFromSSH_Success(t *testing.T) {
+	keySizes := []KeySize{KeySize2048, KeySize3072}
+
+	for _, keySize := range keySizes {
+		t.Run(fmt.Sprintf("%d-bit", keySize.Bits()), func(t *testing.T) {
+			// Generate original key pair
+			originalKeyPair, err := GenerateRSAKeyPair(keySize)
+			assert.NoError(t, err)
+
+			// Test unencrypted SSH round-trip
+			sshData, err := originalKeyPair.PrivateKeyToSSH("test-key", "")
+			assert.NoError(t, err)
+
+			reconstructed, err := RSAKeyPairFromSSH(sshData, "")
+			assert.NoError(t, err)
+			assert.NotNil(t, reconstructed)
+			assert.Equal(t, originalKeyPair.PrivateKey.Size(), reconstructed.PrivateKey.Size())
+
+			// Test encrypted SSH round-trip
+			passphrase := "test-passphrase-123"
+			sshEncrypted, err := originalKeyPair.PrivateKeyToSSH("encrypted-key", passphrase)
+			assert.NoError(t, err)
+
+			reconstructedEncrypted, err := RSAKeyPairFromSSH(sshEncrypted, passphrase)
+			assert.NoError(t, err)
+			assert.NotNil(t, reconstructedEncrypted)
+			assert.Equal(t, originalKeyPair.PrivateKey.Size(), reconstructedEncrypted.PrivateKey.Size())
+		})
+	}
+}
+
+func TestRSAKeyPairFromSSH_InvalidSSH(t *testing.T) {
+	tests := []struct {
+		name       string
+		sshData    string
+		passphrase string
+		errMsg     string
+	}{
+		{
+			name:       "InvalidSSHData",
+			sshData:    "invalid ssh data",
+			passphrase: "",
+			errMsg:     "failed to parse SSH private key",
+		},
+		{
+			name: "WrongPassphrase",
+			sshData: func() string {
+				keyPair, _ := GenerateRSAKeyPair(KeySize2048)
+				sshData, _ := keyPair.PrivateKeyToSSH("test", "correct-passphrase")
+				return sshData
+			}(),
+			passphrase: "wrong-passphrase",
+			errMsg:     "failed to parse SSH private key",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			keyPair, err := RSAKeyPairFromSSH(tt.sshData, tt.passphrase)
+
+			assert.Error(t, err)
+			assert.Nil(t, keyPair)
+			assert.Contains(t, err.Error(), tt.errMsg)
+		})
+	}
+}
+
+func TestRSAKeyPair_SSHRoundTrip(t *testing.T) {
+	keyPair, err := GenerateRSAKeyPair(KeySize2048)
+	assert.NoError(t, err)
+
+	// Test unencrypted round-trip
+	sshPrivate, err := keyPair.PrivateKeyToSSH("test-key", "")
+	assert.NoError(t, err)
+
+	sshPublic, err := keyPair.PublicKeyToSSH("test@example.com")
+	assert.NoError(t, err)
+
+	// Reconstruct from SSH private key
+	reconstructed, err := RSAKeyPairFromSSH(sshPrivate, "")
+	assert.NoError(t, err)
+
+	// Verify keys match
+	assert.Equal(t, keyPair.PrivateKey.Size(), reconstructed.PrivateKey.Size())
+
+	// Verify public key can be reconstructed correctly
+	reconstructedPublic, err := reconstructed.PublicKeyToSSH("test@example.com")
+	assert.NoError(t, err)
+	assert.Equal(t, sshPublic, reconstructedPublic)
+}
+
+// Cross-Format Tests
+
+func TestRSAKeyPair_CrossFormatCompatibility(t *testing.T) {
+	// Generate original key pair
+	original, err := GenerateRSAKeyPair(KeySize2048)
+	assert.NoError(t, err)
+
+	// Test PEM -> DER -> SSH -> PEM conversion chain
+	t.Run("PEM->DER->SSH->PEM", func(t *testing.T) {
+		// PEM to DER
+		pemData, err := original.PrivateKeyToPEM()
+		assert.NoError(t, err)
+
+		keyFromPEM, err := RSAKeyPairFromPEM(pemData)
+		assert.NoError(t, err)
+
+		derData, err := keyFromPEM.PrivateKeyToDER()
+		assert.NoError(t, err)
+
+		// DER to SSH
+		keyFromDER, err := RSAKeyPairFromDER(derData)
+		assert.NoError(t, err)
+
+		sshData, err := keyFromDER.PrivateKeyToSSH("test", "")
+		assert.NoError(t, err)
+
+		// SSH back to PEM
+		keyFromSSH, err := RSAKeyPairFromSSH(sshData, "")
+		assert.NoError(t, err)
+
+		finalPEM, err := keyFromSSH.PrivateKeyToPEM()
+		assert.NoError(t, err)
+
+		// Verify final result matches original
+		finalKey, err := RSAKeyPairFromPEM(finalPEM)
+		assert.NoError(t, err)
+		assert.Equal(t, original.PrivateKey.Size(), finalKey.PrivateKey.Size())
+	})
+}
+
+// Enhanced Benchmarks
+
+func BenchmarkRSAKeyPair_AllFormats(b *testing.B) {
+	keyPair, err := GenerateRSAKeyPair(KeySize2048)
+	if err != nil {
+		b.Fatalf("Key generation failed: %v", err)
+	}
+
+	// DER operations
+	b.Run("PrivateKeyToDER", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, err := keyPair.PrivateKeyToDER()
+			if err != nil {
+				b.Fatalf("DER conversion failed: %v", err)
+			}
+		}
+	})
+
+	derData, _ := keyPair.PrivateKeyToDER()
+	b.Run("RSAKeyPairFromDER", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, err := RSAKeyPairFromDER(derData)
+			if err != nil {
+				b.Fatalf("DER reconstruction failed: %v", err)
+			}
+		}
+	})
+
+	// SSH operations
+	b.Run("PrivateKeyToSSH", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, err := keyPair.PrivateKeyToSSH("bench", "")
+			if err != nil {
+				b.Fatalf("SSH conversion failed: %v", err)
+			}
+		}
+	})
+
+	sshData, _ := keyPair.PrivateKeyToSSH("bench", "")
+	b.Run("RSAKeyPairFromSSH", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, err := RSAKeyPairFromSSH(sshData, "")
+			if err != nil {
+				b.Fatalf("SSH reconstruction failed: %v", err)
+			}
+		}
+	})
+
+	b.Run("PublicKeyToSSH", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, err := keyPair.PublicKeyToSSH("bench@example.com")
+			if err != nil {
+				b.Fatalf("SSH public conversion failed: %v", err)
 			}
 		}
 	})

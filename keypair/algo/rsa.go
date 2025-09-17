@@ -8,6 +8,9 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"strings"
+
+	"golang.org/x/crypto/ssh"
 )
 
 // KeySize represents a secure RSA key size with predefined safe values only.
@@ -168,6 +171,208 @@ func RSAKeyPairFromPEM(privateKeyPEM []byte) (*RSAKeyPair, error) {
 	rsaPrivateKey, ok := privateKey.(*rsa.PrivateKey)
 	if !ok {
 		return nil, fmt.Errorf("private key is not an RSA key")
+	}
+
+	return &RSAKeyPair{
+		PrivateKey: rsaPrivateKey,
+		PublicKey:  &rsaPrivateKey.PublicKey,
+	}, nil
+}
+
+// PrivateKeyToDER converts the RSA private key to DER (Distinguished Encoding Rules) format.
+// DER is a binary format that is more compact than PEM and faster to parse.
+//
+// Returns:
+//   - []byte: DER-encoded private key data
+//   - error: Error if marshaling fails
+//
+// The function uses PKCS#8 encoding for maximum compatibility across different systems.
+// DER format is typically 30% smaller than equivalent PEM format.
+//
+// Example:
+//
+//	derData, err := keyPair.PrivateKeyToDER()
+//	if err != nil {
+//		log.Printf("DER conversion failed: %v", err)
+//	}
+func (kp *RSAKeyPair) PrivateKeyToDER() ([]byte, error) {
+	derBytes, err := x509.MarshalPKCS8PrivateKey(kp.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal private key to DER: %w", err)
+	}
+	return derBytes, nil
+}
+
+// PublicKeyToDER converts the RSA public key to DER (Distinguished Encoding Rules) format.
+// DER is a binary format that provides compact storage and fast parsing.
+//
+// Returns:
+//   - []byte: DER-encoded public key data
+//   - error: Error if marshaling fails
+//
+// The function uses PKIX encoding for standard compatibility.
+// DER format is the binary equivalent of PEM without Base64 encoding and headers.
+//
+// Example:
+//
+//	derData, err := keyPair.PublicKeyToDER()
+//	if err != nil {
+//		log.Printf("DER conversion failed: %v", err)
+//	}
+func (kp *RSAKeyPair) PublicKeyToDER() ([]byte, error) {
+	derBytes, err := x509.MarshalPKIXPublicKey(kp.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal public key to DER: %w", err)
+	}
+	return derBytes, nil
+}
+
+// PublicKeyToSSH converts the RSA public key to SSH public key format.
+// The SSH format is used in authorized_keys files and for key identification.
+//
+// Parameters:
+//   - comment: Optional comment to include in the SSH key (commonly username@hostname)
+//
+// Returns:
+//   - string: SSH public key in format "ssh-rsa base64-key [comment]"
+//   - error: Error if conversion fails
+//
+// Example:
+//
+//	sshKey, err := keyPair.PublicKeyToSSH("user@example.com")
+//	if err != nil {
+//		log.Printf("SSH conversion failed: %v", err)
+//	}
+func (kp *RSAKeyPair) PublicKeyToSSH(comment string) (string, error) {
+	sshPubKey, err := ssh.NewPublicKey(kp.PublicKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert to SSH public key: %w", err)
+	}
+
+	sshData := ssh.MarshalAuthorizedKey(sshPubKey)
+	sshStr := strings.TrimSpace(string(sshData))
+
+	// Add comment if provided and not already present
+	if comment != "" && !strings.Contains(sshStr, comment) {
+		parts := strings.SplitN(sshStr, " ", 3)
+		if len(parts) >= 2 {
+			sshStr = parts[0] + " " + parts[1] + " " + comment
+		}
+	}
+
+	return sshStr, nil
+}
+
+// PrivateKeyToSSH converts the RSA private key to OpenSSH private key format.
+// This format is used by OpenSSH for storing private keys, with optional passphrase protection.
+//
+// Parameters:
+//   - comment: Optional comment to embed in the key file
+//   - passphrase: Optional passphrase for key encryption (empty string for unencrypted)
+//
+// Returns:
+//   - string: OpenSSH private key in PEM-like format
+//   - error: Error if conversion fails
+//
+// Security note: Using a passphrase is recommended for private key storage.
+//
+// Example:
+//
+//	sshKey, err := keyPair.PrivateKeyToSSH("my-key", "secure-passphrase")
+//	if err != nil {
+//		log.Printf("SSH conversion failed: %v", err)
+//	}
+func (kp *RSAKeyPair) PrivateKeyToSSH(comment string, passphrase string) (string, error) {
+	var pemBlock *pem.Block
+	var err error
+
+	if passphrase == "" {
+		pemBlock, err = ssh.MarshalPrivateKey(kp.PrivateKey, comment)
+	} else {
+		pemBlock, err = ssh.MarshalPrivateKeyWithPassphrase(kp.PrivateKey, comment, []byte(passphrase))
+	}
+
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal SSH private key: %w", err)
+	}
+
+	sshPrivateKey := pem.EncodeToMemory(pemBlock)
+	return string(sshPrivateKey), nil
+}
+
+// RSAKeyPairFromDER reconstructs an RSA key pair from DER-encoded private key data.
+// The function parses the private key and derives the public key from it.
+//
+// Parameters:
+//   - privateKeyDER: DER-encoded private key data in PKCS#8 format
+//
+// Returns:
+//   - *RSAKeyPair: The reconstructed key pair
+//   - error: Error if parsing or type assertion fails
+//
+// The function expects the DER data to contain a PKCS#8 encoded private key.
+// It will validate that the key is actually an RSA key before returning.
+//
+// Example:
+//
+//	keyPair, err := RSAKeyPairFromDER(derData)
+//	if err != nil {
+//		log.Printf("Failed to reconstruct RSA key pair from DER: %v", err)
+//	}
+func RSAKeyPairFromDER(privateKeyDER []byte) (*RSAKeyPair, error) {
+	privateKey, err := x509.ParsePKCS8PrivateKey(privateKeyDER)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse DER private key: %w", err)
+	}
+
+	rsaPrivateKey, ok := privateKey.(*rsa.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("private key is not an RSA key")
+	}
+
+	return &RSAKeyPair{
+		PrivateKey: rsaPrivateKey,
+		PublicKey:  &rsaPrivateKey.PublicKey,
+	}, nil
+}
+
+// RSAKeyPairFromSSH reconstructs an RSA key pair from SSH-encoded private key data.
+// The function parses the SSH private key and derives the public key from it.
+//
+// Parameters:
+//   - privateKeySSH: SSH-encoded private key data in OpenSSH format
+//   - passphrase: Passphrase for encrypted keys (empty string for unencrypted)
+//
+// Returns:
+//   - *RSAKeyPair: The reconstructed key pair
+//   - error: Error if parsing, decryption, or type assertion fails
+//
+// The function expects the SSH data to contain an OpenSSH formatted private key.
+// It will validate that the key is actually an RSA key before returning.
+//
+// Example:
+//
+//	keyPair, err := RSAKeyPairFromSSH(sshData, "passphrase")
+//	if err != nil {
+//		log.Printf("Failed to reconstruct RSA key pair from SSH: %v", err)
+//	}
+func RSAKeyPairFromSSH(privateKeySSH string, passphrase string) (*RSAKeyPair, error) {
+	var rawKey interface{}
+	var err error
+
+	if passphrase == "" {
+		rawKey, err = ssh.ParseRawPrivateKey([]byte(privateKeySSH))
+	} else {
+		rawKey, err = ssh.ParseRawPrivateKeyWithPassphrase([]byte(privateKeySSH), []byte(passphrase))
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse SSH private key: %w", err)
+	}
+
+	rsaPrivateKey, ok := rawKey.(*rsa.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("SSH private key is not an RSA key, got %T", rawKey)
 	}
 
 	return &RSAKeyPair{
