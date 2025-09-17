@@ -1,3 +1,15 @@
+## [1.8.0](https://github.com/jasoet/gopki/compare/v1.7.0...v1.8.0) (2025-09-17)
+
+
+### ✨ Features
+
+* **encryption:** add comprehensive CMS encryption and type-safe decryption tests ([ecdb06e](https://github.com/jasoet/gopki/commit/ecdb06e03f992b82086f0a981e5cfbc4200dd0be))
+
+
+### ✅ Tests
+
+* add unit tests for asymmetric encryption and decryption ([ba28806](https://github.com/jasoet/gopki/commit/ba28806d0748c8a1dd92b8e268adaa65db6ef5f4))
+
 ## [1.7.0](https://github.com/jasoet/gopki/compare/v1.6.0...v1.7.0) (2025-09-17)
 
 
