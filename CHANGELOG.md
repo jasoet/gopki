@@ -1,3 +1,17 @@
+## [1.7.0](https://github.com/jasoet/gopki/compare/v1.6.0...v1.7.0) (2025-09-17)
+
+
+### ✨ Features
+
+* restructure encryption package with Go generics and sub-packages ([43a3064](https://github.com/jasoet/gopki/commit/43a306471226c9466ca55af91d60c358cd3241d0))
+
+
+### ♻️ Refactoring
+
+* **keypair:** move generic type aliases from pkcs12 package ([eacefdd](https://github.com/jasoet/gopki/commit/eacefdde4dd29e6dfa2e93c6b65e92706866a6fc))
+* **pkcs12:** modernize with generics and type aliases ([1464af4](https://github.com/jasoet/gopki/commit/1464af4291994e93601fcebbcc60fffbdfe4e2e7))
+* **pkcs12:** move certificate integration from cert package ([1957f4d](https://github.com/jasoet/gopki/commit/1957f4dd1a7849f49d5812bc5f1eeb73d0ffab8d))
+
 ## [1.6.0](https://github.com/jasoet/gopki/compare/v1.5.1...v1.6.0) (2025-09-16)
 
 
