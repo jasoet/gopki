@@ -94,11 +94,12 @@
 //	encrypted, err := EncryptData(largeData, keyPair, opts)
 //
 // Integration with Other GoPKI Packages:
-//   This package is designed to work seamlessly with:
-//   - keypair: For key generation and management
-//   - cert: For certificate-based encryption workflows
-//   - pkcs12: For importing/exporting encrypted key stores
-//   - signing: For combined sign-then-encrypt workflows
+//
+//	This package is designed to work seamlessly with:
+//	- keypair: For key generation and management
+//	- cert: For certificate-based encryption workflows
+//	- pkcs12: For importing/exporting encrypted key stores
+//	- signing: For combined sign-then-encrypt workflows
 package encryption
 
 import (
@@ -350,28 +351,3 @@ func DecodeData(data []byte) (*EncryptedData, error) {
 func ValidateEncodedData(data []byte) error {
 	return ValidateCMS(data)
 }
-
-// Package Usage:
-//
-// This package provides common types and interfaces for encryption operations.
-// For actual encryption functionality, import the specific sub-packages:
-//
-//   - github.com/jasoet/gopki/encryption/asymmetric: RSA, ECDSA, Ed25519 encryption
-//   - github.com/jasoet/gopki/encryption/symmetric: AES-GCM symmetric encryption
-//   - github.com/jasoet/gopki/encryption/envelope: Hybrid envelope encryption
-//   - github.com/jasoet/gopki/encryption/certificate: Certificate-based encryption
-//
-// Example usage:
-//
-//	import (
-//		"github.com/jasoet/gopki/encryption"
-//		"github.com/jasoet/gopki/encryption/asymmetric"
-//		"github.com/jasoet/gopki/encryption/envelope"
-//	)
-//
-//	// Use envelope encryption for large data
-//	opts := encryption.DefaultEncryptOptions()
-//	encrypted, err := envelope.Encrypt(data, keyPair, opts)
-//
-//	// Use direct asymmetric encryption for small data
-//	encrypted, err := asymmetric.Encrypt(smallData, keyPair, opts)
