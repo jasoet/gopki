@@ -7,10 +7,10 @@
 // of data or when you need to encrypt for multiple recipients.
 //
 // How envelope encryption works:
-//   1. Generate a random symmetric encryption key (Data Encryption Key - DEK)
-//   2. Encrypt the actual data with the DEK using AES-GCM
-//   3. Encrypt the DEK with the recipient's public key (Key Encryption Key - KEK)
-//   4. Return both the encrypted data and the encrypted DEK
+//  1. Generate a random symmetric encryption key (Data Encryption Key - DEK)
+//  2. Encrypt the actual data with the DEK using AES-GCM
+//  3. Encrypt the DEK with the recipient's public key (Key Encryption Key - KEK)
+//  4. Return both the encrypted data and the encrypted DEK
 //
 // Advantages:
 //   - Efficient for large data (no size limitations)
@@ -512,7 +512,7 @@ func getPublicKeyType(publicKeyAny keypair.GenericPublicKey) string {
 }
 
 // GetAlgorithmForKeyType returns the appropriate encryption algorithm for a key type
-func GetAlgorithmForKeyType(keyType string) encryption.EncryptionAlgorithm {
+func GetAlgorithmForKeyType(keyType string) encryption.Algorithm {
 	switch keyType {
 	case "RSA":
 		return encryption.AlgorithmRSAOAEP

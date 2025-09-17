@@ -110,31 +110,31 @@ import (
 	"github.com/jasoet/gopki/keypair"
 )
 
-// EncryptionAlgorithm represents the algorithm used for encryption
-type EncryptionAlgorithm string
+// Algorithm EncryptionAlgorithm represents the algorithm used for encryption
+type Algorithm string
 
 const (
-	AlgorithmRSAOAEP  EncryptionAlgorithm = "RSA-OAEP"
-	AlgorithmECDH     EncryptionAlgorithm = "ECDH"
-	AlgorithmX25519   EncryptionAlgorithm = "X25519"
-	AlgorithmAESGCM   EncryptionAlgorithm = "AES-GCM"
-	AlgorithmEnvelope EncryptionAlgorithm = "Envelope"
+	AlgorithmRSAOAEP  Algorithm = "RSA-OAEP"
+	AlgorithmECDH     Algorithm = "ECDH"
+	AlgorithmX25519   Algorithm = "X25519"
+	AlgorithmAESGCM   Algorithm = "AES-GCM"
+	AlgorithmEnvelope Algorithm = "Envelope"
 )
 
-// EncryptionFormat represents the format of encrypted data
+// Format EncryptionFormat represents the format of encrypted data
 // Currently only CMS (RFC 5652) format is supported
-type EncryptionFormat string
+type Format string
 
 const (
-	FormatCMS EncryptionFormat = "cms" // RFC 5652 Cryptographic Message Syntax
+	FormatCMS Format = "cms" // RFC 5652 Cryptographic Message Syntax
 )
 
 // EncryptedData represents encrypted data with its metadata
 type EncryptedData struct {
 	// Algorithm used for encryption
-	Algorithm EncryptionAlgorithm
+	Algorithm Algorithm
 	// Format of the encrypted data
-	Format EncryptionFormat
+	Format Format
 	// The encrypted data bytes
 	Data []byte
 	// Encrypted symmetric key (for envelope encryption)
@@ -162,7 +162,7 @@ type RecipientInfo struct {
 	// Encrypted key for this recipient
 	EncryptedKey []byte
 	// Key encryption algorithm
-	KeyEncryptionAlgorithm EncryptionAlgorithm
+	KeyEncryptionAlgorithm Algorithm
 	// Additional fields for ECDSA/Ed25519 support
 	// Ephemeral public key (for ECDH/X25519)
 	EphemeralKey []byte
@@ -189,9 +189,9 @@ type KDFParams struct {
 // EncryptOptions contains options for encryption operations
 type EncryptOptions struct {
 	// Encryption algorithm to use
-	Algorithm EncryptionAlgorithm
+	Algorithm Algorithm
 	// Output format
-	Format EncryptionFormat
+	Format Format
 	// Include recipient certificate
 	IncludeCertificate bool
 	// Additional certificate recipients for multi-recipient encryption
@@ -205,7 +205,7 @@ type EncryptOptions struct {
 // DecryptOptions contains options for decryption operations
 type DecryptOptions struct {
 	// Expected algorithm (for validation)
-	ExpectedAlgorithm EncryptionAlgorithm
+	ExpectedAlgorithm Algorithm
 	// Verify timestamp
 	VerifyTimestamp bool
 	// Maximum age for encrypted data
@@ -222,49 +222,37 @@ type DecryptOptions struct {
 
 // Encryptor provides type-safe encryption operations
 type Encryptor[K keypair.KeyPair] interface {
-	// Encrypt data using a key pair
 	Encrypt(data []byte, keyPair K, opts EncryptOptions) (*EncryptedData, error)
-	// Get supported algorithms
-	SupportedAlgorithms() []EncryptionAlgorithm
+	SupportedAlgorithms() []Algorithm
 }
 
 // PublicKeyEncryptor provides type-safe public key encryption
 type PublicKeyEncryptor[P keypair.PublicKey] interface {
-	// Encrypt data for a specific public key
 	EncryptForPublicKey(data []byte, publicKey P, opts EncryptOptions) (*EncryptedData, error)
-	// Get supported algorithms
-	SupportedAlgorithms() []EncryptionAlgorithm
+	SupportedAlgorithms() []Algorithm
 }
 
 // Decryptor provides type-safe decryption operations
 type Decryptor[K keypair.KeyPair] interface {
-	// Decrypt data using a key pair
 	Decrypt(encrypted *EncryptedData, keyPair K, opts DecryptOptions) ([]byte, error)
-	// Get supported algorithms
-	SupportedAlgorithms() []EncryptionAlgorithm
+	SupportedAlgorithms() []Algorithm
 }
 
 // PrivateKeyDecryptor provides type-safe private key decryption
 type PrivateKeyDecryptor[P keypair.PrivateKey] interface {
-	// Decrypt data using a private key
 	DecryptWithPrivateKey(encrypted *EncryptedData, privateKey P, opts DecryptOptions) ([]byte, error)
-	// Get supported algorithms
-	SupportedAlgorithms() []EncryptionAlgorithm
+	SupportedAlgorithms() []Algorithm
 }
 
 // CertificateEncryptor provides type-safe certificate-based encryption
 type CertificateEncryptor interface {
-	// Encrypt data using a certificate
 	EncryptWithCertificate(data []byte, certificate *x509.Certificate, opts EncryptOptions) (*EncryptedData, error)
-	// Get supported algorithms
-	SupportedAlgorithms() []EncryptionAlgorithm
+	SupportedAlgorithms() []Algorithm
 }
 
 // MultiRecipientEncryptor provides type-safe multi-recipient encryption for certificates
 type MultiRecipientEncryptor interface {
-	// Encrypt for multiple certificate recipients
 	EncryptForCertificates(data []byte, certificates []*x509.Certificate, opts EncryptOptions) (*EncryptedData, error)
-	// Add certificate recipient to existing encrypted data
 	AddCertificateRecipient(encrypted *EncryptedData, certificate *x509.Certificate) error
 }
 
@@ -306,7 +294,7 @@ func DefaultDecryptOptions() DecryptOptions {
 }
 
 // GetAlgorithmForKeyType determines the appropriate encryption algorithm for a key type
-func GetAlgorithmForKeyType(keyType string) EncryptionAlgorithm {
+func GetAlgorithmForKeyType(keyType string) Algorithm {
 	switch keyType {
 	case "RSA":
 		return AlgorithmRSAOAEP

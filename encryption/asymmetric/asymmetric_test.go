@@ -331,7 +331,7 @@ func TestDecryptWithPrivateKey(t *testing.T) {
 func TestSupportedAlgorithms(t *testing.T) {
 	algorithms := SupportedAlgorithms()
 
-	expectedAlgorithms := []encryption.EncryptionAlgorithm{
+	expectedAlgorithms := []encryption.Algorithm{
 		encryption.AlgorithmRSAOAEP,
 		encryption.AlgorithmECDH,
 		encryption.AlgorithmX25519,

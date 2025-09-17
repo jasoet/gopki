@@ -356,7 +356,7 @@ func saveEncryptedDataToFile(filename string, encrypted *encryption.EncryptedDat
 	saveToFile(filename, data)
 }
 
-func saveEncryptedDataWithFormat(filename string, encrypted *encryption.EncryptedData, format encryption.EncryptionFormat) {
+func saveEncryptedDataWithFormat(filename string, encrypted *encryption.EncryptedData, format encryption.Format) {
 	data, err := encryption.EncodeData(encrypted)
 	if err != nil {
 		log.Printf("Failed to encode encrypted data in %s format: %v", format, err)

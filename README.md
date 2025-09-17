@@ -1,13 +1,14 @@
 # GoPKI
 
-A type-safe Go library for Public Key Infrastructure (PKI) operations using generic constraints for compile-time safety.
+A type-safe Go library for Public Key Infrastructure (PKI) operations using **generic constraints for compile-time safety**. This library focuses on generic abstractions and avoids `any` or `interface{}` types unless absolutely necessary, ensuring maximum type safety through Go's generic system.
 
 ## Features
 
-- **Type-Safe Cryptography**: Generic constraints ensure compile-time type safety
+- **Type-Safe Cryptography**: Pure generic interfaces with compile-time type safety
 - **Multi-Algorithm Support**: RSA, ECDSA (P-224/P-256/P-384/P-521), and Ed25519
 - **Complete PKI**: Self-signed certificates, CA certificates, certificate chains
 - **Document Signing**: Industry-standard PKCS#7/CMS and raw signature formats
+- **Data Encryption**: RFC 5652 CMS encryption with envelope encryption for large data
 - **Format Support**: PEM/DER/SSH key formats with seamless conversion
 - **Production Ready**: Comprehensive testing, file operations, certificate verification
 
@@ -16,6 +17,7 @@ A type-safe Go library for Public Key Infrastructure (PKI) operations using gene
 - **📘 [KeyPair Module](docs/KeyPair.md)** - Cryptographic key pair generation and management
 - **📗 [Certificate Module](docs/Certificate.md)** - X.509 certificate creation and PKI operations
 - **📙 [Signing Module](docs/Signing.md)** - Document signing and signature verification
+- **📔 [Encryption Module](docs/Encryption.md)** - Type-safe data encryption with CMS format support
 
 ## Installation
 
@@ -76,11 +78,12 @@ GoPKI/
 ├── cert/             # X.509 certificate operations
 ├── signing/          # Document signing and verification
 │   └── formats/      # Signature formats (Raw, PKCS#7/CMS)
+├── encryption/       # Type-safe data encryption with CMS format
 ├── examples/         # Working demonstrations
 └── docs/             # Detailed module documentation
 ```
 
-The library uses Go generics for type safety across all cryptographic operations.
+The library uses Go generics for type safety across all cryptographic operations with pure generic interfaces and strong type constraints.
 
 ### Document Signing Example
 
@@ -100,7 +103,43 @@ pkcs7Signature, err := signing.SignDocument(document, keyPair, certificate, sign
 })
 ```
 
+### Data Encryption Example
+
+```go
+import "github.com/jasoet/gopki/encryption"
+
+// Create encrypted data with type-safe recipient handling
+encData := &encryption.EncryptedData{
+    Algorithm: encryption.AlgorithmEnvelope,
+    Format:    encryption.FormatCMS,
+    Data:      plaintext,
+    Recipients: []*encryption.RecipientInfo{
+        {
+            Certificate:            recipientCert,
+            KeyEncryptionAlgorithm: encryption.AlgorithmRSAOAEP,
+        },
+    },
+}
+
+// Encode to CMS format using external library
+cmsData, err := encryption.EncodeToCMS(encData)
+
+// Type-safe decryption with automatic type inference
+decrypted, err := encryption.DecodeFromCMS(cmsData, cert, privateKey)
+
+// Using wrapper function with keypair.PrivateKey constraint
+decrypted, err := encryption.DecodeDataWithKey(cmsData, cert, privateKey)
+```
+
 ## Key Features
+
+### 🔒 Data Encryption
+- **Type-Safe APIs**: Pure generic interfaces with compile-time type safety
+- **CMS Format**: RFC 5652 Cryptographic Message Syntax using external library
+- **Multi-Algorithm**: RSA-OAEP, ECDH+AES-GCM, X25519+AES-GCM encryption
+- **Envelope Encryption**: Large data encryption with multiple recipients
+- **Certificate-Based**: Strongly-typed certificate encryption workflows
+- **Generic Constraints**: Uses `keypair.PrivateKey` constraints for all function signatures
 
 ### 🔐 Document Signing
 - **Multi-Algorithm Support**: RSA, ECDSA, Ed25519 signing
@@ -131,12 +170,14 @@ The `examples/` directory contains working demonstrations:
 - **`examples/keypair/`** - Key generation, format conversion, and SSH support
 - **`examples/certificates/`** - Advanced PKI with CA hierarchies and certificate chains
 - **`examples/signing/`** - Document signing with multi-algorithm and PKCS#7/CMS support
+- **`examples/encryption/`** - Data encryption with type-safe APIs and CMS format support
 
 ```bash
 # Run examples
 cd examples/keypair && go run main.go           # Key generation and format conversion
 cd examples/certificates && go run main.go     # Advanced PKI operations
 cd examples/signing && go run main.go          # Document signing with all algorithms
+cd examples/encryption && go run main.go       # Data encryption with CMS format
 ```
 
 ## Development
@@ -170,4 +211,5 @@ MIT License - see LICENSE file for details.
 - 📘 [KeyPair Documentation](docs/KeyPair.md) - Detailed key generation and management guide
 - 📗 [Certificate Documentation](docs/Certificate.md) - Complete PKI and certificate operations guide
 - 📙 [Signing Documentation](docs/Signing.md) - Document signing and PKCS#7/CMS format guide
+- 📔 [Encryption Documentation](docs/Encryption.md) - Type-safe data encryption with CMS format support
 - 🚀 [Examples](examples/) - Working code demonstrations

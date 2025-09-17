@@ -39,8 +39,10 @@ import (
 	"go.mozilla.org/pkcs7"
 )
 
+type CMS []byte
+
 // EncodeToCMS converts EncryptedData to CMS format using external library
-func EncodeToCMS(data *EncryptedData) ([]byte, error) {
+func EncodeToCMS(data *EncryptedData) (CMS, error) {
 	if data == nil {
 		return nil, fmt.Errorf("encrypted data is nil")
 	}
@@ -95,7 +97,7 @@ func EncodeToCMS(data *EncryptedData) ([]byte, error) {
 //
 //	// Explicit type parameter
 //	data, err := DecodeFromCMS[*rsa.PrivateKey](cmsBytes, cert, rsaPrivateKey)
-func DecodeFromCMS[T any](cmsData []byte, cert *x509.Certificate, privateKey T) (*EncryptedData, error) {
+func DecodeFromCMS[T any](cmsData CMS, cert *x509.Certificate, privateKey T) (*EncryptedData, error) {
 	if len(cmsData) == 0 {
 		return nil, fmt.Errorf("CMS data is empty")
 	}
@@ -135,7 +137,7 @@ func DecodeFromCMS[T any](cmsData []byte, cert *x509.Certificate, privateKey T) 
 }
 
 // ValidateCMS validates CMS format data using external library
-func ValidateCMS(data []byte) error {
+func ValidateCMS(data CMS) error {
 	if len(data) == 0 {
 		return fmt.Errorf("CMS data is empty")
 	}

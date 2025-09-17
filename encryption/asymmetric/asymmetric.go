@@ -179,8 +179,8 @@ func DecryptWithPrivateKey[T keypair.PrivateKey](encrypted *encryption.Encrypted
 }
 
 // SupportedAlgorithms returns the encryption algorithms supported by this package.
-func SupportedAlgorithms() []encryption.EncryptionAlgorithm {
-	return []encryption.EncryptionAlgorithm{
+func SupportedAlgorithms() []encryption.Algorithm {
+	return []encryption.Algorithm{
 		encryption.AlgorithmRSAOAEP,
 		encryption.AlgorithmECDH,
 		encryption.AlgorithmX25519,
