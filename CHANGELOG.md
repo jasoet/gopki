@@ -1,3 +1,29 @@
+## [1.11.0](https://github.com/jasoet/gopki/compare/v1.10.0...v1.11.0) (2025-09-17)
+
+
+### ✨ Features
+
+* **keypair:** implement type-safe key parsing and format-specific file handling ([7fce986](https://github.com/jasoet/gopki/commit/7fce98620325407bcbc3570f341a7b2f1844f500))
+* **keypair:** introduce KeyPairManager and type-safe keypair operations ([d789669](https://github.com/jasoet/gopki/commit/d7896699d87d452464b8a6c4ede076971ffe9289))
+
+
+### ♻️ Refactoring
+
+* **keypair:** rename KeyPairManager to Manager for clarity ([b6ce54b](https://github.com/jasoet/gopki/commit/b6ce54bc09989204ba4e1a3bf11e410887caeb00))
+* **keypair:** utilize explicit private/public key generics in Manager ([ce72bbe](https://github.com/jasoet/gopki/commit/ce72bbec555349473a44713bdce9dde61f96b2cc))
+
+
+### ✅ Tests
+
+* **keypair:** add comprehensive unit tests and benchmarks for Manager ([c3f4a1f](https://github.com/jasoet/gopki/commit/c3f4a1f4294d02f34b406088d4d7cee432060089))
+* **keypair:** enhance static function tests to cover all algorithms ([5c9e978](https://github.com/jasoet/gopki/commit/5c9e978fbe0f2e26646105a416f05f3aadb08abb))
+
+
+### 🔧 Miscellaneous
+
+* remove deprecated DER and PEM format handling code ([8d3c505](https://github.com/jasoet/gopki/commit/8d3c505394fc834af1b67f99536e63a2449f7108))
+* remove outdated keypair test files and associated functionality ([e769601](https://github.com/jasoet/gopki/commit/e769601af48c91238c4402e488e5d8fc309a4844))
+
 ## [1.10.0](https://github.com/jasoet/gopki/compare/v1.9.0...v1.10.0) (2025-09-17)
 
 
