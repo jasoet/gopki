@@ -10,9 +10,25 @@ import (
 	"fmt"
 )
 
-// KeySize represents the bit size for RSA key generation.
-// Valid values are 2048 or higher for security compliance.
-type KeySize int
+// KeySize represents a secure RSA key size with predefined safe values only.
+// This type enforces compile-time safety by restricting key sizes to security-approved values.
+// Developers cannot create custom KeySize values - only predefined constants are allowed.
+type KeySize struct {
+	bits int // unexported field - cannot be set directly by external code
+}
+
+// Predefined RSA key sizes with security and performance recommendations.
+// These are the ONLY valid KeySize values that can be used for key generation.
+var (
+	KeySize2048 = KeySize{bits: 2048} // Minimum secure key size, good performance (recommended for most use cases)
+	KeySize3072 = KeySize{bits: 3072} // Enhanced security level, moderate performance impact
+	KeySize4096 = KeySize{bits: 4096} // Maximum security level, slower performance (recommended for long-term security)
+)
+
+// Bits returns the key size in bits for internal cryptographic operations.
+func (ks KeySize) Bits() int {
+	return ks.bits
+}
 
 // RSAKeyPair represents a generated RSA key pair containing both private and public keys.
 // The public key is derived from the private key to ensure mathematical relationship.
@@ -38,16 +54,17 @@ type RSAKeyPair struct {
 //
 // Example:
 //
-//	keyPair, err := GenerateRSAKeyPair(2048)
+//	keyPair, err := GenerateRSAKeyPair(KeySize2048)
 //	if err != nil {
 //		log.Printf("RSA key generation failed: %v", err)
 //	}
 func GenerateRSAKeyPair(keySize KeySize) (*RSAKeyPair, error) {
-	if keySize < 2048 {
+	bits := keySize.Bits()
+	if bits < 2048 {
 		return nil, fmt.Errorf("RSA key size must be at least 2048 bits")
 	}
 
-	privateKey, err := rsa.GenerateKey(rand.Reader, int(keySize))
+	privateKey, err := rsa.GenerateKey(rand.Reader, bits)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate RSA private key: %w", err)
 	}
