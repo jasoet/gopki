@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"github.com/jasoet/gopki/keypair/format"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
@@ -94,7 +95,7 @@ func GenerateRSAKeyPair(keySize KeySize) (*RSAKeyPair, error) {
 //	if err != nil {
 //		log.Printf("Private key PEM conversion failed: %v", err)
 //	}
-func (kp *RSAKeyPair) PrivateKeyToPEM() (PEM, error) {
+func (kp *RSAKeyPair) PrivateKeyToPEM() (format.PEM, error) {
 	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(kp.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal private key: %w", err)
@@ -105,7 +106,7 @@ func (kp *RSAKeyPair) PrivateKeyToPEM() (PEM, error) {
 		Bytes: privateKeyBytes,
 	})
 
-	return PEM(privateKeyPEM), nil
+	return privateKeyPEM, nil
 }
 
 // PublicKeyToPEM converts the RSA public key to PEM format using PKIX encoding.
@@ -124,7 +125,7 @@ func (kp *RSAKeyPair) PrivateKeyToPEM() (PEM, error) {
 //	if err != nil {
 //		log.Printf("Public key PEM conversion failed: %v", err)
 //	}
-func (kp *RSAKeyPair) PublicKeyToPEM() (PEM, error) {
+func (kp *RSAKeyPair) PublicKeyToPEM() (format.PEM, error) {
 	publicKeyBytes, err := x509.MarshalPKIXPublicKey(kp.PublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal public key: %w", err)
@@ -135,7 +136,7 @@ func (kp *RSAKeyPair) PublicKeyToPEM() (PEM, error) {
 		Bytes: publicKeyBytes,
 	})
 
-	return PEM(publicKeyPEM), nil
+	return publicKeyPEM, nil
 }
 
 // RSAKeyPairFromPEM reconstructs an RSA key pair from PEM-encoded private key data.
@@ -157,7 +158,7 @@ func (kp *RSAKeyPair) PublicKeyToPEM() (PEM, error) {
 //	if err != nil {
 //		log.Printf("Failed to reconstruct RSA key pair: %v", err)
 //	}
-func RSAKeyPairFromPEM(privateKeyPEM PEM) (*RSAKeyPair, error) {
+func RSAKeyPairFromPEM(privateKeyPEM format.PEM) (*RSAKeyPair, error) {
 	block, _ := pem.Decode(privateKeyPEM)
 	if block == nil {
 		return nil, fmt.Errorf("failed to decode PEM block")
@@ -195,12 +196,12 @@ func RSAKeyPairFromPEM(privateKeyPEM PEM) (*RSAKeyPair, error) {
 //	if err != nil {
 //		log.Printf("DER conversion failed: %v", err)
 //	}
-func (kp *RSAKeyPair) PrivateKeyToDER() (DER, error) {
+func (kp *RSAKeyPair) PrivateKeyToDER() (format.DER, error) {
 	derBytes, err := x509.MarshalPKCS8PrivateKey(kp.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal private key to DER: %w", err)
 	}
-	return DER(derBytes), nil
+	return derBytes, nil
 }
 
 // PublicKeyToDER converts the RSA public key to DER (Distinguished Encoding Rules) format.
@@ -219,12 +220,12 @@ func (kp *RSAKeyPair) PrivateKeyToDER() (DER, error) {
 //	if err != nil {
 //		log.Printf("DER conversion failed: %v", err)
 //	}
-func (kp *RSAKeyPair) PublicKeyToDER() (DER, error) {
+func (kp *RSAKeyPair) PublicKeyToDER() (format.DER, error) {
 	derBytes, err := x509.MarshalPKIXPublicKey(kp.PublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal public key to DER: %w", err)
 	}
-	return DER(derBytes), nil
+	return derBytes, nil
 }
 
 // PublicKeyToSSH converts the RSA public key to SSH public key format.
@@ -243,7 +244,7 @@ func (kp *RSAKeyPair) PublicKeyToDER() (DER, error) {
 //	if err != nil {
 //		log.Printf("SSH conversion failed: %v", err)
 //	}
-func (kp *RSAKeyPair) PublicKeyToSSH(comment string) (SSH, error) {
+func (kp *RSAKeyPair) PublicKeyToSSH(comment string) (format.SSH, error) {
 	sshPubKey, err := ssh.NewPublicKey(kp.PublicKey)
 	if err != nil {
 		return "", fmt.Errorf("failed to convert to SSH public key: %w", err)
@@ -260,7 +261,7 @@ func (kp *RSAKeyPair) PublicKeyToSSH(comment string) (SSH, error) {
 		}
 	}
 
-	return SSH(sshStr), nil
+	return format.SSH(sshStr), nil
 }
 
 // PrivateKeyToSSH converts the RSA private key to OpenSSH private key format.
@@ -282,7 +283,7 @@ func (kp *RSAKeyPair) PublicKeyToSSH(comment string) (SSH, error) {
 //	if err != nil {
 //		log.Printf("SSH conversion failed: %v", err)
 //	}
-func (kp *RSAKeyPair) PrivateKeyToSSH(comment string, passphrase string) (SSH, error) {
+func (kp *RSAKeyPair) PrivateKeyToSSH(comment string, passphrase string) (format.SSH, error) {
 	var pemBlock *pem.Block
 	var err error
 
@@ -297,7 +298,7 @@ func (kp *RSAKeyPair) PrivateKeyToSSH(comment string, passphrase string) (SSH, e
 	}
 
 	sshPrivateKey := pem.EncodeToMemory(pemBlock)
-	return SSH(sshPrivateKey), nil
+	return format.SSH(sshPrivateKey), nil
 }
 
 // RSAKeyPairFromDER reconstructs an RSA key pair from DER-encoded private key data.
@@ -319,7 +320,7 @@ func (kp *RSAKeyPair) PrivateKeyToSSH(comment string, passphrase string) (SSH, e
 //	if err != nil {
 //		log.Printf("Failed to reconstruct RSA key pair from DER: %v", err)
 //	}
-func RSAKeyPairFromDER(privateKeyDER DER) (*RSAKeyPair, error) {
+func RSAKeyPairFromDER(privateKeyDER format.DER) (*RSAKeyPair, error) {
 	privateKey, err := x509.ParsePKCS8PrivateKey(privateKeyDER)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse DER private key: %w", err)
@@ -356,7 +357,7 @@ func RSAKeyPairFromDER(privateKeyDER DER) (*RSAKeyPair, error) {
 //	if err != nil {
 //		log.Printf("Failed to reconstruct RSA key pair from SSH: %v", err)
 //	}
-func RSAKeyPairFromSSH(privateKeySSH SSH, passphrase string) (*RSAKeyPair, error) {
+func RSAKeyPairFromSSH(privateKeySSH format.SSH, passphrase string) (*RSAKeyPair, error) {
 	var rawKey interface{}
 	var err error
 

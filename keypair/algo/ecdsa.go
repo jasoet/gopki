@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"github.com/jasoet/gopki/keypair/format"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
@@ -115,7 +116,7 @@ func GenerateECDSAKeyPair(curve ECDSACurve) (*ECDSAKeyPair, error) {
 //	if err != nil {
 //		log.Printf("Private key PEM conversion failed: %v", err)
 //	}
-func (kp *ECDSAKeyPair) PrivateKeyToPEM() (PEM, error) {
+func (kp *ECDSAKeyPair) PrivateKeyToPEM() (format.PEM, error) {
 	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(kp.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal private key: %w", err)
@@ -126,7 +127,7 @@ func (kp *ECDSAKeyPair) PrivateKeyToPEM() (PEM, error) {
 		Bytes: privateKeyBytes,
 	})
 
-	return PEM(privateKeyPEM), nil
+	return privateKeyPEM, nil
 }
 
 // PublicKeyToPEM converts the ECDSA public key to PEM format using PKIX encoding.
@@ -145,7 +146,7 @@ func (kp *ECDSAKeyPair) PrivateKeyToPEM() (PEM, error) {
 //	if err != nil {
 //		log.Printf("Public key PEM conversion failed: %v", err)
 //	}
-func (kp *ECDSAKeyPair) PublicKeyToPEM() (PEM, error) {
+func (kp *ECDSAKeyPair) PublicKeyToPEM() (format.PEM, error) {
 	publicKeyBytes, err := x509.MarshalPKIXPublicKey(kp.PublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal public key: %w", err)
@@ -156,7 +157,7 @@ func (kp *ECDSAKeyPair) PublicKeyToPEM() (PEM, error) {
 		Bytes: publicKeyBytes,
 	})
 
-	return PEM(publicKeyPEM), nil
+	return publicKeyPEM, nil
 }
 
 // ECDSAKeyPairFromPEM reconstructs an ECDSA key pair from PEM-encoded private key data.
@@ -178,7 +179,7 @@ func (kp *ECDSAKeyPair) PublicKeyToPEM() (PEM, error) {
 //	if err != nil {
 //		log.Printf("Failed to reconstruct ECDSA key pair: %v", err)
 //	}
-func ECDSAKeyPairFromPEM(privateKeyPEM PEM) (*ECDSAKeyPair, error) {
+func ECDSAKeyPairFromPEM(privateKeyPEM format.PEM) (*ECDSAKeyPair, error) {
 	block, _ := pem.Decode(privateKeyPEM)
 	if block == nil {
 		return nil, fmt.Errorf("failed to decode PEM block")
@@ -216,12 +217,12 @@ func ECDSAKeyPairFromPEM(privateKeyPEM PEM) (*ECDSAKeyPair, error) {
 //	if err != nil {
 //		log.Printf("DER conversion failed: %v", err)
 //	}
-func (kp *ECDSAKeyPair) PrivateKeyToDER() (DER, error) {
+func (kp *ECDSAKeyPair) PrivateKeyToDER() (format.DER, error) {
 	derBytes, err := x509.MarshalPKCS8PrivateKey(kp.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal private key to DER: %w", err)
 	}
-	return DER(derBytes), nil
+	return derBytes, nil
 }
 
 // PublicKeyToDER converts the ECDSA public key to DER (Distinguished Encoding Rules) format.
@@ -240,12 +241,12 @@ func (kp *ECDSAKeyPair) PrivateKeyToDER() (DER, error) {
 //	if err != nil {
 //		log.Printf("DER conversion failed: %v", err)
 //	}
-func (kp *ECDSAKeyPair) PublicKeyToDER() (DER, error) {
+func (kp *ECDSAKeyPair) PublicKeyToDER() (format.DER, error) {
 	derBytes, err := x509.MarshalPKIXPublicKey(kp.PublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal public key to DER: %w", err)
 	}
-	return DER(derBytes), nil
+	return derBytes, nil
 }
 
 // PublicKeyToSSH converts the ECDSA public key to SSH public key format.
@@ -264,7 +265,7 @@ func (kp *ECDSAKeyPair) PublicKeyToDER() (DER, error) {
 //	if err != nil {
 //		log.Printf("SSH conversion failed: %v", err)
 //	}
-func (kp *ECDSAKeyPair) PublicKeyToSSH(comment string) (SSH, error) {
+func (kp *ECDSAKeyPair) PublicKeyToSSH(comment string) (format.SSH, error) {
 	sshPubKey, err := ssh.NewPublicKey(kp.PublicKey)
 	if err != nil {
 		return "", fmt.Errorf("failed to convert to SSH public key: %w", err)
@@ -281,7 +282,7 @@ func (kp *ECDSAKeyPair) PublicKeyToSSH(comment string) (SSH, error) {
 		}
 	}
 
-	return SSH(sshStr), nil
+	return format.SSH(sshStr), nil
 }
 
 // PrivateKeyToSSH converts the ECDSA private key to OpenSSH private key format.
@@ -303,7 +304,7 @@ func (kp *ECDSAKeyPair) PublicKeyToSSH(comment string) (SSH, error) {
 //	if err != nil {
 //		log.Printf("SSH conversion failed: %v", err)
 //	}
-func (kp *ECDSAKeyPair) PrivateKeyToSSH(comment string, passphrase string) (SSH, error) {
+func (kp *ECDSAKeyPair) PrivateKeyToSSH(comment string, passphrase string) (format.SSH, error) {
 	var pemBlock *pem.Block
 	var err error
 
@@ -318,7 +319,7 @@ func (kp *ECDSAKeyPair) PrivateKeyToSSH(comment string, passphrase string) (SSH,
 	}
 
 	sshPrivateKey := pem.EncodeToMemory(pemBlock)
-	return SSH(sshPrivateKey), nil
+	return format.SSH(sshPrivateKey), nil
 }
 
 // ECDSAKeyPairFromDER reconstructs an ECDSA key pair from DER-encoded private key data.
@@ -340,7 +341,7 @@ func (kp *ECDSAKeyPair) PrivateKeyToSSH(comment string, passphrase string) (SSH,
 //	if err != nil {
 //		log.Printf("Failed to reconstruct ECDSA key pair from DER: %v", err)
 //	}
-func ECDSAKeyPairFromDER(privateKeyDER DER) (*ECDSAKeyPair, error) {
+func ECDSAKeyPairFromDER(privateKeyDER format.DER) (*ECDSAKeyPair, error) {
 	privateKey, err := x509.ParsePKCS8PrivateKey(privateKeyDER)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse DER private key: %w", err)
@@ -377,7 +378,7 @@ func ECDSAKeyPairFromDER(privateKeyDER DER) (*ECDSAKeyPair, error) {
 //	if err != nil {
 //		log.Printf("Failed to reconstruct ECDSA key pair from SSH: %v", err)
 //	}
-func ECDSAKeyPairFromSSH(privateKeySSH SSH, passphrase string) (*ECDSAKeyPair, error) {
+func ECDSAKeyPairFromSSH(privateKeySSH format.SSH, passphrase string) (*ECDSAKeyPair, error) {
 	var rawKey interface{}
 	var err error
 

@@ -26,6 +26,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"github.com/jasoet/gopki/keypair/format"
 	"os"
 	"path/filepath"
 
@@ -65,12 +66,6 @@ type GenericPublicKey any
 // GenericKeyPair represents any keypair type for functions that need to work with multiple keypair types dynamically
 type GenericKeyPair any
 
-// PEM represents PEM-encoded key data as a byte slice.
-// PEM format uses Base64 encoding with headers for text-based key storage.
-type PEM []byte
-type DER []byte
-type SSH string
-
 // PrivateKeyToPEM converts a private key to PEM-encoded format.
 // The key is marshaled using PKCS#8 format for maximum compatibility.
 //
@@ -88,7 +83,7 @@ type SSH string
 //	if err != nil {
 //		log.Printf("Failed to convert private key: %v", err)
 //	}
-func PrivateKeyToPEM[T PrivateKey](privateKey T) (PEM, error) {
+func PrivateKeyToPEM[T PrivateKey](privateKey T) (format.PEM, error) {
 	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal private key: %w", err)
@@ -119,7 +114,7 @@ func PrivateKeyToPEM[T PrivateKey](privateKey T) (PEM, error) {
 //	if err != nil {
 //		log.Printf("Failed to convert public key: %v", err)
 //	}
-func PublicKeyToPEM[T PublicKey](publicKey T) (PEM, error) {
+func PublicKeyToPEM[T PublicKey](publicKey T) (format.PEM, error) {
 	publicKeyBytes, err := x509.MarshalPKIXPublicKey(publicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal public key: %w", err)
@@ -243,7 +238,7 @@ func GetPublicKey[TPriv PrivateKey, TPub PublicKey](privateKey TPriv) (TPub, err
 //		log.Printf("Failed to save key pair: %v", err)
 //	}
 func ToFiles[T KeyPair](keyPair T, privateFile, publicFile string) error {
-	var privateKeyPEM, publicKeyPEM PEM
+	var privateKeyPEM, publicKeyPEM format.PEM
 	var err error
 
 	switch kp := any(keyPair).(type) {
@@ -302,7 +297,7 @@ func ToFiles[T KeyPair](keyPair T, privateFile, publicFile string) error {
 //   - Saves files with 0600 permissions (owner read/write only)
 //
 // Returns an error if file operations fail.
-func savePEMToFile(pemData PEM, filename string) error {
+func savePEMToFile(pemData format.PEM, filename string) error {
 	dir := filepath.Dir(filename)
 
 	if err := os.MkdirAll(dir, 0700); err != nil {

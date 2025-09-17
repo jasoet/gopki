@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"github.com/jasoet/gopki/keypair/format"
 	"strings"
 	"testing"
 
@@ -576,7 +577,7 @@ func TestRSAKeyPairFromSSH_InvalidSSH(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			keyPair, err := RSAKeyPairFromSSH(SSH(tt.sshData), tt.passphrase)
+			keyPair, err := RSAKeyPairFromSSH(format.SSH(tt.sshData), tt.passphrase)
 
 			assert.Error(t, err)
 			assert.Nil(t, keyPair)

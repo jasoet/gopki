@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/x509/pkix"
 	"fmt"
+	"github.com/jasoet/gopki/keypair/format"
 	"log"
 	"os"
 	"strings"
@@ -310,12 +311,12 @@ func formatConversionExample() {
 	// Demonstrate round-trip conversion
 	fmt.Println("   Round-trip conversion test (PEM → DER → PEM):")
 
-	derFromPEM, err := algo.ConvertPEMToDER(algo.PEM(pemData))
+	derFromPEM, err := algo.ConvertPEMToDER(pemData)
 	if err != nil {
 		log.Fatal("PEM to DER conversion failed:", err)
 	}
 
-	pemFromDER, err := algo.ConvertDERToPEM(derFromPEM, "RSA")
+	pemFromDER, err := algo.ConvertDERToPEM(derFromPEM)
 	if err != nil {
 		log.Fatal("DER to PEM conversion failed:", err)
 	}

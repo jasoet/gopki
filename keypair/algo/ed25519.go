@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"github.com/jasoet/gopki/keypair/format"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
@@ -72,7 +73,7 @@ func GenerateEd25519KeyPair() (*Ed25519KeyPair, error) {
 //	if err != nil {
 //		log.Printf("Private key PEM conversion failed: %v", err)
 //	}
-func (kp *Ed25519KeyPair) PrivateKeyToPEM() (PEM, error) {
+func (kp *Ed25519KeyPair) PrivateKeyToPEM() (format.PEM, error) {
 	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(kp.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal private key: %w", err)
@@ -83,7 +84,7 @@ func (kp *Ed25519KeyPair) PrivateKeyToPEM() (PEM, error) {
 		Bytes: privateKeyBytes,
 	})
 
-	return PEM(privateKeyPEM), nil
+	return privateKeyPEM, nil
 }
 
 // PublicKeyToPEM converts the Ed25519 public key to PEM format using PKIX encoding.
@@ -102,7 +103,7 @@ func (kp *Ed25519KeyPair) PrivateKeyToPEM() (PEM, error) {
 //	if err != nil {
 //		log.Printf("Public key PEM conversion failed: %v", err)
 //	}
-func (kp *Ed25519KeyPair) PublicKeyToPEM() (PEM, error) {
+func (kp *Ed25519KeyPair) PublicKeyToPEM() (format.PEM, error) {
 	publicKeyBytes, err := x509.MarshalPKIXPublicKey(kp.PublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal public key: %w", err)
@@ -113,7 +114,7 @@ func (kp *Ed25519KeyPair) PublicKeyToPEM() (PEM, error) {
 		Bytes: publicKeyBytes,
 	})
 
-	return PEM(publicKeyPEM), nil
+	return publicKeyPEM, nil
 }
 
 // Ed25519KeyPairFromPEM reconstructs an Ed25519 key pair from PEM-encoded private key data.
@@ -136,7 +137,7 @@ func (kp *Ed25519KeyPair) PublicKeyToPEM() (PEM, error) {
 //	if err != nil {
 //		log.Printf("Failed to reconstruct Ed25519 key pair: %v", err)
 //	}
-func Ed25519KeyPairFromPEM(privateKeyPEM PEM) (*Ed25519KeyPair, error) {
+func Ed25519KeyPairFromPEM(privateKeyPEM format.PEM) (*Ed25519KeyPair, error) {
 	block, _ := pem.Decode(privateKeyPEM)
 	if block == nil {
 		return nil, fmt.Errorf("failed to decode PEM block")
@@ -176,12 +177,12 @@ func Ed25519KeyPairFromPEM(privateKeyPEM PEM) (*Ed25519KeyPair, error) {
 //	if err != nil {
 //		log.Printf("DER conversion failed: %v", err)
 //	}
-func (kp *Ed25519KeyPair) PrivateKeyToDER() (DER, error) {
+func (kp *Ed25519KeyPair) PrivateKeyToDER() (format.DER, error) {
 	derBytes, err := x509.MarshalPKCS8PrivateKey(kp.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal private key to DER: %w", err)
 	}
-	return DER(derBytes), nil
+	return derBytes, nil
 }
 
 // PublicKeyToDER converts the Ed25519 public key to DER (Distinguished Encoding Rules) format.
@@ -200,12 +201,12 @@ func (kp *Ed25519KeyPair) PrivateKeyToDER() (DER, error) {
 //	if err != nil {
 //		log.Printf("DER conversion failed: %v", err)
 //	}
-func (kp *Ed25519KeyPair) PublicKeyToDER() (DER, error) {
+func (kp *Ed25519KeyPair) PublicKeyToDER() (format.DER, error) {
 	derBytes, err := x509.MarshalPKIXPublicKey(kp.PublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal public key to DER: %w", err)
 	}
-	return DER(derBytes), nil
+	return derBytes, nil
 }
 
 // PublicKeyToSSH converts the Ed25519 public key to SSH public key format.
@@ -224,7 +225,7 @@ func (kp *Ed25519KeyPair) PublicKeyToDER() (DER, error) {
 //	if err != nil {
 //		log.Printf("SSH conversion failed: %v", err)
 //	}
-func (kp *Ed25519KeyPair) PublicKeyToSSH(comment string) (SSH, error) {
+func (kp *Ed25519KeyPair) PublicKeyToSSH(comment string) (format.SSH, error) {
 	sshPubKey, err := ssh.NewPublicKey(kp.PublicKey)
 	if err != nil {
 		return "", fmt.Errorf("failed to convert to SSH public key: %w", err)
@@ -241,7 +242,7 @@ func (kp *Ed25519KeyPair) PublicKeyToSSH(comment string) (SSH, error) {
 		}
 	}
 
-	return SSH(sshStr), nil
+	return format.SSH(sshStr), nil
 }
 
 // PrivateKeyToSSH converts the Ed25519 private key to OpenSSH private key format.
@@ -263,7 +264,7 @@ func (kp *Ed25519KeyPair) PublicKeyToSSH(comment string) (SSH, error) {
 //	if err != nil {
 //		log.Printf("SSH conversion failed: %v", err)
 //	}
-func (kp *Ed25519KeyPair) PrivateKeyToSSH(comment string, passphrase string) (SSH, error) {
+func (kp *Ed25519KeyPair) PrivateKeyToSSH(comment string, passphrase string) (format.SSH, error) {
 	var pemBlock *pem.Block
 	var err error
 
@@ -278,7 +279,7 @@ func (kp *Ed25519KeyPair) PrivateKeyToSSH(comment string, passphrase string) (SS
 	}
 
 	sshPrivateKey := pem.EncodeToMemory(pemBlock)
-	return SSH(sshPrivateKey), nil
+	return format.SSH(sshPrivateKey), nil
 }
 
 // Ed25519KeyPairFromDER reconstructs an Ed25519 key pair from DER-encoded private key data.
@@ -301,7 +302,7 @@ func (kp *Ed25519KeyPair) PrivateKeyToSSH(comment string, passphrase string) (SS
 //	if err != nil {
 //		log.Printf("Failed to reconstruct Ed25519 key pair from DER: %v", err)
 //	}
-func Ed25519KeyPairFromDER(privateKeyDER DER) (*Ed25519KeyPair, error) {
+func Ed25519KeyPairFromDER(privateKeyDER format.DER) (*Ed25519KeyPair, error) {
 	privateKey, err := x509.ParsePKCS8PrivateKey(privateKeyDER)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse DER private key: %w", err)
@@ -341,7 +342,7 @@ func Ed25519KeyPairFromDER(privateKeyDER DER) (*Ed25519KeyPair, error) {
 //	if err != nil {
 //		log.Printf("Failed to reconstruct Ed25519 key pair from SSH: %v", err)
 //	}
-func Ed25519KeyPairFromSSH(privateKeySSH SSH, passphrase string) (*Ed25519KeyPair, error) {
+func Ed25519KeyPairFromSSH(privateKeySSH format.SSH, passphrase string) (*Ed25519KeyPair, error) {
 	var rawKey interface{}
 	var err error
 
