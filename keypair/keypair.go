@@ -26,11 +26,13 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"github.com/jasoet/gopki/keypair/algo"
 	"github.com/jasoet/gopki/keypair/format"
 	"os"
 	"path/filepath"
+	"strings"
 
-	"github.com/jasoet/gopki/keypair/algo"
+	"golang.org/x/crypto/ssh"
 )
 
 // Param defines the constraint for key generation parameters.
@@ -126,6 +128,135 @@ func PublicKeyToPEM[T PublicKey](publicKey T) (format.PEM, error) {
 	})
 
 	return publicKeyPEM, nil
+}
+
+// PrivateKeyToDER converts a private key to DER-encoded format.
+// The key is marshaled using PKCS#8 format for maximum compatibility.
+//
+// Type parameter:
+//   - T: Private key type (*rsa.PrivateKey, *ecdsa.PrivateKey, or ed25519.PrivateKey)
+//
+// Parameters:
+//   - privateKey: The private key to convert
+//
+// Returns DER-encoded data or an error if conversion fails.
+//
+// Example:
+//
+//	derData, err := PrivateKeyToDER(rsaPrivateKey)
+//	if err != nil {
+//		log.Printf("Failed to convert private key: %v", err)
+//	}
+func PrivateKeyToDER[T PrivateKey](privateKey T) (format.DER, error) {
+	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal private key: %w", err)
+	}
+
+	return privateKeyBytes, nil
+}
+
+// PublicKeyToDER converts a public key to DER-encoded format.
+// The key is marshaled using PKIX format for standard compatibility.
+//
+// Type parameter:
+//   - T: Public key type (*rsa.PublicKey, *ecdsa.PublicKey, or ed25519.PublicKey)
+//
+// Parameters:
+//   - publicKey: The public key to convert
+//
+// Returns DER-encoded data or an error if conversion fails.
+//
+// Example:
+//
+//	derData, err := PublicKeyToDER(rsaPublicKey)
+//	if err != nil {
+//		log.Printf("Failed to convert public key: %v", err)
+//	}
+func PublicKeyToDER[T PublicKey](publicKey T) (format.DER, error) {
+	publicKeyBytes, err := x509.MarshalPKIXPublicKey(publicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal public key: %w", err)
+	}
+
+	return publicKeyBytes, nil
+}
+
+// PrivateKeyToSSH converts a private key to SSH-encoded format.
+// The key is marshaled using OpenSSH private key format with optional passphrase protection.
+//
+// Type parameter:
+//   - T: Private key type (*rsa.PrivateKey, *ecdsa.PrivateKey, or ed25519.PrivateKey)
+//
+// Parameters:
+//   - privateKey: The private key to convert
+//   - comment: Optional comment to embed in the key file
+//   - passphrase: Optional passphrase for key encryption (empty string for unencrypted)
+//
+// Returns SSH-encoded data or an error if conversion fails.
+//
+// Security note: Using a passphrase is recommended for private key storage.
+//
+// Example:
+//
+//	sshData, err := PrivateKeyToSSH(rsaPrivateKey, "my-key", "secure-passphrase")
+//	if err != nil {
+//		log.Printf("Failed to convert private key: %v", err)
+//	}
+func PrivateKeyToSSH[T PrivateKey](privateKey T, comment string, passphrase string) (format.SSH, error) {
+	var pemBlock *pem.Block
+	var err error
+
+	if passphrase == "" {
+		pemBlock, err = ssh.MarshalPrivateKey(privateKey, comment)
+	} else {
+		pemBlock, err = ssh.MarshalPrivateKeyWithPassphrase(privateKey, comment, []byte(passphrase))
+	}
+
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal SSH private key: %w", err)
+	}
+
+	sshPrivateKey := pem.EncodeToMemory(pemBlock)
+	return format.SSH(sshPrivateKey), nil
+}
+
+// PublicKeyToSSH converts a public key to SSH-encoded format.
+// The key is marshaled using SSH public key format suitable for authorized_keys files.
+//
+// Type parameter:
+//   - T: Public key type (*rsa.PublicKey, *ecdsa.PublicKey, or ed25519.PublicKey)
+//
+// Parameters:
+//   - publicKey: The public key to convert
+//   - comment: Optional comment to include in the SSH key (commonly username@hostname)
+//
+// Returns SSH-encoded data in format "ssh-rsa base64-key [comment]" or an error if conversion fails.
+//
+// Example:
+//
+//	sshData, err := PublicKeyToSSH(rsaPublicKey, "user@example.com")
+//	if err != nil {
+//		log.Printf("Failed to convert public key: %v", err)
+//	}
+func PublicKeyToSSH[T PublicKey](publicKey T, comment string) (format.SSH, error) {
+	sshPubKey, err := ssh.NewPublicKey(publicKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert to SSH public key: %w", err)
+	}
+
+	sshData := ssh.MarshalAuthorizedKey(sshPubKey)
+	sshStr := strings.TrimSpace(string(sshData))
+
+	// Add comment if provided and not already present
+	if comment != "" && !strings.Contains(sshStr, comment) {
+		parts := strings.SplitN(sshStr, " ", 3)
+		if len(parts) >= 2 {
+			sshStr = parts[0] + " " + parts[1] + " " + comment
+		}
+	}
+
+	return format.SSH(sshStr), nil
 }
 
 // GenerateKeyPair generates a cryptographic key pair using type-safe generic constraints.
@@ -282,6 +413,92 @@ func ToFiles[T KeyPair](keyPair T, privateFile, publicFile string) error {
 	}
 
 	return nil
+}
+
+// GetPrivateKeyFromKeyPair extracts the private key from a KeyPair with type safety.
+// This function works with all supported KeyPair types and maintains type relationships.
+//
+// Type parameters:
+//   - K: KeyPair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//   - T: Expected private key type (*rsa.PrivateKey, *ecdsa.PrivateKey, or ed25519.PrivateKey)
+//
+// Parameters:
+//   - keyPair: The key pair from which to extract the private key
+//
+// Returns the corresponding private key or an error if extraction fails or type mismatch occurs.
+//
+// Examples:
+//
+//	// Extract RSA private key with explicit types
+//	rsaPriv, err := GetPrivateKeyFromKeyPair[*algo.RSAKeyPair, *rsa.PrivateKey](rsaKeyPair)
+//
+//	// Extract ECDSA private key with type inference
+//	ecdsaPriv, err := GetPrivateKeyFromKeyPair[*algo.ECDSAKeyPair, *ecdsa.PrivateKey](ecdsaKeyPair)
+//
+//	// Extract Ed25519 private key
+//	ed25519Priv, err := GetPrivateKeyFromKeyPair[*algo.Ed25519KeyPair, ed25519.PrivateKey](ed25519KeyPair)
+func GetPrivateKeyFromKeyPair[K KeyPair, T PrivateKey](keyPair K) (T, error) {
+	var zero T
+
+	switch kp := any(keyPair).(type) {
+	case *algo.RSAKeyPair:
+		if priv, ok := any(kp.PrivateKey).(T); ok {
+			return priv, nil
+		}
+	case *algo.ECDSAKeyPair:
+		if priv, ok := any(kp.PrivateKey).(T); ok {
+			return priv, nil
+		}
+	case *algo.Ed25519KeyPair:
+		if priv, ok := any(kp.PrivateKey).(T); ok {
+			return priv, nil
+		}
+	}
+
+	return zero, fmt.Errorf("unsupported key pair type or type mismatch")
+}
+
+// GetPublicKeyFromKeyPair extracts the public key from a KeyPair with type safety.
+// This function works with all supported KeyPair types and maintains type relationships.
+//
+// Type parameters:
+//   - K: KeyPair type (*algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair)
+//   - T: Expected public key type (*rsa.PublicKey, *ecdsa.PublicKey, or ed25519.PublicKey)
+//
+// Parameters:
+//   - keyPair: The key pair from which to extract the public key
+//
+// Returns the corresponding public key or an error if extraction fails or type mismatch occurs.
+//
+// Examples:
+//
+//	// Extract RSA public key with explicit types
+//	rsaPub, err := GetPublicKeyFromKeyPair[*algo.RSAKeyPair, *rsa.PublicKey](rsaKeyPair)
+//
+//	// Extract ECDSA public key with type inference
+//	ecdsaPub, err := GetPublicKeyFromKeyPair[*algo.ECDSAKeyPair, *ecdsa.PublicKey](ecdsaKeyPair)
+//
+//	// Extract Ed25519 public key
+//	ed25519Pub, err := GetPublicKeyFromKeyPair[*algo.Ed25519KeyPair, ed25519.PublicKey](ed25519KeyPair)
+func GetPublicKeyFromKeyPair[K KeyPair, T PublicKey](keyPair K) (T, error) {
+	var zero T
+
+	switch kp := any(keyPair).(type) {
+	case *algo.RSAKeyPair:
+		if pub, ok := any(kp.PublicKey).(T); ok {
+			return pub, nil
+		}
+	case *algo.ECDSAKeyPair:
+		if pub, ok := any(kp.PublicKey).(T); ok {
+			return pub, nil
+		}
+	case *algo.Ed25519KeyPair:
+		if pub, ok := any(kp.PublicKey).(T); ok {
+			return pub, nil
+		}
+	}
+
+	return zero, fmt.Errorf("unsupported key pair type or type mismatch")
 }
 
 // savePEMToFile saves PEM-encoded data to a file with secure permissions.
