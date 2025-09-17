@@ -1,3 +1,11 @@
+## [1.10.0](https://github.com/jasoet/gopki/compare/v1.9.0...v1.10.0) (2025-09-17)
+
+
+### ✨ Features
+
+* **format:** implement format-specific generic type system with comprehensive tests ([6591b70](https://github.com/jasoet/gopki/commit/6591b70caf95591bab406953766f915c8b2bb740))
+* **keypair:** add DER and SSH format support for RSA, ECDSA, and Ed25519 ([879df25](https://github.com/jasoet/gopki/commit/879df2588c4527fb6b169fe21471a73311b7a320)), closes [PKCS#8](https://github.com/jasoet/PKCS/issues/8)
+
 ## [1.9.0](https://github.com/jasoet/gopki/compare/v1.8.0...v1.9.0) (2025-09-17)
 
 
