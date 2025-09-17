@@ -9,6 +9,9 @@ import (
 
 	"github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/encryption"
+	"github.com/jasoet/gopki/encryption/asymmetric"
+	certenc "github.com/jasoet/gopki/encryption/certificate"
+	"github.com/jasoet/gopki/encryption/envelope"
 	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
 )
@@ -55,7 +58,7 @@ func demonstrateRSAEncryption() {
 
 	// Encrypt with default options
 	opts := encryption.DefaultEncryptOptions()
-	encrypted, err := encryption.EncryptData(smallData, rsaKeys, opts)
+	encrypted, err := asymmetric.Encrypt(smallData, rsaKeys, opts)
 	if err != nil {
 		log.Fatal("RSA encryption failed:", err)
 	}
@@ -65,7 +68,7 @@ func demonstrateRSAEncryption() {
 
 	// Decrypt the data
 	decryptOpts := encryption.DefaultDecryptOptions()
-	decrypted, err := encryption.DecryptData(encrypted, rsaKeys, decryptOpts)
+	decrypted, err := asymmetric.Decrypt(encrypted, rsaKeys, decryptOpts)
 	if err != nil {
 		log.Fatal("RSA decryption failed:", err)
 	}
@@ -114,7 +117,7 @@ func demonstrateEnvelopeEncryption() {
 	opts := encryption.DefaultEncryptOptions()
 	opts.Format = encryption.FormatCMS
 
-	encrypted, err := encryption.EncryptData(largeData, rsaKeys, opts)
+	encrypted, err := envelope.Encrypt(largeData, rsaKeys, opts)
 	if err != nil {
 		log.Fatal("Envelope encryption failed:", err)
 	}
@@ -125,7 +128,7 @@ func demonstrateEnvelopeEncryption() {
 
 	// Decrypt the data
 	decryptOpts := encryption.DefaultDecryptOptions()
-	decrypted, err := encryption.DecryptData(encrypted, rsaKeys, decryptOpts)
+	decrypted, err := envelope.Decrypt(encrypted, rsaKeys, decryptOpts)
 	if err != nil {
 		log.Fatal("Envelope decryption failed:", err)
 	}
@@ -169,7 +172,7 @@ func demonstrateCertificateBasedEncryption() {
 	fmt.Printf("Original document: %s\n", document)
 
 	opts := encryption.DefaultEncryptOptions()
-	encrypted, err := encryption.EncryptWithCertificate(document, certificate, opts)
+	encrypted, err := certenc.EncryptDocument(document, certificate, opts)
 	if err != nil {
 		log.Fatal("Certificate-based encryption failed:", err)
 	}
@@ -179,7 +182,7 @@ func demonstrateCertificateBasedEncryption() {
 
 	// Decrypt using the private key
 	decryptOpts := encryption.DefaultDecryptOptions()
-	decrypted, err := encryption.DecryptData(encrypted, rsaKeys, decryptOpts)
+	decrypted, err := certenc.DecryptDocument(encrypted, rsaKeys, decryptOpts)
 	if err != nil {
 		log.Fatal("Certificate-based decryption failed:", err)
 	}
@@ -207,7 +210,7 @@ func demonstrateFormatSupport() {
 
 	// Encrypt once
 	opts := encryption.DefaultEncryptOptions()
-	encrypted, err := encryption.EncryptData(data, rsaKeys, opts)
+	encrypted, err := asymmetric.Encrypt(data, rsaKeys, opts)
 	if err != nil {
 		log.Fatal("Encryption failed:", err)
 	}
@@ -232,7 +235,7 @@ func demonstrateFormatSupport() {
 	}
 
 	// Decrypt
-	decrypted, err := encryption.DecryptData(decodedData, rsaKeys, encryption.DefaultDecryptOptions())
+	decrypted, err := asymmetric.Decrypt(decodedData, rsaKeys, encryption.DefaultDecryptOptions())
 	if err != nil {
 		log.Printf("Failed to decrypt: %v", err)
 		return
@@ -275,21 +278,21 @@ func demonstrateMultiRecipientEncryption() {
 	opts := encryption.DefaultEncryptOptions()
 
 	// Encrypt for Alice (RSA)
-	encryptedForAlice, err := encryption.EncryptData(message, alice, opts)
+	encryptedForAlice, err := envelope.Encrypt(message, alice, opts)
 	if err != nil {
 		log.Fatal("Failed to encrypt for Alice:", err)
 	}
 	fmt.Printf("Encrypted for Alice (RSA): %d bytes\n", len(encryptedForAlice.Data))
 
 	// Encrypt for Bob (RSA)
-	encryptedForBob, err := encryption.EncryptData(message, bob, opts)
+	encryptedForBob, err := envelope.Encrypt(message, bob, opts)
 	if err != nil {
 		log.Fatal("Failed to encrypt for Bob:", err)
 	}
 	fmt.Printf("Encrypted for Bob (RSA): %d bytes\n", len(encryptedForBob.Data))
 
 	// Encrypt for Charlie (RSA)
-	encryptedForCharlie, err := encryption.EncryptData(message, charlie, opts)
+	encryptedForCharlie, err := envelope.Encrypt(message, charlie, opts)
 	if err != nil {
 		log.Fatal("Failed to encrypt for Charlie:", err)
 	}
@@ -299,19 +302,19 @@ func demonstrateMultiRecipientEncryption() {
 	decryptOpts := encryption.DefaultDecryptOptions()
 
 	// Alice decrypts her copy
-	aliceMessage, err := encryption.DecryptData(encryptedForAlice, alice, decryptOpts)
+	aliceMessage, err := envelope.Decrypt(encryptedForAlice, alice, decryptOpts)
 	if err != nil {
 		log.Fatal("Alice failed to decrypt:", err)
 	}
 
 	// Bob decrypts his copy
-	bobMessage, err := encryption.DecryptData(encryptedForBob, bob, decryptOpts)
+	bobMessage, err := envelope.Decrypt(encryptedForBob, bob, decryptOpts)
 	if err != nil {
 		log.Fatal("Bob failed to decrypt:", err)
 	}
 
 	// Charlie decrypts his copy
-	charlieMessage, err := encryption.DecryptData(encryptedForCharlie, charlie, decryptOpts)
+	charlieMessage, err := envelope.Decrypt(encryptedForCharlie, charlie, decryptOpts)
 	if err != nil {
 		log.Fatal("Charlie failed to decrypt:", err)
 	}
