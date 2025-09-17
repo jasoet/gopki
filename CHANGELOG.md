@@ -1,3 +1,17 @@
+## [1.9.0](https://github.com/jasoet/gopki/compare/v1.8.0...v1.9.0) (2025-09-17)
+
+
+### ✨ Features
+
+* add testify assertion library for improved test quality ([b7fd524](https://github.com/jasoet/gopki/commit/b7fd5240ef95c9cfa570e5cc2ef5993653222d51))
+* **keypair:** restructure RSA tests and enhance key handling ([bfab19f](https://github.com/jasoet/gopki/commit/bfab19f2c0fd2df4724096f8f18ac143331dfd9c))
+* update README with encryption module and sync with CLAUDE.md changes ([2480aeb](https://github.com/jasoet/gopki/commit/2480aeb2d07835fdc7de4cd085353fdc3ae3565e))
+
+
+### ✅ Tests
+
+* add comprehensive unit tests for ECDSA and Ed25519 algorithms ([b2ea014](https://github.com/jasoet/gopki/commit/b2ea0149b64b15e3f3a1df153574ec055e3eb398))
+
 ## [1.8.0](https://github.com/jasoet/gopki/compare/v1.7.0...v1.8.0) (2025-09-17)
 
 
