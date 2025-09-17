@@ -205,6 +205,18 @@ func demonstrateFormatSupport() {
 		log.Fatal("Failed to generate RSA key pair:", err)
 	}
 
+	// Create a test certificate for CMS decryption
+	testCert, err := cert.CreateSelfSignedCertificate(rsaKeys, cert.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName:   "CMS Test Certificate",
+			Organization: []string{"GoPKI Example"},
+		},
+		ValidFor: 365 * 24 * time.Hour,
+	})
+	if err != nil {
+		log.Fatal("Failed to create test certificate:", err)
+	}
+
 	data := []byte("Format demonstration data")
 	fmt.Printf("Original data: %s\n", data)
 
@@ -227,10 +239,11 @@ func demonstrateFormatSupport() {
 
 	fmt.Printf("Encoded size: %d bytes\n", len(encodedData))
 
-	// Decode back from CMS format
-	decodedData, err := encryption.DecodeData(encodedData)
+	// Decode back from CMS format using type-safe API
+	// Note: CMS decoding now requires certificate and private key for security
+	decodedData, err := encryption.DecodeDataWithKey(encodedData, testCert.Certificate, rsaKeys.PrivateKey)
 	if err != nil {
-		log.Printf("Failed to decode from CMS format: %v", err)
+		log.Printf("Error decoding CMS data: %v", err)
 		return
 	}
 

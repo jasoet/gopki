@@ -107,7 +107,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/jasoet/gopki/cert"
+	"github.com/jasoet/gopki/keypair"
 )
 
 // EncryptionAlgorithm represents the algorithm used for encryption
@@ -150,7 +150,7 @@ type EncryptedData struct {
 	// Timestamp when encrypted
 	Timestamp time.Time
 	// Additional metadata
-	Metadata map[string]interface{}
+	Metadata map[string]any
 }
 
 // RecipientInfo contains information about an encryption recipient
@@ -183,7 +183,7 @@ type KDFParams struct {
 	// Key length
 	KeyLength int
 	// Additional parameters
-	Params map[string]interface{}
+	Params map[string]any
 }
 
 // EncryptOptions contains options for encryption operations
@@ -194,12 +194,12 @@ type EncryptOptions struct {
 	Format EncryptionFormat
 	// Include recipient certificate
 	IncludeCertificate bool
-	// Additional recipients for multi-recipient encryption
-	Recipients []any
+	// Additional certificate recipients for multi-recipient encryption
+	CertificateRecipients []*x509.Certificate
 	// Key derivation function parameters
 	KDF *KDFParams
 	// Custom metadata
-	Metadata map[string]interface{}
+	Metadata map[string]any
 }
 
 // DecryptOptions contains options for decryption operations
@@ -215,40 +215,57 @@ type DecryptOptions struct {
 	// Skip expiration check
 	SkipExpirationCheck bool
 	// Additional validation options
-	ValidationOptions map[string]interface{}
+	ValidationOptions map[string]any
 }
 
-// Encryptor interface for encryption operations using existing keypair abstractions
-// Internal interface uses any for flexibility, but public APIs use generic constraints
-type Encryptor interface {
-	// Encrypt data using a key pair (internal - use public APIs)
-	Encrypt(data []byte, keyPair any, opts EncryptOptions) (*EncryptedData, error)
-	// Encrypt data for a specific public key (internal - use public APIs)
-	EncryptForPublicKey(data []byte, publicKey any, opts EncryptOptions) (*EncryptedData, error)
+// Generic Interfaces for Type Safety
+
+// Encryptor provides type-safe encryption operations
+type Encryptor[K keypair.KeyPair] interface {
+	// Encrypt data using a key pair
+	Encrypt(data []byte, keyPair K, opts EncryptOptions) (*EncryptedData, error)
+	// Get supported algorithms
+	SupportedAlgorithms() []EncryptionAlgorithm
+}
+
+// PublicKeyEncryptor provides type-safe public key encryption
+type PublicKeyEncryptor[P keypair.PublicKey] interface {
+	// Encrypt data for a specific public key
+	EncryptForPublicKey(data []byte, publicKey P, opts EncryptOptions) (*EncryptedData, error)
+	// Get supported algorithms
+	SupportedAlgorithms() []EncryptionAlgorithm
+}
+
+// Decryptor provides type-safe decryption operations
+type Decryptor[K keypair.KeyPair] interface {
+	// Decrypt data using a key pair
+	Decrypt(encrypted *EncryptedData, keyPair K, opts DecryptOptions) ([]byte, error)
+	// Get supported algorithms
+	SupportedAlgorithms() []EncryptionAlgorithm
+}
+
+// PrivateKeyDecryptor provides type-safe private key decryption
+type PrivateKeyDecryptor[P keypair.PrivateKey] interface {
+	// Decrypt data using a private key
+	DecryptWithPrivateKey(encrypted *EncryptedData, privateKey P, opts DecryptOptions) ([]byte, error)
+	// Get supported algorithms
+	SupportedAlgorithms() []EncryptionAlgorithm
+}
+
+// CertificateEncryptor provides type-safe certificate-based encryption
+type CertificateEncryptor interface {
 	// Encrypt data using a certificate
-	EncryptWithCertificate(data []byte, certificate *cert.Certificate, opts EncryptOptions) (*EncryptedData, error)
+	EncryptWithCertificate(data []byte, certificate *x509.Certificate, opts EncryptOptions) (*EncryptedData, error)
 	// Get supported algorithms
 	SupportedAlgorithms() []EncryptionAlgorithm
 }
 
-// Decryptor interface for decryption operations using existing keypair abstractions
-// Internal interface uses any for flexibility, but public APIs use generic constraints
-type Decryptor interface {
-	// Decrypt data using a key pair (internal - use public APIs)
-	Decrypt(encrypted *EncryptedData, keyPair any, opts DecryptOptions) ([]byte, error)
-	// Decrypt data using a private key (internal - use public APIs)
-	DecryptWithPrivateKey(encrypted *EncryptedData, privateKey any, opts DecryptOptions) ([]byte, error)
-	// Get supported algorithms
-	SupportedAlgorithms() []EncryptionAlgorithm
-}
-
-// MultiRecipientEncryptor interface for multi-recipient encryption
-// Internal interface uses any for flexibility, but public APIs use generic constraints
+// MultiRecipientEncryptor provides type-safe multi-recipient encryption for certificates
 type MultiRecipientEncryptor interface {
-	// Encrypt for multiple recipients (internal - use public APIs)
-	EncryptForRecipients(data []byte, recipients []any, opts EncryptOptions) (*EncryptedData, error)
-	// Add recipient to existing encrypted data (internal - use public APIs)
-	AddRecipient(encrypted *EncryptedData, recipient any) error
+	// Encrypt for multiple certificate recipients
+	EncryptForCertificates(data []byte, certificates []*x509.Certificate, opts EncryptOptions) (*EncryptedData, error)
+	// Add certificate recipient to existing encrypted data
+	AddCertificateRecipient(encrypted *EncryptedData, certificate *x509.Certificate) error
 }
 
 // Common error types
@@ -267,12 +284,12 @@ var (
 // DefaultEncryptOptions returns default encryption options
 func DefaultEncryptOptions() EncryptOptions {
 	return EncryptOptions{
-		Algorithm:          AlgorithmEnvelope,
-		Format:             FormatCMS, // CMS is the only supported format
-		IncludeCertificate: false,
-		Recipients:         nil,
-		KDF:                nil,
-		Metadata:           make(map[string]interface{}),
+		Algorithm:             AlgorithmEnvelope,
+		Format:                FormatCMS, // CMS is the only supported format
+		IncludeCertificate:    false,
+		CertificateRecipients: nil,
+		KDF:                   nil,
+		Metadata:              make(map[string]any),
 	}
 }
 
@@ -284,7 +301,7 @@ func DefaultDecryptOptions() DecryptOptions {
 		MaxAge:              24 * time.Hour,
 		VerifyTime:          time.Time{}, // Zero time means use current time
 		SkipExpirationCheck: false,
-		ValidationOptions:   make(map[string]interface{}),
+		ValidationOptions:   make(map[string]any),
 	}
 }
 
@@ -338,13 +355,15 @@ func EncodeData(data *EncryptedData) ([]byte, error) {
 	return EncodeToCMS(data)
 }
 
-// DecodeData decodes CMS format bytes back to EncryptedData
-// Since CMS is the only supported format, this is a convenience function
-func DecodeData(data []byte) (*EncryptedData, error) {
+// DecodeDataWithKey decodes CMS format bytes back to EncryptedData using certificate and private key
+// This is the secure way to decode CMS data that requires explicit decryption credentials.
+//
+// T represents the private key type (*rsa.PrivateKey, *ecdsa.PrivateKey, or ed25519.PrivateKey)
+func DecodeDataWithKey[T keypair.PrivateKey](data []byte, cert *x509.Certificate, privateKey T) (*EncryptedData, error) {
 	if len(data) == 0 {
 		return nil, errors.New("data is empty")
 	}
-	return DecodeFromCMS(data)
+	return DecodeFromCMS(data, cert, privateKey)
 }
 
 // ValidateEncodedData validates that the data is in valid CMS format
