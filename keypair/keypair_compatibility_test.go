@@ -10,10 +10,9 @@ import (
 // Advanced compatibility tests with format conversion are in integration tests
 func TestAlgorithmCompatibilityBasic(t *testing.T) {
 	// Test that all algorithms can generate keys successfully
-	_, err := algo.GenerateRSAKeyPair(2048)
-	if err != nil {
-		t.Fatalf("Failed to generate RSA key: %v", err)
-	}
+	kp, err := algo.GenerateRSAKeyPair(2048)
+	assertNotNil(t, kp)
+	assertNoError(t, err)
 
 	_, err = algo.GenerateECDSAKeyPair(algo.P256)
 	if err != nil {

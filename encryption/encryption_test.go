@@ -4,74 +4,34 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/jasoet/gopki/keypair/algo"
 )
 
 func TestDefaultEncryptOptions(t *testing.T) {
 	opts := DefaultEncryptOptions()
 
-	// Test default values
-	if opts.Algorithm != AlgorithmEnvelope {
-		t.Errorf("Expected default algorithm to be AlgorithmEnvelope, got %s", opts.Algorithm)
-	}
-
-	if opts.Format != FormatCMS {
-		t.Errorf("Expected default format to be FormatCMS, got %s", opts.Format)
-	}
-
-	if opts.IncludeCertificate != false {
-		t.Errorf("Expected default IncludeCertificate to be false, got %v", opts.IncludeCertificate)
-	}
-
-	if opts.CertificateRecipients != nil {
-		t.Errorf("Expected default CertificateRecipients to be nil, got %v", opts.CertificateRecipients)
-	}
-
-	if opts.KDF != nil {
-		t.Errorf("Expected default KDF to be nil, got %v", opts.KDF)
-	}
-
-	if opts.Metadata == nil {
-		t.Error("Expected default Metadata to be initialized, got nil")
-	}
-
-	if len(opts.Metadata) != 0 {
-		t.Errorf("Expected default Metadata to be empty, got %d entries", len(opts.Metadata))
-	}
+	// Test default values using assert
+	assert.Equal(t, AlgorithmEnvelope, opts.Algorithm, "Expected default algorithm to be AlgorithmEnvelope")
+	assert.Equal(t, FormatCMS, opts.Format, "Expected default format to be FormatCMS")
+	assert.False(t, opts.IncludeCertificate, "Expected default IncludeCertificate to be false")
+	assert.Nil(t, opts.CertificateRecipients, "Expected default CertificateRecipients to be nil")
+	assert.Nil(t, opts.KDF, "Expected default KDF to be nil")
+	assert.NotNil(t, opts.Metadata, "Expected default Metadata to be initialized")
+	assert.Empty(t, opts.Metadata, "Expected default Metadata to be empty")
 }
 
 func TestDefaultDecryptOptions(t *testing.T) {
 	opts := DefaultDecryptOptions()
 
-	// Test default values
-	if opts.ExpectedAlgorithm != "" {
-		t.Errorf("Expected default ExpectedAlgorithm to be empty, got %s", opts.ExpectedAlgorithm)
-	}
-
-	if opts.VerifyTimestamp != false {
-		t.Errorf("Expected default VerifyTimestamp to be false, got %v", opts.VerifyTimestamp)
-	}
-
-	expectedMaxAge := 24 * time.Hour
-	if opts.MaxAge != expectedMaxAge {
-		t.Errorf("Expected default MaxAge to be %v, got %v", expectedMaxAge, opts.MaxAge)
-	}
-
-	if !opts.VerifyTime.IsZero() {
-		t.Errorf("Expected default VerifyTime to be zero time, got %v", opts.VerifyTime)
-	}
-
-	if opts.SkipExpirationCheck != false {
-		t.Errorf("Expected default SkipExpirationCheck to be false, got %v", opts.SkipExpirationCheck)
-	}
-
-	if opts.ValidationOptions == nil {
-		t.Error("Expected default ValidationOptions to be initialized, got nil")
-	}
-
-	if len(opts.ValidationOptions) != 0 {
-		t.Errorf("Expected default ValidationOptions to be empty, got %d entries", len(opts.ValidationOptions))
-	}
+	// Test default values using assert
+	assert.Empty(t, opts.ExpectedAlgorithm, "Expected default ExpectedAlgorithm to be empty")
+	assert.False(t, opts.VerifyTimestamp, "Expected default VerifyTimestamp to be false")
+	assert.Equal(t, 24*time.Hour, opts.MaxAge, "Expected default MaxAge to be 24 hours")
+	assert.True(t, opts.VerifyTime.IsZero(), "Expected default VerifyTime to be zero time")
+	assert.False(t, opts.SkipExpirationCheck, "Expected default SkipExpirationCheck to be false")
+	assert.NotNil(t, opts.ValidationOptions, "Expected default ValidationOptions to be initialized")
+	assert.Empty(t, opts.ValidationOptions, "Expected default ValidationOptions to be empty")
 }
 
 func TestGetAlgorithmForKeyType(t *testing.T) {
@@ -91,9 +51,7 @@ func TestGetAlgorithmForKeyType(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.keyType, func(t *testing.T) {
 			result := GetAlgorithmForKeyType(tc.keyType)
-			if result != tc.expectedAlg {
-				t.Errorf("For key type %s, expected %s, got %s", tc.keyType, tc.expectedAlg, result)
-			}
+			assert.Equal(t, tc.expectedAlg, result, "For key type %s", tc.keyType)
 		})
 	}
 }
@@ -115,9 +73,7 @@ func TestValidateEncryptOptions(t *testing.T) {
 			}
 
 			err := ValidateEncryptOptions(opts)
-			if err != nil {
-				t.Errorf("Expected valid options for algorithm %s to pass validation, got error: %v", alg, err)
-			}
+			assert.NoError(t, err, "Valid options for algorithm %s should pass validation", alg)
 		}
 	})
 
@@ -128,9 +84,7 @@ func TestValidateEncryptOptions(t *testing.T) {
 		}
 
 		err := ValidateEncryptOptions(opts)
-		if err != ErrUnsupportedAlgorithm {
-			t.Errorf("Expected ErrUnsupportedAlgorithm for invalid algorithm, got: %v", err)
-		}
+		assert.ErrorIs(t, err, ErrUnsupportedAlgorithm, "Should return ErrUnsupportedAlgorithm for invalid algorithm")
 	})
 
 	t.Run("InvalidFormat", func(t *testing.T) {
@@ -140,9 +94,7 @@ func TestValidateEncryptOptions(t *testing.T) {
 		}
 
 		err := ValidateEncryptOptions(opts)
-		if err != ErrUnsupportedFormat {
-			t.Errorf("Expected ErrUnsupportedFormat for invalid format, got: %v", err)
-		}
+		assert.ErrorIs(t, err, ErrUnsupportedFormat, "Should return ErrUnsupportedFormat for invalid format")
 	})
 
 	t.Run("EmptyAlgorithm", func(t *testing.T) {

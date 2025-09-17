@@ -218,8 +218,6 @@ type DecryptOptions struct {
 	ValidationOptions map[string]any
 }
 
-// Generic Interfaces for Type Safety
-
 // Encryptor provides type-safe encryption operations
 type Encryptor[K keypair.KeyPair] interface {
 	Encrypt(data []byte, keyPair K, opts EncryptOptions) (*EncryptedData, error)
