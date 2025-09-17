@@ -533,18 +533,18 @@ func TestEd25519KeyPair_PublicKeyToSSH(t *testing.T) {
 	assert.NotEmpty(t, sshData)
 
 	// Verify SSH format starts with Ed25519 prefix
-	assert.True(t, strings.HasPrefix(sshData, "ssh-ed25519 "), "SSH key should start with 'ssh-ed25519 '")
-	assert.Contains(t, sshData, "user@example.com", "SSH key should contain comment")
-	assert.Equal(t, 3, len(strings.Fields(sshData)), "SSH key should have 3 parts")
+	assert.True(t, strings.HasPrefix(string(sshData), "ssh-ed25519 "), "SSH key should start with 'ssh-ed25519 '")
+	assert.Contains(t, string(sshData), "user@example.com", "SSH key should contain comment")
+	assert.Equal(t, 3, len(strings.Fields(string(sshData))), "SSH key should have 3 parts")
 
 	// Test without comment
 	sshDataNoComment, err := keyPair.PublicKeyToSSH("")
 	assert.NoError(t, err)
-	assert.Equal(t, 2, len(strings.Fields(sshDataNoComment)), "SSH key without comment should have 2 parts")
-	assert.True(t, strings.HasPrefix(sshDataNoComment, "ssh-ed25519 "))
+	assert.Equal(t, 2, len(strings.Fields(string(sshDataNoComment))), "SSH key without comment should have 2 parts")
+	assert.True(t, strings.HasPrefix(string(sshDataNoComment), "ssh-ed25519 "))
 
 	// Verify the SSH public key is properly formatted and compact
-	parts := strings.Fields(sshData)
+	parts := strings.Fields(string(sshData))
 	assert.Equal(t, "ssh-ed25519", parts[0])
 	assert.True(t, len(parts[1]) > 40, "Base64 encoded key should be substantial")
 }
@@ -623,7 +623,7 @@ func TestEd25519KeyPairFromSSH_InvalidSSH(t *testing.T) {
 			sshData: func() string {
 				keyPair, _ := GenerateEd25519KeyPair()
 				sshData, _ := keyPair.PrivateKeyToSSH("test", "correct-passphrase")
-				return sshData
+				return string(sshData)
 			}(),
 			passphrase: "wrong-passphrase",
 			errMsg:     "failed to parse SSH private key",
@@ -632,7 +632,7 @@ func TestEd25519KeyPairFromSSH_InvalidSSH(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			keyPair, err := Ed25519KeyPairFromSSH(tt.sshData, tt.passphrase)
+			keyPair, err := Ed25519KeyPairFromSSH(SSH(tt.sshData), tt.passphrase)
 
 			assert.Error(t, err)
 			assert.Nil(t, keyPair)

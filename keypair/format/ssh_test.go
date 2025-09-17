@@ -4,78 +4,78 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
 )
 
 func TestPublicKeyToSSH_RSA(t *testing.T) {
-	// Generate RSA key pair
-	rsaKeyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
-	if err != nil {
-		t.Fatalf("Failed to generate RSA key pair: %v", err)
-	}
+	keySizes := []algo.KeySize{algo.KeySize2048, algo.KeySize3072, algo.KeySize4096}
 
-	// Convert to SSH format
-	sshData, err := PublicKeyToSSH(&rsaKeyPair.PrivateKey.PublicKey, "test@example.com")
-	if err != nil {
-		t.Fatalf("Failed to convert RSA public key to SSH: %v", err)
-	}
+	for _, keySize := range keySizes {
+		t.Run(fmt.Sprintf("KeySize_%d", keySize.Bits()), func(t *testing.T) {
+			// Generate RSA key pair using new KeySize constants
+			rsaKeyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](keySize)
+			assert.NoError(t, err, "Failed to generate RSA key pair")
 
-	// Verify SSH format
-	if !strings.HasPrefix(string(sshData), "ssh-rsa ") {
-		t.Error("SSH RSA public key should start with 'ssh-rsa '")
-	}
+			// Convert to SSH format
+			sshData, err := PublicKeyToSSH(&rsaKeyPair.PrivateKey.PublicKey, "test@example.com")
+			assert.NoError(t, err, "Failed to convert RSA public key to SSH")
 
-	if !strings.Contains(string(sshData), "test@example.com") {
-		t.Error("SSH key should contain the comment")
-	}
+			// Verify SSH format
+			assert.True(t, strings.HasPrefix(string(sshData), "ssh-rsa "), "SSH RSA public key should start with 'ssh-rsa '")
+			assert.Contains(t, string(sshData), "test@example.com", "SSH key should contain the comment")
+			assert.Equal(t, 3, len(strings.Fields(string(sshData))), "SSH key should have 3 parts: algorithm, key, comment")
 
-	// Verify round-trip
-	parsedKey, err := ParsePublicKeyFromSSH[*rsa.PublicKey](sshData)
-	if err != nil {
-		t.Fatalf("Failed to parse SSH RSA public key: %v", err)
-	}
+			// Test without comment
+			sshDataNoComment, err := PublicKeyToSSH(&rsaKeyPair.PrivateKey.PublicKey, "")
+			assert.NoError(t, err, "Failed to convert RSA public key to SSH without comment")
+			assert.Equal(t, 2, len(strings.Fields(string(sshDataNoComment))), "SSH key without comment should have 2 parts")
 
-	// Verify key properties match
-	if parsedKey.N.Cmp(rsaKeyPair.PrivateKey.PublicKey.N) != 0 {
-		t.Error("Public key modulus doesn't match after SSH round-trip")
+			// Verify round-trip
+			parsedKey, err := ParsePublicKeyFromSSH[*rsa.PublicKey](sshData)
+			assert.NoError(t, err, "Failed to parse SSH RSA public key")
+			assert.NotNil(t, parsedKey, "Parsed key should not be nil")
+
+			// Verify key properties match
+			assert.Equal(t, 0, parsedKey.N.Cmp(rsaKeyPair.PrivateKey.PublicKey.N), "Public key modulus should match after SSH round-trip")
+			assert.Equal(t, parsedKey.E, rsaKeyPair.PrivateKey.PublicKey.E, "Public key exponent should match after SSH round-trip")
+		})
 	}
 }
 
 func TestPublicKeyToSSH_ECDSA(t *testing.T) {
-	// Generate ECDSA key pair
-	ecdsaKeyPair, err := keypair.GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
-	if err != nil {
-		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
-	}
+	curves := []algo.ECDSACurve{algo.P224, algo.P256, algo.P384, algo.P521}
+	expectedPrefixes := []string{"ecdsa-sha2-nistp224", "ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384", "ecdsa-sha2-nistp521"}
 
-	// Convert to SSH format
-	sshData, err := PublicKeyToSSH(&ecdsaKeyPair.PrivateKey.PublicKey, "ecdsa-test@example.com")
-	if err != nil {
-		t.Fatalf("Failed to convert ECDSA public key to SSH: %v", err)
-	}
+	for i, curve := range curves {
+		t.Run(curve.Curve().Params().Name, func(t *testing.T) {
+			// Generate ECDSA key pair
+			ecdsaKeyPair, err := keypair.GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](curve)
+			assert.NoError(t, err, "Failed to generate ECDSA key pair")
 
-	// Verify SSH format
-	if !strings.HasPrefix(string(sshData), "ecdsa-sha2-") {
-		t.Error("SSH ECDSA public key should start with 'ecdsa-sha2-'")
-	}
+			// Convert to SSH format
+			sshData, err := PublicKeyToSSH(&ecdsaKeyPair.PrivateKey.PublicKey, "ecdsa-test@example.com")
+			assert.NoError(t, err, "Failed to convert ECDSA public key to SSH")
 
-	if !strings.Contains(string(sshData), "ecdsa-test@example.com") {
-		t.Error("SSH key should contain the comment")
-	}
+			// Verify SSH format
+			assert.True(t, strings.HasPrefix(string(sshData), expectedPrefixes[i]), "SSH ECDSA public key should start with correct curve prefix")
+			assert.Contains(t, string(sshData), "ecdsa-test@example.com", "SSH key should contain the comment")
 
-	// Verify round-trip
-	parsedKey, err := ParsePublicKeyFromSSH[*ecdsa.PublicKey](sshData)
-	if err != nil {
-		t.Fatalf("Failed to parse SSH ECDSA public key: %v", err)
-	}
+			// Verify round-trip
+			parsedKey, err := ParsePublicKeyFromSSH[*ecdsa.PublicKey](sshData)
+			assert.NoError(t, err, "Failed to parse SSH ECDSA public key")
+			assert.NotNil(t, parsedKey, "Parsed key should not be nil")
 
-	// Verify key properties match
-	if parsedKey.X.Cmp(ecdsaKeyPair.PrivateKey.PublicKey.X) != 0 {
-		t.Error("Public key X coordinate doesn't match after SSH round-trip")
+			// Verify key properties match
+			assert.Equal(t, 0, parsedKey.X.Cmp(ecdsaKeyPair.PrivateKey.PublicKey.X), "Public key X coordinate should match")
+			assert.Equal(t, 0, parsedKey.Y.Cmp(ecdsaKeyPair.PrivateKey.PublicKey.Y), "Public key Y coordinate should match")
+			assert.Equal(t, curve.Curve(), parsedKey.Curve, "Curves should match")
+		})
 	}
 }
 

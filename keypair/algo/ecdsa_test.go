@@ -522,15 +522,15 @@ func TestECDSAKeyPair_PublicKeyToSSH(t *testing.T) {
 			assert.NotEmpty(t, sshData)
 
 			// Verify SSH format starts with ECDSA prefix (format varies by curve)
-			assert.True(t, strings.HasPrefix(sshData, "ecdsa-sha2-"), "SSH key should start with ecdsa-sha2- prefix")
-			assert.Contains(t, sshData, "user@example.com", "SSH key should contain comment")
-			assert.Equal(t, 3, len(strings.Fields(sshData)), "SSH key should have 3 parts")
+			assert.True(t, strings.HasPrefix(string(sshData), "ecdsa-sha2-"), "SSH key should start with ecdsa-sha2- prefix")
+			assert.Contains(t, string(sshData), "user@example.com", "SSH key should contain comment")
+			assert.Equal(t, 3, len(strings.Fields(string(sshData))), "SSH key should have 3 parts")
 
 			// Test without comment
 			sshDataNoComment, err := keyPair.PublicKeyToSSH("")
 			assert.NoError(t, err)
-			assert.Equal(t, 2, len(strings.Fields(sshDataNoComment)), "SSH key without comment should have 2 parts")
-			assert.True(t, strings.HasPrefix(sshDataNoComment, "ecdsa-sha2-"))
+			assert.Equal(t, 2, len(strings.Fields(string(sshDataNoComment))), "SSH key without comment should have 2 parts")
+			assert.True(t, strings.HasPrefix(string(sshDataNoComment), "ecdsa-sha2-"))
 		})
 	}
 }
@@ -625,7 +625,7 @@ func TestECDSAKeyPairFromSSH_InvalidSSH(t *testing.T) {
 			sshData: func() string {
 				keyPair, _ := GenerateECDSAKeyPair(P256)
 				sshData, _ := keyPair.PrivateKeyToSSH("test", "correct-passphrase")
-				return sshData
+				return string(sshData)
 			}(),
 			passphrase: "wrong-passphrase",
 			errMsg:     "failed to parse SSH private key",
@@ -634,7 +634,7 @@ func TestECDSAKeyPairFromSSH_InvalidSSH(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			keyPair, err := ECDSAKeyPairFromSSH(tt.sshData, tt.passphrase)
+			keyPair, err := ECDSAKeyPairFromSSH(SSH(tt.sshData), tt.passphrase)
 
 			assert.Error(t, err)
 			assert.Nil(t, keyPair)

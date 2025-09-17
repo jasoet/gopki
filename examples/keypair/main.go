@@ -1,9 +1,6 @@
 package main
 
 import (
-	"crypto/ecdsa"
-	"crypto/ed25519"
-	"crypto/rsa"
 	"crypto/x509/pkix"
 	"fmt"
 	"log"
@@ -13,7 +10,6 @@ import (
 	"github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
-	"github.com/jasoet/gopki/keypair/format"
 )
 
 func main() {
@@ -58,7 +54,7 @@ func main() {
 
 func rsaExample() {
 	// Generate RSA key pair using the generic function
-	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](algo.KeySize2048)
 	if err != nil {
 		log.Fatal("Failed to generate RSA key pair:", err)
 	}
@@ -109,7 +105,7 @@ func ed25519Example() {
 
 func certificateExample() {
 	// Generate a key pair for the certificate
-	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](algo.KeySize2048)
 	if err != nil {
 		log.Fatal("Failed to generate key pair:", err)
 	}
@@ -153,31 +149,38 @@ func detectionExample() {
 			continue
 		}
 
-		// Use the generic detection function - try each type
-		var algorithm string
-		if _, alg, err := format.PrivateKeyFromPEM[*rsa.PrivateKey](pemData); err == nil {
-			algorithm = alg
-		} else if _, alg, err := format.PrivateKeyFromPEM[*ecdsa.PrivateKey](pemData); err == nil {
-			algorithm = alg
-		} else if _, alg, err := format.PrivateKeyFromPEM[ed25519.PrivateKey](pemData); err == nil {
-			algorithm = alg
-		} else {
-			fmt.Printf("   ❌ Failed to detect %s: %v\n", expectedAlgo, err)
+		// Use algo format auto-detection
+		detectedFormat, err := algo.AutoFormat(pemData)
+		if err != nil {
+			fmt.Printf("   ❌ Failed to detect format for %s: %v\n", expectedAlgo, err)
 			continue
 		}
-		fmt.Printf("   ✓ %s detected as: %s\n", expectedAlgo, algorithm)
+
+		// Get format type from the detected format wrapper
+		var formatName string
+		switch detectedFormat.(type) {
+		case algo.PEMFormat:
+			formatName = "PEM"
+		case algo.DERFormat:
+			formatName = "DER"
+		case algo.SSHFormat:
+			formatName = "SSH"
+		default:
+			formatName = "UNKNOWN"
+		}
+		fmt.Printf("   ✓ %s detected as: %s (expected PEM)\n", expectedAlgo, formatName)
 	}
 }
 
 func sshFormatExample() {
 	// Generate RSA key pair for SSH demonstration
-	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](algo.KeySize2048)
 	if err != nil {
 		log.Fatal("Failed to generate RSA key pair for SSH:", err)
 	}
 
-	// Convert public key to SSH format
-	sshPublicKey, err := format.PublicKeyToSSH(keyPair.PublicKey, "user@example.com")
+	// Convert public key to SSH format using algorithm method
+	sshPublicKey, err := keyPair.PublicKeyToSSH("user@example.com")
 	if err != nil {
 		log.Fatal("Failed to convert to SSH public key:", err)
 	}
@@ -188,8 +191,8 @@ func sshFormatExample() {
 		log.Fatal("Failed to save SSH public key:", err)
 	}
 
-	// Convert private key to SSH format (OpenSSH)
-	sshPrivateKey, err := format.PrivateKeyToSSH(keyPair.PrivateKey, "user@example.com", "")
+	// Convert private key to SSH format (OpenSSH) using algorithm method
+	sshPrivateKey, err := keyPair.PrivateKeyToSSH("user@example.com", "")
 	if err != nil {
 		log.Fatal("Failed to convert to SSH private key:", err)
 	}
@@ -204,18 +207,18 @@ func sshFormatExample() {
 	fmt.Printf("   ✓ SSH private key generated: %d bytes\n", len(sshPrivateKey))
 	fmt.Printf("   ✓ Saved to: output/id_rsa, output/id_rsa.pub\n")
 
-	// Demonstrate SSH public key parsing
-	parsedKey, err := format.ParsePublicKeyFromSSH[*rsa.PublicKey](sshPublicKey)
+	// Demonstrate SSH public key round-trip using algorithm method
+	parsedKeyPair, err := algo.RSAKeyPairFromSSH(sshPrivateKey, "")
 	if err != nil {
-		log.Fatal("Failed to parse SSH public key:", err)
+		log.Fatal("Failed to parse SSH private key:", err)
 	}
 
-	fmt.Printf("   ✓ SSH public key parsed successfully (%d-bit)\n", parsedKey.Size()*8)
+	fmt.Printf("   ✓ SSH private key parsed successfully (%d-bit)\n", parsedKeyPair.PrivateKey.Size()*8)
 }
 
 func formatConversionExample() {
 	// Generate RSA key pair for format conversion demonstration
-	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](algo.KeySize2048)
 	if err != nil {
 		log.Fatal("Failed to generate RSA key pair:", err)
 	}
@@ -229,14 +232,14 @@ func formatConversionExample() {
 		log.Fatal("Failed to convert to PEM:", err)
 	}
 
-	// DER format
-	derData, err := format.PrivateKeyToDER(keyPair.PrivateKey)
+	// DER format using algorithm method
+	derData, err := keyPair.PrivateKeyToDER()
 	if err != nil {
 		log.Fatal("Failed to convert to DER:", err)
 	}
 
-	// SSH format
-	sshData, err := format.PublicKeyToSSH(keyPair.PublicKey, "conversion@example.com")
+	// SSH format using algorithm method
+	sshData, err := keyPair.PublicKeyToSSH("conversion@example.com")
 	if err != nil {
 		log.Fatal("Failed to convert to SSH:", err)
 	}
@@ -281,31 +284,44 @@ func formatConversionExample() {
 			continue
 		}
 
-		detected, err := format.DetectFormat(data)
+		detected, err := algo.AutoFormat(data)
 		if err != nil {
 			fmt.Printf("   ❌ Failed to detect format for %s: %v\n", filename, err)
 			continue
 		}
 
+		// Get format type from the detected format wrapper
+		var formatName string
+		switch detected.(type) {
+		case algo.PEMFormat:
+			formatName = "PEM"
+		case algo.DERFormat:
+			formatName = "DER"
+		case algo.SSHFormat:
+			formatName = "SSH"
+		default:
+			formatName = "UNKNOWN"
+		}
+
 		fmt.Printf("   ✓ %s detected as %s (expected %s)\n",
-			filename, detected, expected)
+			filename, formatName, expected)
 	}
 
 	// Demonstrate round-trip conversion
 	fmt.Println("   Round-trip conversion test (PEM → DER → PEM):")
 
-	derFromPEM, err := format.ConvertPEMToDER(pemData)
+	derFromPEM, err := algo.ConvertPEMToDER(algo.PEM(pemData))
 	if err != nil {
 		log.Fatal("PEM to DER conversion failed:", err)
 	}
 
-	pemFromDER, err := format.ConvertDERToPEM(derFromPEM, "RSA")
+	pemFromDER, err := algo.ConvertDERToPEM(derFromPEM, "RSA")
 	if err != nil {
 		log.Fatal("DER to PEM conversion failed:", err)
 	}
 
-	// Verify we can parse the result
-	_, err = format.ParsePrivateKeyFromPEM[*rsa.PrivateKey](pemFromDER)
+	// Verify we can parse the result using RSA algorithm method
+	_, err = algo.RSAKeyPairFromPEM(pemFromDER)
 	if err != nil {
 		log.Fatal("Failed to parse round-trip PEM:", err)
 	}

@@ -485,15 +485,15 @@ func TestRSAKeyPair_PublicKeyToSSH(t *testing.T) {
 			assert.NotEmpty(t, sshData)
 
 			// Verify SSH format
-			assert.True(t, strings.HasPrefix(sshData, "ssh-rsa "), "SSH key should start with 'ssh-rsa '")
-			assert.Contains(t, sshData, "user@example.com", "SSH key should contain comment")
-			assert.Equal(t, 3, len(strings.Fields(sshData)), "SSH key should have 3 parts")
+			assert.True(t, strings.HasPrefix(string(sshData), "ssh-rsa "), "SSH key should start with 'ssh-rsa '")
+			assert.Contains(t, string(sshData), "user@example.com", "SSH key should contain comment")
+			assert.Equal(t, 3, len(strings.Fields(string(sshData))), "SSH key should have 3 parts")
 
 			// Test without comment
 			sshDataNoComment, err := keyPair.PublicKeyToSSH("")
 			assert.NoError(t, err)
-			assert.Equal(t, 2, len(strings.Fields(sshDataNoComment)), "SSH key without comment should have 2 parts")
-			assert.True(t, strings.HasPrefix(sshDataNoComment, "ssh-rsa "))
+			assert.Equal(t, 2, len(strings.Fields(string(sshDataNoComment))), "SSH key without comment should have 2 parts")
+			assert.True(t, strings.HasPrefix(string(sshDataNoComment), "ssh-rsa "))
 		})
 	}
 }
@@ -567,7 +567,7 @@ func TestRSAKeyPairFromSSH_InvalidSSH(t *testing.T) {
 			sshData: func() string {
 				keyPair, _ := GenerateRSAKeyPair(KeySize2048)
 				sshData, _ := keyPair.PrivateKeyToSSH("test", "correct-passphrase")
-				return sshData
+				return string(sshData)
 			}(),
 			passphrase: "wrong-passphrase",
 			errMsg:     "failed to parse SSH private key",
@@ -576,7 +576,7 @@ func TestRSAKeyPairFromSSH_InvalidSSH(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			keyPair, err := RSAKeyPairFromSSH(tt.sshData, tt.passphrase)
+			keyPair, err := RSAKeyPairFromSSH(SSH(tt.sshData), tt.passphrase)
 
 			assert.Error(t, err)
 			assert.Nil(t, keyPair)
