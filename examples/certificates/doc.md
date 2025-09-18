@@ -1,920 +1,686 @@
-# Certificate Module
+# Certificate Module Documentation
 
-X.509 certificate creation and management with support for self-signed certificates, Certificate Authorities (CAs), and complex PKI hierarchies.
-
-> 📖 **Related Documentation**: [KeyPair Module](KeyPair.md) | [Signing Module](Signing.md) | [Main README](../README.md)
+Complete documentation for the GoPKI Certificate module, demonstrating X.509 certificate creation, management, and PKI operations.
 
 ## Table of Contents
-- [PKI Theory](#pki-theory)
-- [Certificate Types](#certificate-types)
-- [Architecture](#architecture)
-- [API Reference](#api-reference)
-- [Tutorial](#tutorial)
-- [Certificate Chains](#certificate-chains)
-- [Best Practices](#best-practices)
-- [Examples](#examples)
+- [Overview](#overview)
+- [Core Certificate Operations](#core-certificate-operations)
+- [Advanced CA Hierarchies](#advanced-ca-hierarchies)
+- [Multi-Algorithm Support](#multi-algorithm-support)
+- [Subject Alternative Names (SAN)](#subject-alternative-names-san)
+- [Format Operations](#format-operations)
+- [PKCS#12 Integration](#pkcs12-integration)
+- [Certificate Validation](#certificate-validation)
+- [Integration & Best Practices](#integration--best-practices)
 
-## Features
+## Overview
 
-- **Multiple Certificate Types**: Self-signed, CA certificates, and intermediate CAs
-- **Type-Safe Integration**: Works with the KeyPair module's generic constraints
-- **Certificate Chains**: Support for multi-level certificate hierarchies
-- **Path Length Controls**: Configurable CA depth restrictions
-- **Multi-Format Support**: PEM and DER format support with seamless conversion
-- **File Operations**: Save and load certificates with proper metadata
-- **Certificate Verification**: Built-in certificate chain validation
+The Certificate module provides comprehensive X.509 certificate creation and management capabilities with type-safe integration across all supported cryptographic algorithms. It supports the complete PKI lifecycle from root CA creation to end-entity certificate validation.
 
-## PKI Theory
+### Key Design Principles
+- **Type Safety**: Seamless integration with keypair module's generic constraints
+- **PKI Hierarchy Support**: Root CA → Intermediate CA → End-entity chains
+- **Algorithm Agnostic**: Works with RSA, ECDSA, and Ed25519 keys
+- **Format Flexibility**: PEM and DER formats with conversion capabilities
+- **Enterprise Ready**: PKCS#12 integration, path length constraints, comprehensive SAN support
 
-### Public Key Infrastructure (PKI)
-
-PKI is a framework that manages digital keys and certificates to enable secure communications. It consists of:
-
-1. **Certificate Authorities (CAs)**: Trusted entities that issue certificates
-2. **Registration Authorities (RAs)**: Verify identity before certificate issuance
-3. **Certificates**: Digital documents that bind public keys to identities
-4. **Certificate Revocation Lists (CRLs)**: Lists of revoked certificates
-
-### X.509 Certificates
-
-X.509 is the standard format for public key certificates, containing:
-
-- **Subject**: Entity the certificate identifies
-- **Public Key**: The actual public key
-- **Issuer**: CA that issued the certificate
-- **Validity Period**: Start and end dates
-- **Extensions**: Additional certificate properties
-- **Digital Signature**: CA's signature proving authenticity
-
-### Trust Models
-
-#### Hierarchical Trust Model
-```
-Root CA (Self-signed)
-├── Intermediate CA 1
-│   ├── Server Certificate (www.example.com)
-│   └── Client Certificate (user@example.com)
-└── Intermediate CA 2
-    └── Code Signing Certificate
-```
-
-#### Web of Trust Model
-Used in systems like PGP, where trust is established through multiple paths rather than a single authority.
-
-## Certificate Types
+## Core Certificate Operations
 
 ### 1. Self-Signed Certificates
-
-**Purpose**: Direct authentication without CA intermediary  
-**Use Cases**: Development, testing, internal services  
-**Trust**: Must be explicitly trusted by clients
-
-**Characteristics**:
-- Subject == Issuer (signs itself)
-- No CA certificate chain required
-- Not trusted by browsers by default
-- Good for encrypted communication when trust is established out-of-band
-
-### 2. CA Certificates (Root CA)
-
-**Purpose**: Issue and sign other certificates  
-**Use Cases**: Root of trust for organizations  
-**Trust**: Manually installed in trust stores
-
-**Characteristics**:
-- `IsCA: true`
-- `KeyUsage: CertSign + CRLSign`
-- Long validity periods (10+ years)
-- Configurable path length constraints
-
-### 3. Intermediate CA Certificates
-
-**Purpose**: Issued by root CA to sign end-entity certificates  
-**Use Cases**: Operational certificate issuance, delegation  
-**Trust**: Validated through certificate chain to root CA
-
-**Characteristics**:
-- `IsCA: true`
-- Signed by another CA (not self-signed)
-- Shorter validity than root CA
-- Path length restrictions inherited from parent
-
-### 4. End-Entity Certificates
-
-**Purpose**: Identify servers, clients, or applications  
-**Use Cases**: TLS/SSL, email encryption, code signing  
-**Trust**: Validated through certificate chain
-
-**Characteristics**:
-- `IsCA: false`
-- Contains subject alternative names (SANs)
-- Specific key usage restrictions
-- Cannot sign other certificates
-
-## Architecture
-
-### Core Types
+Self-signed certificates are certificates signed by their own private key, typically used for testing, development, or root CA certificates.
 
 ```go
-type Certificate struct {
-    Certificate *x509.Certificate  // Parsed certificate
-    PEMData     []byte            // PEM-encoded data
+import (
+    "github.com/jasoet/gopki/cert"
+    "github.com/jasoet/gopki/keypair/algo"
+)
+
+// Generate key pair
+keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+
+// Create certificate request
+request := cert.CertificateRequest{
+    Subject: pkix.Name{
+        Country:            []string{"US"},
+        Organization:       []string{"GoPKI Examples Inc"},
+        OrganizationalUnit: []string{"IT Department"},
+        CommonName:         "GoPKI Self-Signed Certificate",
+    },
+    DNSNames:    []string{"localhost", "example.com"},
+    IPAddresses: []net.IP{net.IPv4(127, 0, 0, 1)},
+    ValidFrom:   time.Now(),
+    ValidFor:    365 * 24 * time.Hour, // 1 year
 }
 
-type CertificateRequest struct {
-    Subject      pkix.Name    // Certificate subject
-    DNSNames     []string     // Subject Alternative Names
-    IPAddresses  []net.IP     // IP address SANs
-    EmailAddress []string     // Email SANs
-    ValidFrom    time.Time    // Validity start
-    ValidFor     time.Duration // Validity period
-    
-    // CA-specific fields
-    IsCA           bool  // Create CA certificate
-    MaxPathLen     int   // Maximum CA chain depth
-    MaxPathLenZero bool  // Explicitly set MaxPathLen to 0
-}
+// Create self-signed certificate
+certificate, err := cert.CreateSelfSignedCertificate(keyPair, request)
+
+// Save certificate
+err = certificate.SaveToFile("self_signed.pem")
 ```
 
-### Key Usage Patterns
+**Features:**
+- Generic support for all key algorithms (RSA, ECDSA, Ed25519)
+- Full Subject Alternative Name (SAN) support
+- Customizable validity periods
+- Automatic key usage assignment (KeyEncipherment + DigitalSignature)
 
-| Certificate Type | KeyUsage | ExtKeyUsage | IsCA |
-|------------------|----------|-------------|------|
-| Self-Signed | KeyEncipherment + DigitalSignature | ServerAuth + ClientAuth | false |
-| CA Certificate | CertSign + CRLSign + DigitalSignature | None | true |
-| Server Certificate | KeyEncipherment + DigitalSignature | ServerAuth | false |
-| Client Certificate | DigitalSignature | ClientAuth | false |
+### 2. Certificate Authority (CA) Certificates
+CA certificates can sign other certificates and are essential for PKI hierarchies.
 
-## API Reference
-
-### Certificate Creation
-
-#### `CreateSelfSignedCertificate[T keypair.KeyPair](keyPair T, request CertificateRequest) (*Certificate, error)`
-Creates a self-signed certificate for direct use.
-
-**Example:**
 ```go
-keyPair, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
-cert, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
-    Subject: pkix.Name{CommonName: "example.com"},
-    DNSNames: []string{"example.com", "www.example.com"},
-})
-```
-
-#### `CreateCACertificate[T keypair.KeyPair](keyPair T, request CertificateRequest) (*Certificate, error)`
-Creates a Certificate Authority certificate that can sign other certificates.
-
-**Example:**
-```go
-caKeyPair, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](4096)
-rootCA, err := cert.CreateCACertificate(caKeyPair, cert.CertificateRequest{
+// Create CA certificate request
+caRequest := cert.CertificateRequest{
     Subject: pkix.Name{
         Country:      []string{"US"},
-        Organization: []string{"Example Corp"},
-        CommonName:   "Example Root CA",
+        Organization: []string{"GoPKI Root CA"},
+        CommonName:   "GoPKI Root Certificate Authority",
     },
-    MaxPathLen: 2, // Can create 2 levels of intermediate CAs
-})
+    IsCA:       true,
+    MaxPathLen: 2, // Allow up to 2 intermediate CAs
+    ValidFrom:  time.Now(),
+    ValidFor:   10 * 365 * 24 * time.Hour, // 10 years
+}
+
+// Create CA certificate
+caCert, err := cert.CreateCACertificate(caKeyPair, caRequest)
 ```
 
-#### `SignCertificate[T keypair.KeyPair](caCert *Certificate, caKeyPair T, request CertificateRequest, subjectPublicKey crypto.PublicKey) (*Certificate, error)`
-Signs a certificate using a CA certificate. Can create both intermediate CAs and end-entity certificates.
+**CA-Specific Features:**
+- **Path Length Constraints**: Control intermediate CA depth
+  - `MaxPathLen > 0`: Allow N intermediate CA levels
+  - `MaxPathLen = 0`: Can only sign end-entity certificates
+  - `MaxPathLen = -1`: No path length limit
+- **Key Usage**: Automatic CertSign + CRLSign + DigitalSignature
+- **BasicConstraints**: CA=true extension added automatically
 
-**End-Entity Certificate:**
+### 3. Certificate Signing
+Sign certificates using a CA certificate and private key.
+
 ```go
-serverCert, err := cert.SignCertificate(
-    rootCA, rootCAKeyPair,
-    cert.CertificateRequest{
-        Subject: pkix.Name{CommonName: "www.example.com"},
-        DNSNames: []string{"www.example.com"},
-        IsCA: false, // End-entity certificate
+// Create server certificate request
+serverRequest := cert.CertificateRequest{
+    Subject: pkix.Name{
+        Country:      []string{"US"},
+        Organization: []string{"GoPKI Web Services"},
+        CommonName:   "api.gopki.example.com",
     },
-    serverKeyPair.PublicKey,
-)
-```
-
-**Intermediate CA Certificate:**
-```go
-intermediateCA, err := cert.SignCertificate(
-    rootCA, rootCAKeyPair,
-    cert.CertificateRequest{
-        Subject: pkix.Name{CommonName: "Example Intermediate CA"},
-        IsCA: true,           // This is a CA certificate
-        MaxPathLen: 0,        // Can only sign end-entity certificates
-        MaxPathLenZero: true,
-    },
-    intermediateKeyPair.PublicKey,
-)
-```
-
-### Certificate Operations
-
-#### `(*Certificate) SaveToFile(filename string) error`
-Saves a certificate to a PEM file.
-
-#### `LoadCertificateFromFile(filename string) (*Certificate, error)`
-Loads a certificate from a PEM file.
-
-#### `ParseCertificateFromPEM(pemData []byte) (*Certificate, error)`
-Parses a certificate from PEM-encoded data.
-
-#### `VerifyCertificate(cert *Certificate, caCert *Certificate) error`
-Verifies that a certificate was signed by a specific CA.
-
-## Tutorial
-
-### Basic Certificate Operations
-
-#### 1. Creating a Self-Signed Certificate
-
-```go
-package main
-
-import (
-    "crypto/x509/pkix"
-    "fmt"
-    "log"
-    
-    "github.com/jasoet/gopki/cert"
-    "github.com/jasoet/gopki/keypair"
-    "github.com/jasoet/gopki/keypair/algo"
-)
-
-func createSelfSignedExample() {
-    // Generate key pair
-    keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
-    if err != nil {
-        log.Fatal(err)
-    }
-    
-    // Create certificate request
-    request := cert.CertificateRequest{
-        Subject: pkix.Name{
-            Country:            []string{"US"},
-            Province:           []string{"California"},
-            Locality:           []string{"San Francisco"},
-            Organization:       []string{"Example Corp"},
-            OrganizationalUnit: []string{"IT Department"},
-            CommonName:         "www.example.com",
-        },
-        DNSNames: []string{
-            "www.example.com",
-            "example.com",
-            "*.example.com",
-        },
-        IPAddresses: []net.IP{
-            net.ParseIP("192.168.1.1"),
-        },
-        EmailAddress: []string{
-            "admin@example.com",
-        },
-    }
-    
-    // Create self-signed certificate
-    certificate, err := cert.CreateSelfSignedCertificate(keyPair, request)
-    if err != nil {
-        log.Fatal(err)
-    }
-    
-    fmt.Printf("Certificate created for: %s\n", certificate.Certificate.Subject.CommonName)
-    fmt.Printf("Valid from: %s\n", certificate.Certificate.NotBefore)
-    fmt.Printf("Valid until: %s\n", certificate.Certificate.NotAfter)
-    fmt.Printf("DNS names: %v\n", certificate.Certificate.DNSNames)
-    
-    // Save to file
-    err = certificate.SaveToFile("server.pem")
-    if err != nil {
-        log.Fatal(err)
-    }
-    fmt.Println("Certificate saved to server.pem")
-}
-```
-
-#### 2. Creating a Simple CA
-
-```go
-func createSimpleCA() {
-    // Generate CA key pair (use larger key for CA)
-    caKeyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](4096)
-    if err != nil {
-        log.Fatal(err)
-    }
-    
-    // Create CA certificate
-    caRequest := cert.CertificateRequest{
-        Subject: pkix.Name{
-            Country:      []string{"US"},
-            Organization: []string{"Example Corp"},
-            CommonName:   "Example Root CA",
-        },
-        // Default MaxPathLen = 0 means can only sign end-entity certificates
-        // Set MaxPathLen > 0 to allow intermediate CAs
-        MaxPathLen: 1, // Can create one level of intermediate CA
-    }
-    
-    rootCA, err := cert.CreateCACertificate(caKeyPair, caRequest)
-    if err != nil {
-        log.Fatal(err)
-    }
-    
-    fmt.Printf("Root CA created: %s\n", rootCA.Certificate.Subject.CommonName)
-    fmt.Printf("CA can sign certificates: %v\n", 
-        rootCA.Certificate.KeyUsage&x509.KeyUsageCertSign != 0)
-    fmt.Printf("Max path length: %d\n", rootCA.Certificate.MaxPathLen)
-    
-    // Save CA certificate
-    err = rootCA.SaveToFile("root-ca.pem")
-    if err != nil {
-        log.Fatal(err)
-    }
-    
-    // Now create a server certificate signed by this CA
-    serverKeyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
-    if err != nil {
-        log.Fatal(err)
-    }
-    
-    serverRequest := cert.CertificateRequest{
-        Subject: pkix.Name{
-            CommonName: "www.example.com",
-        },
-        DNSNames: []string{"www.example.com", "example.com"},
-        // IsCA: false is default - this is an end-entity certificate
-    }
-    
-    serverCert, err := cert.SignCertificate(
-        rootCA, caKeyPair, serverRequest, serverKeyPair.PublicKey)
-    if err != nil {
-        log.Fatal(err)
-    }
-    
-    fmt.Printf("Server certificate created: %s\n", serverCert.Certificate.Subject.CommonName)
-    fmt.Printf("Issued by: %s\n", serverCert.Certificate.Issuer.CommonName)
-    
-    // Verify the certificate
-    err = cert.VerifyCertificate(serverCert, rootCA)
-    if err != nil {
-        log.Fatal("Certificate verification failed:", err)
-    }
-    fmt.Println("✓ Certificate verification successful")
-    
-    // Save server certificate
-    err = serverCert.SaveToFile("server-signed.pem")
-    if err != nil {
-        log.Fatal(err)
-    }
-}
-```
-
-### Advanced Certificate Chains
-
-#### 3. Multi-Level Certificate Chain
-
-```go
-func createCertificateChain() {
-    fmt.Println("=== Creating Multi-Level Certificate Chain ===")
-    
-    // 1. Root CA (MaxPathLen = 2)
-    rootKeyPair, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](4096)
-    rootCA, err := cert.CreateCACertificate(rootKeyPair, cert.CertificateRequest{
-        Subject: pkix.Name{
-            Country:      []string{"US"},
-            Organization: []string{"Example Corp"},
-            CommonName:   "Example Root CA",
-        },
-        MaxPathLen: 2, // Can create 2 levels of intermediate CAs
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
-    fmt.Printf("1. Root CA created (MaxPathLen=2): %s\n", rootCA.Certificate.Subject.CommonName)
-    
-    // 2. Intermediate CA Level 1 (MaxPathLen = 1) 
-    intermediate1KeyPair, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](3072)
-    intermediate1CA, err := cert.SignCertificate(
-        rootCA, rootKeyPair,
-        cert.CertificateRequest{
-            Subject: pkix.Name{
-                Country:      []string{"US"},
-                Organization: []string{"Example Corp"},
-                CommonName:   "Example Intermediate CA Level 1",
-            },
-            IsCA:       true,
-            MaxPathLen: 1, // Can create 1 more level of intermediate CA
-        },
-        intermediate1KeyPair.PublicKey,
-    )
-    if err != nil {
-        log.Fatal(err)
-    }
-    fmt.Printf("2. Intermediate CA L1 created (MaxPathLen=1): %s\n", 
-        intermediate1CA.Certificate.Subject.CommonName)
-    
-    // 3. Intermediate CA Level 2 (MaxPathLen = 0)
-    intermediate2KeyPair, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
-    intermediate2CA, err := cert.SignCertificate(
-        intermediate1CA, intermediate1KeyPair,
-        cert.CertificateRequest{
-            Subject: pkix.Name{
-                Country:      []string{"US"},
-                Organization: []string{"Example Corp"},
-                CommonName:   "Example Intermediate CA Level 2",
-            },
-            IsCA:           true,
-            MaxPathLen:     0,   // Can only sign end-entity certificates
-            MaxPathLenZero: true,
-        },
-        intermediate2KeyPair.PublicKey,
-    )
-    if err != nil {
-        log.Fatal(err)
-    }
-    fmt.Printf("3. Intermediate CA L2 created (MaxPathLen=0): %s\n", 
-        intermediate2CA.Certificate.Subject.CommonName)
-    
-    // 4. End-entity certificate (signed by Level 2 CA)
-    serverKeyPair, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
-    serverCert, err := cert.SignCertificate(
-        intermediate2CA, intermediate2KeyPair,
-        cert.CertificateRequest{
-            Subject: pkix.Name{
-                CommonName: "secure.example.com",
-            },
-            DNSNames: []string{"secure.example.com", "api.example.com"},
-            IsCA: false, // End-entity certificate
-        },
-        serverKeyPair.PublicKey,
-    )
-    if err != nil {
-        log.Fatal(err)
-    }
-    fmt.Printf("4. Server certificate created: %s\n", serverCert.Certificate.Subject.CommonName)
-    
-    // Verify the entire chain
-    fmt.Println("\n=== Certificate Chain Verification ===")
-    
-    // Verify server cert against intermediate CA L2
-    err = cert.VerifyCertificate(serverCert, intermediate2CA)
-    if err != nil {
-        log.Fatal("Server -> Intermediate L2 verification failed:", err)
-    }
-    fmt.Println("✓ Server certificate verified against Intermediate CA L2")
-    
-    // Verify intermediate L2 against intermediate L1
-    err = cert.VerifyCertificate(intermediate2CA, intermediate1CA)
-    if err != nil {
-        log.Fatal("Intermediate L2 -> Intermediate L1 verification failed:", err)
-    }
-    fmt.Println("✓ Intermediate CA L2 verified against Intermediate CA L1")
-    
-    // Verify intermediate L1 against root CA
-    err = cert.VerifyCertificate(intermediate1CA, rootCA)
-    if err != nil {
-        log.Fatal("Intermediate L1 -> Root verification failed:", err)
-    }
-    fmt.Println("✓ Intermediate CA L1 verified against Root CA")
-    
-    fmt.Println("\n✓ Complete certificate chain verification successful!")
-    
-    // Save all certificates
-    rootCA.SaveToFile("chain-root-ca.pem")
-    intermediate1CA.SaveToFile("chain-intermediate-1.pem")
-    intermediate2CA.SaveToFile("chain-intermediate-2.pem")
-    serverCert.SaveToFile("chain-server.pem")
-    
-    fmt.Println("\nCertificate chain saved:")
-    fmt.Println("├── chain-root-ca.pem (Root CA)")
-    fmt.Println("├── chain-intermediate-1.pem (Intermediate CA L1)")
-    fmt.Println("├── chain-intermediate-2.pem (Intermediate CA L2)")
-    fmt.Println("└── chain-server.pem (Server Certificate)")
-}
-```
-
-### Certificate Loading and Verification
-
-#### 4. Loading and Verifying Certificates
-
-```go
-func loadAndVerifyExample() {
-    fmt.Println("=== Loading and Verifying Certificates ===")
-    
-    // Load certificates from files
-    rootCA, err := cert.LoadCertificateFromFile("chain-root-ca.pem")
-    if err != nil {
-        log.Fatal("Failed to load root CA:", err)
-    }
-    
-    serverCert, err := cert.LoadCertificateFromFile("chain-server.pem")
-    if err != nil {
-        log.Fatal("Failed to load server certificate:", err)
-    }
-    
-    fmt.Printf("Loaded Root CA: %s\n", rootCA.Certificate.Subject.CommonName)
-    fmt.Printf("Loaded Server Certificate: %s\n", serverCert.Certificate.Subject.CommonName)
-    
-    // Check certificate properties
-    fmt.Printf("\nServer Certificate Details:\n")
-    fmt.Printf("  Subject: %s\n", serverCert.Certificate.Subject.CommonName)
-    fmt.Printf("  Issuer: %s\n", serverCert.Certificate.Issuer.CommonName)
-    fmt.Printf("  DNS Names: %v\n", serverCert.Certificate.DNSNames)
-    fmt.Printf("  Valid From: %s\n", serverCert.Certificate.NotBefore.Format("2006-01-02 15:04:05"))
-    fmt.Printf("  Valid Until: %s\n", serverCert.Certificate.NotAfter.Format("2006-01-02 15:04:05"))
-    fmt.Printf("  Is CA: %v\n", serverCert.Certificate.IsCA)
-    fmt.Printf("  Key Usage: %d\n", serverCert.Certificate.KeyUsage)
-    
-    // Check if certificate is still valid
-    now := time.Now()
-    if now.Before(serverCert.Certificate.NotBefore) {
-        fmt.Println("⚠️  Certificate is not yet valid")
-    } else if now.After(serverCert.Certificate.NotAfter) {
-        fmt.Println("❌ Certificate has expired")
-    } else {
-        fmt.Println("✓ Certificate is currently valid")
-    }
-    
-    // Note: Direct verification will fail because we need the intermediate CAs
-    // In a real application, you would verify the entire chain
-    fmt.Println("\nNote: For complete verification, you would need to verify")
-    fmt.Println("the entire certificate chain, not just against the root CA.")
-}
-```
-
-### Different Key Algorithms
-
-#### 5. Using Different Cryptographic Algorithms
-
-```go
-func demonstrateDifferentAlgorithms() {
-    fmt.Println("=== Different Cryptographic Algorithms ===")
-    
-    // RSA Certificate
-    fmt.Println("\n1. RSA Certificate")
-    rsaKeyPair, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
-    rsaCert, err := cert.CreateSelfSignedCertificate(rsaKeyPair, cert.CertificateRequest{
-        Subject: pkix.Name{CommonName: "rsa.example.com"},
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
-    fmt.Printf("✓ RSA certificate created for %s\n", rsaCert.Certificate.Subject.CommonName)
-    
-    // ECDSA Certificate  
-    fmt.Println("\n2. ECDSA Certificate")
-    ecdsaKeyPair, _ := keypair.GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
-    ecdsaCert, err := cert.CreateSelfSignedCertificate(ecdsaKeyPair, cert.CertificateRequest{
-        Subject: pkix.Name{CommonName: "ecdsa.example.com"},
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
-    fmt.Printf("✓ ECDSA certificate created for %s\n", ecdsaCert.Certificate.Subject.CommonName)
-    
-    // Ed25519 Certificate
-    fmt.Println("\n3. Ed25519 Certificate")
-    ed25519KeyPair, _ := keypair.GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
-    ed25519Cert, err := cert.CreateSelfSignedCertificate(ed25519KeyPair, cert.CertificateRequest{
-        Subject: pkix.Name{CommonName: "ed25519.example.com"},
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
-    fmt.Printf("✓ Ed25519 certificate created for %s\n", ed25519Cert.Certificate.Subject.CommonName)
-    
-    // Save all certificates
-    rsaCert.SaveToFile("rsa-cert.pem")
-    ecdsaCert.SaveToFile("ecdsa-cert.pem")
-    ed25519Cert.SaveToFile("ed25519-cert.pem")
-    
-    fmt.Println("\n✓ All certificates saved with different algorithms")
-}
-```
-
-## Certificate Chains
-
-### Understanding MaxPathLen
-
-The `MaxPathLen` field controls how deep a certificate chain can be:
-
-```go
-// Root CA with MaxPathLen = 2
-rootCA := cert.CertificateRequest{
-    Subject:    pkix.Name{CommonName: "Root CA"},
-    MaxPathLen: 2, // Can create 2 levels below
+    DNSNames:     []string{"api.gopki.example.com", "www.gopki.example.com"},
+    IPAddresses:  []net.IP{net.IPv4(192, 168, 1, 100)},
+    EmailAddress: []string{"admin@gopki.example.com"},
+    ValidFrom:    time.Now(),
+    ValidFor:     365 * 24 * time.Hour, // 1 year
 }
 
-// This creates the hierarchy:
+// Sign certificate with CA
+serverCert, err := cert.SignCertificate(caCert, caKeyPair, serverRequest, &serverKeyPair.PrivateKey.PublicKey)
+```
+
+**Signing Features:**
+- Supports signing both end-entity and intermediate CA certificates
+- Automatic key usage determination based on `IsCA` flag
+- Certificate chain validation during signing
+- Full SAN support for server certificates
+
+## Advanced CA Hierarchies
+
+### Multi-Level Certificate Chains
+Create sophisticated PKI hierarchies with proper path length constraint enforcement.
+
+```go
 // Root CA (MaxPathLen=2)
-// ├── Level 1 CA (MaxPathLen=1) 
-// │   └── Level 2 CA (MaxPathLen=0)
-// │       └── End-entity certificate
-// └── Direct end-entity certificate
+rootCA := createRootCA(MaxPathLen: 2)
+
+// Intermediate CA (MaxPathLen=0 - can only sign end-entity certs)
+intermediateRequest := cert.CertificateRequest{
+    Subject: pkix.Name{
+        CommonName: "GoPKI Intermediate Certificate Authority",
+    },
+    IsCA:       true,
+    MaxPathLen: 0, // Can only sign end-entity certificates
+    ValidFor:   5 * 365 * 24 * time.Hour, // 5 years
+}
+
+intermediateCert, err := cert.SignCertificate(rootCA, rootCAKey, intermediateRequest, &intermediateKeyPair.PrivateKey.PublicKey)
+
+// End-entity certificate signed by intermediate CA
+endEntityCert, err := cert.SignCertificate(intermediateCert, intermediateKeyPair, endEntityRequest, endEntityKeyPair.PublicKey)
 ```
 
-### Path Length Rules
+### Path Length Constraint Enforcement
+The module automatically enforces path length constraints:
 
-- **MaxPathLen = -1**: No limit (unlimited depth)
-- **MaxPathLen = 0**: Can only sign end-entity certificates
-- **MaxPathLen = n**: Can create n levels of intermediate CAs
+```go
+// This will FAIL - intermediate CA with MaxPathLen=0 cannot sign another CA
+anotherIntermediateRequest := cert.CertificateRequest{
+    Subject: pkix.Name{CommonName: "Another Intermediate CA"},
+    IsCA:    true,
+}
+
+// Results in error: "path length constraint violated"
+_, err := cert.SignCertificate(intermediateCert, intermediateKeyPair, anotherIntermediateRequest, &anotherKeyPair.PrivateKey.PublicKey)
+```
+
+**Certificate Chain Structure:**
+```
+Root CA (MaxPathLen=2)
+├── Intermediate CA (MaxPathLen=0)
+│   ├── End-Entity Certificate
+│   └── End-Entity Certificate
+└── Another Intermediate CA (MaxPathLen=0)
+    ├── End-Entity Certificate
+    └── End-Entity Certificate
+```
+
+## Multi-Algorithm Support
+
+### RSA Certificate Variants
+Support for multiple RSA key sizes with security recommendations.
+
+```go
+// RSA 2048-bit (minimum recommended)
+rsa2048Keys, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
+rsa2048Cert, _ := cert.CreateSelfSignedCertificate(rsa2048Keys, request)
+
+// RSA 3072-bit (recommended for high security)
+rsa3072Keys, _ := algo.GenerateRSAKeyPair(algo.KeySize3072)
+rsa3072Cert, _ := cert.CreateSelfSignedCertificate(rsa3072Keys, request)
+
+// RSA 4096-bit (maximum security)
+rsa4096Keys, _ := algo.GenerateRSAKeyPair(algo.KeySize4096)
+rsa4096Cert, _ := cert.CreateSelfSignedCertificate(rsa4096Keys, request)
+```
+
+### ECDSA Certificate Variants
+Support for all NIST P-curves with different security levels.
+
+```go
+// ECDSA P-224 (224-bit, ~2048-bit RSA equivalent)
+p224Keys, _ := algo.GenerateECDSAKeyPair(algo.P224)
+p224Cert, _ := cert.CreateSelfSignedCertificate(p224Keys, request)
+
+// ECDSA P-256 (256-bit, ~3072-bit RSA equivalent) - RECOMMENDED
+p256Keys, _ := algo.GenerateECDSAKeyPair(algo.P256)
+p256Cert, _ := cert.CreateSelfSignedCertificate(p256Keys, request)
+
+// ECDSA P-384 (384-bit, ~7680-bit RSA equivalent)
+p384Keys, _ := algo.GenerateECDSAKeyPair(algo.P384)
+p384Cert, _ := cert.CreateSelfSignedCertificate(p384Keys, request)
+
+// ECDSA P-521 (521-bit, ~15360-bit RSA equivalent)
+p521Keys, _ := algo.GenerateECDSAKeyPair(algo.P521)
+p521Cert, _ := cert.CreateSelfSignedCertificate(p521Keys, request)
+```
+
+### Ed25519 Certificates
+Modern elliptic curve cryptography with excellent performance.
+
+```go
+// Ed25519 (fixed 256-bit, high security + performance)
+ed25519Keys, _ := algo.GenerateEd25519KeyPair("")
+ed25519Cert, _ := cert.CreateSelfSignedCertificate(ed25519Keys, request)
+```
+
+### Algorithm Performance Comparison
+Relative performance for certificate creation:
+
+| Algorithm | Key Generation | Certificate Creation | Total Time | Security Level |
+|-----------|----------------|---------------------|------------|----------------|
+| Ed25519 | Fastest | Fastest | ~0.02ms | High |
+| ECDSA P-256 | Fast | Fast | ~0.05ms | High |
+| ECDSA P-384 | Medium | Medium | ~0.10ms | Very High |
+| RSA 2048 | Slow | Medium | ~15ms | Medium |
+| RSA 3072 | Very Slow | Medium | ~35ms | High |
+| RSA 4096 | Slowest | Medium | ~80ms | Very High |
+
+## Subject Alternative Names (SAN)
+
+### Complex SAN Combinations
+Support for multiple DNS names, IP addresses, and email addresses in a single certificate.
+
+```go
+request := cert.CertificateRequest{
+    Subject: pkix.Name{
+        CommonName: "multi-domain.gopki.example.com",
+    },
+    // Multiple DNS names including wildcards
+    DNSNames: []string{
+        "multi-domain.gopki.example.com",
+        "api.gopki.example.com",
+        "www.gopki.example.com",
+        "admin.gopki.example.com",
+        "*.staging.gopki.example.com", // Wildcard domain
+        "localhost",
+    },
+    // Multiple IP addresses (IPv4 and IPv6)
+    IPAddresses: []net.IP{
+        net.IPv4(127, 0, 0, 1),     // localhost
+        net.IPv4(192, 168, 1, 100), // private network
+        net.IPv4(10, 0, 0, 50),     // another private network
+        net.ParseIP("::1"),         // IPv6 localhost
+        net.ParseIP("2001:db8::1"), // IPv6 example
+    },
+    // Multiple email addresses
+    EmailAddress: []string{
+        "admin@gopki.example.com",
+        "support@gopki.example.com",
+        "security@gopki.example.com",
+    },
+    ValidFor: 2 * 365 * 24 * time.Hour, // 2 years
+}
+```
+
+### Domain-Specific SAN Patterns
+
+#### Web Server Certificate Pattern
+```go
+webServerSAN := []string{
+    "example.com",
+    "www.example.com",
+    "api.example.com",
+    "cdn.example.com",
+}
+```
+
+#### API Service Certificate Pattern
+```go
+apiServiceSAN := []string{
+    "api.service.internal",
+    "api-v1.service.internal",
+    "api-v2.service.internal",
+    "*.microservice.internal",
+}
+```
+
+#### Development Certificate Pattern
+```go
+developmentSAN := []string{
+    "localhost",
+    "dev.local",
+    "*.dev.local",
+    "test.local",
+}
+```
+
+## Format Operations
+
+### PEM vs DER Format Comparison
+The module supports both PEM (ASCII) and DER (binary) formats with automatic conversion.
+
+```go
+// Save in both formats
+certificate.SaveToFile("cert.pem")        // PEM format
+certificate.SaveToDERFile("cert.der")     // DER format
+
+// Format conversion
+pemData := certificate.ToPEM()
+derData := certificate.ToDER()
+
+// Convert between formats
+derData, err := cert.ConvertPEMToDER(pemData)
+pemData, err := cert.ConvertDERToPEM(derData)
+```
+
+**Format Characteristics:**
+- **PEM Format**: Human-readable, Base64-encoded, ~33% larger
+- **DER Format**: Binary, compact, ~30% smaller, faster parsing
+- **Use Cases**:
+  - PEM: Configuration files, manual inspection, wide compatibility
+  - DER: Performance-critical applications, binary storage, mobile apps
+
+### Format Loading and Parsing
+```go
+// Load from files
+pemCert, err := cert.LoadCertificateFromFile("cert.pem")
+derCert, err := cert.LoadCertificateFromDERFile("cert.der")
+
+// Parse from data
+pemCert, err := cert.ParseCertificateFromPEM(pemData)
+derCert, err := cert.ParseCertificateFromDER(derData)
+```
+
+### Performance Comparison
+Based on 100 parsing iterations:
+- **DER parsing**: ~2-3x faster than PEM
+- **File size**: DER is ~30% smaller than PEM
+- **Memory usage**: DER requires less memory for parsing
+
+## PKCS#12 Integration
+
+### Certificate Bundle Creation
+PKCS#12 format allows bundling certificates and private keys in a single, password-protected file.
+
+```go
+import "github.com/jasoet/gopki/pkcs12"
+
+// Save certificate and private key to PKCS#12
+password := "secure-password-123"
+err := pkcs12.SaveCertToP12(certificate, privateKey, "certificate.p12", password)
+```
+
+### Certificate Chain Bundles
+Include certificate chains in PKCS#12 bundles for complete trust chain distribution.
+
+```go
+// Create certificate chain array
+caCerts := []*cert.Certificate{rootCA, intermediateCA}
+
+// Save certificate with full chain
+chainPassword := "chain-password-456"
+err := pkcs12.SaveCertToP12WithChain(
+    certificate,
+    privateKey,
+    caCerts,
+    "certificate_with_chain.p12",
+    chainPassword
+)
+```
+
+### Loading and Extraction
+```go
+// Load certificate from PKCS#12
+loadedCert, caCerts, err := pkcs12.FromP12CertFile("certificate.p12", password)
+
+// Load full certificate chain
+certChain, err := pkcs12.LoadCertificateChainFromP12("certificate_with_chain.p12", chainPassword)
+
+// Extract to PEM files
+err = pkcs12.ExtractCertificatesFromP12("certificate.p12", password, "output/")
+```
+
+### PKCS#12 Validation and Metadata
+```go
+// Validate PKCS#12 file and extract metadata
+metadata, err := pkcs12.ValidateP12Certificate("certificate.p12", password)
+
+// Metadata includes:
+// - Certificate count
+// - Private key presence
+// - CA certificate count
+// - Certificate subjects and issuers
+// - Validity periods
+```
+
+## Certificate Validation
 
 ### Certificate Chain Validation
-
-For a certificate chain to be valid:
-
-1. Each certificate must be signed by the one above it
-2. The root CA must be trusted
-3. All certificates must be within their validity periods
-4. Path length constraints must be respected
-5. Key usage must be appropriate for the certificate's role
-
-## Best Practices
-
-### Security
-
-1. **Key Sizes**:
-   - Root CA: 4096-bit RSA or P-384 ECDSA
-   - Intermediate CA: 3072-bit RSA or P-256 ECDSA  
-   - End-entity: 2048-bit RSA or P-256 ECDSA
-
-2. **Validity Periods**:
-   - Root CA: 10-20 years
-   - Intermediate CA: 3-5 years
-   - End-entity: 1-2 years
-
-3. **Path Length**:
-   - Set appropriate MaxPathLen to prevent excessive chain depth
-   - Use MaxPathLen = 0 for operational intermediate CAs
-
-### Operational
-
-1. **Certificate Storage**:
-   - Store root CA keys offline
-   - Use hardware security modules (HSMs) for CA keys
-   - Regular backups with proper encryption
-
-2. **Certificate Rotation**:
-   - Plan for certificate renewal before expiration
-   - Implement automated certificate deployment
-   - Monitor certificate expiration dates
-
-3. **Revocation**:
-   - Implement Certificate Revocation Lists (CRLs) or OCSP
-   - Have procedures for emergency revocation
-   - Regular updates to revocation information
-
-### Code Organization
-
-1. **Error Handling**:
-   ```go
-   cert, err := cert.CreateSelfSignedCertificate(keyPair, request)
-   if err != nil {
-       return fmt.Errorf("certificate creation failed: %w", err)
-   }
-   ```
-
-2. **Configuration**:
-   - Use configuration files for certificate parameters
-   - Validate input parameters before certificate creation
-   - Implement proper logging for certificate operations
-
-3. **Testing**:
-   - Test certificate chains thoroughly
-   - Verify certificate properties after creation
-   - Test certificate validation logic
-
-## Complete Example
-
-Here's a complete working example that demonstrates all major features:
+Verify certificate chains using the built-in validation engine.
 
 ```go
-package main
+// Verify server certificate against CA
+err := cert.VerifyCertificate(serverCert, caCert)
+if err != nil {
+    // Validation failed - certificate is invalid
+} else {
+    // Certificate is valid and properly signed
+}
+```
 
-import (
-    "crypto/x509"
-    "crypto/x509/pkix"
-    "fmt"
-    "log"
-    "net"
-    "time"
-    
-    "github.com/jasoet/gopki/cert"
-    "github.com/jasoet/gopki/keypair"
-    "github.com/jasoet/gopki/keypair/algo"
+**Validation Checks:**
+- **Signature Verification**: Verify certificate signature using CA's public key
+- **Certificate Chain**: Validate the complete certificate chain
+- **Validity Period**: Check certificate is within valid time range
+- **Certificate Extensions**: Verify critical extensions are properly set
+
+### Certificate Expiration Checking
+```go
+now := time.Now()
+cert := certificate.Certificate
+
+if now.Before(cert.NotBefore) {
+    // Certificate not yet valid
+} else if now.After(cert.NotAfter) {
+    // Certificate expired
+} else {
+    // Certificate is currently valid
+    daysLeft := int(cert.NotAfter.Sub(now).Hours() / 24)
+    fmt.Printf("Certificate valid for %d more days\n", daysLeft)
+}
+```
+
+### Certificate Information Extraction
+Extract detailed certificate information for analysis and monitoring.
+
+```go
+cert := certificate.Certificate
+
+// Basic information
+serialNumber := cert.SerialNumber.String()
+signatureAlgorithm := cert.SignatureAlgorithm.String()
+publicKeyAlgorithm := cert.PublicKeyAlgorithm.String()
+version := cert.Version
+isCA := cert.IsCA
+
+// Subject Alternative Names
+dnsNames := cert.DNSNames
+ipAddresses := cert.IPAddresses
+emailAddresses := cert.EmailAddresses
+
+// Fingerprint calculation (example)
+fingerprint := sha256.Sum256(cert.Raw)
+```
+
+### Invalid Certificate Testing
+Test certificate validation with various invalid scenarios to ensure proper security.
+
+```go
+// Create an invalid self-signed certificate
+invalidCert, _ := cert.CreateSelfSignedCertificate(invalidKeyPair, invalidRequest)
+
+// Try to validate against CA (should fail)
+err := cert.VerifyCertificate(invalidCert, caCert)
+if err != nil {
+    // Correctly rejected invalid certificate
+} else {
+    // ERROR: Invalid certificate was incorrectly accepted
+}
+```
+
+## Integration & Best Practices
+
+### Certificate-KeyPair Integration
+Seamless integration with the keypair module's type-safe APIs.
+
+```go
+// All algorithms work identically
+algorithms := []func() (interface{}, error){
+    func() (interface{}, error) { return algo.GenerateRSAKeyPair(algo.KeySize2048) },
+    func() (interface{}, error) { return algo.GenerateECDSAKeyPair(algo.P256) },
+    func() (interface{}, error) { return algo.GenerateEd25519KeyPair("") },
+}
+
+for _, genFunc := range algorithms {
+    keyPair, _ := genFunc()
+
+    // Type-safe certificate creation works with any key type
+    switch kp := keyPair.(type) {
+    case *algo.RSAKeyPair:
+        cert, _ := cert.CreateSelfSignedCertificate(kp, request)
+    case *algo.ECDSAKeyPair:
+        cert, _ := cert.CreateSelfSignedCertificate(kp, request)
+    case *algo.Ed25519KeyPair:
+        cert, _ := cert.CreateSelfSignedCertificate(kp, request)
+    }
+}
+```
+
+### Real-World TLS Server Setup
+Complete production-ready TLS server certificate configuration.
+
+```go
+serverRequest := cert.CertificateRequest{
+    Subject: pkix.Name{
+        Country:            []string{"US"},
+        Province:           []string{"California"},
+        Locality:           []string{"San Francisco"},
+        Organization:       []string{"Production Services"},
+        OrganizationalUnit: []string{"Web Services"},
+        CommonName:         "api.production.example.com",
+    },
+    DNSNames: []string{
+        "api.production.example.com",
+        "www.production.example.com",
+        "cdn.production.example.com",
+        "admin.production.example.com",
+    },
+    IPAddresses: []net.IP{
+        net.IPv4(203, 0, 113, 10), // Public IP
+        net.IPv4(203, 0, 113, 11), // Load balancer IP
+    },
+    EmailAddress: []string{
+        "admin@production.example.com",
+        "security@production.example.com",
+    },
+    ValidFor: 2 * 365 * 24 * time.Hour, // 2 years
+}
+
+// Sign with production CA
+serverCert, err := cert.SignCertificate(productionCA, caPrivateKey, serverRequest, &serverKeyPair.PrivateKey.PublicKey)
+```
+
+### Certificate Analytics and Monitoring
+Track certificate collections for operational insights.
+
+```go
+// Certificate collection analytics
+type CertificateAnalytics struct {
+    TotalCertificates    int
+    CACertificates      int
+    SelfSignedCerts     int
+    EndEntityCerts      int
+    AlgorithmCounts     map[string]int
+    ExpiringCerts       []*cert.Certificate // Expiring within 30 days
+    ExpiredCerts        []*cert.Certificate
+}
+
+// Analyze certificate directory
+analytics := AnalyzeCertificateCollection("output/")
+```
+
+### Security Best Practices
+
+#### Algorithm Selection
+```go
+// RECOMMENDED: Use ECDSA P-256 or Ed25519 for new certificates
+preferredKeyPair, _ := algo.GenerateECDSAKeyPair(algo.P256)
+// OR
+modernKeyPair, _ := algo.GenerateEd25519KeyPair("")
+
+// ACCEPTABLE: RSA 2048+ for compatibility requirements
+compatKeyPair, _ := algo.GenerateRSAKeyPair(algo.KeySize3072)
+```
+
+#### CA Hierarchy Design
+```go
+// Proper CA hierarchy with path length constraints
+rootCA := createCA(MaxPathLen: 2)           // Can sign 2 levels of intermediate CAs
+intermediateCA := createCA(MaxPathLen: 0)   // Can only sign end-entity certificates
+endEntityCert := signEndEntity()            // Cannot sign other certificates
+```
+
+#### Certificate Validity Periods
+```go
+// Recommended validity periods
+const (
+    RootCAValidity        = 20 * 365 * 24 * time.Hour  // 20 years
+    IntermediateCAValidity = 10 * 365 * 24 * time.Hour  // 10 years
+    ServerCertValidity     = 2 * 365 * 24 * time.Hour   // 2 years
+    ClientCertValidity     = 1 * 365 * 24 * time.Hour   // 1 year
 )
-
-func main() {
-    fmt.Println("=== Complete GoPKI Certificate Example ===")
-    
-    // 1. Self-signed certificate
-    fmt.Println("\n1. Creating self-signed certificate...")
-    createSelfSignedExample()
-    
-    // 2. Simple CA with signed certificate
-    fmt.Println("\n2. Creating CA and signed certificate...")
-    createSimpleCAExample()
-    
-    // 3. Multi-level certificate chain
-    fmt.Println("\n3. Creating certificate chain...")
-    createCertificateChainExample()
-    
-    // 4. Different algorithms
-    fmt.Println("\n4. Different algorithms...")
-    demonstrateDifferentAlgorithmsExample()
-    
-    fmt.Println("\n✅ All examples completed successfully!")
-}
-
-func createSelfSignedExample() {
-    keyPair, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
-    
-    cert, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
-        Subject: pkix.Name{
-            Country:      []string{"US"},
-            Organization: []string{"Example Corp"},
-            CommonName:   "www.example.com",
-        },
-        DNSNames: []string{"www.example.com", "example.com"},
-        IPAddresses: []net.IP{net.ParseIP("192.168.1.1")},
-        ValidFor: 365 * 24 * time.Hour, // 1 year
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
-    
-    fmt.Printf("✓ Self-signed certificate: %s\n", cert.Certificate.Subject.CommonName)
-    fmt.Printf("  Valid until: %s\n", cert.Certificate.NotAfter.Format("2006-01-02"))
-    
-    cert.SaveToFile("self-signed.pem")
-}
-
-func createSimpleCAExample() {
-    // Create CA
-    caKeyPair, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](4096)
-    ca, err := cert.CreateCACertificate(caKeyPair, cert.CertificateRequest{
-        Subject: pkix.Name{
-            Country:      []string{"US"},
-            Organization: []string{"Example Corp CA"},
-            CommonName:   "Example Root CA",
-        },
-        ValidFor:   10 * 365 * 24 * time.Hour, // 10 years
-        MaxPathLen: 0, // Can only sign end-entity certificates
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
-    
-    fmt.Printf("✓ Root CA created: %s\n", ca.Certificate.Subject.CommonName)
-    
-    // Create server certificate signed by CA
-    serverKeyPair, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
-    serverCert, err := cert.SignCertificate(ca, caKeyPair, cert.CertificateRequest{
-        Subject: pkix.Name{CommonName: "secure.example.com"},
-        DNSNames: []string{"secure.example.com", "api.example.com"},
-        ValidFor: 2 * 365 * 24 * time.Hour, // 2 years
-    }, serverKeyPair.PublicKey)
-    if err != nil {
-        log.Fatal(err)
-    }
-    
-    fmt.Printf("✓ Server certificate: %s\n", serverCert.Certificate.Subject.CommonName)
-    fmt.Printf("  Issued by: %s\n", serverCert.Certificate.Issuer.CommonName)
-    
-    // Verify
-    err = cert.VerifyCertificate(serverCert, ca)
-    if err != nil {
-        log.Fatal("Verification failed:", err)
-    }
-    fmt.Println("✓ Certificate verification successful")
-    
-    ca.SaveToFile("example-root-ca.pem")
-    serverCert.SaveToFile("example-server.pem")
-}
-
-func createCertificateChainExample() {
-    // Root CA (MaxPathLen = 1)
-    rootKeyPair, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](4096)
-    rootCA, _ := cert.CreateCACertificate(rootKeyPair, cert.CertificateRequest{
-        Subject: pkix.Name{CommonName: "Chain Root CA"},
-        MaxPathLen: 1, // Can create 1 level of intermediate CA
-    })
-    
-    // Intermediate CA (MaxPathLen = 0)
-    intKeyPair, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](3072)
-    intCA, _ := cert.SignCertificate(rootCA, rootKeyPair, cert.CertificateRequest{
-        Subject: pkix.Name{CommonName: "Chain Intermediate CA"},
-        IsCA: true,
-        MaxPathLen: 0,
-        MaxPathLenZero: true,
-    }, intKeyPair.PublicKey)
-    
-    // End-entity certificate
-    serverKeyPair, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
-    serverCert, _ := cert.SignCertificate(intCA, intKeyPair, cert.CertificateRequest{
-        Subject: pkix.Name{CommonName: "chain.example.com"},
-        DNSNames: []string{"chain.example.com"},
-    }, serverKeyPair.PublicKey)
-    
-    fmt.Printf("✓ Certificate chain created:\n")
-    fmt.Printf("  Root CA: %s\n", rootCA.Certificate.Subject.CommonName)
-    fmt.Printf("  Intermediate CA: %s\n", intCA.Certificate.Subject.CommonName)
-    fmt.Printf("  Server Cert: %s\n", serverCert.Certificate.Subject.CommonName)
-    
-    // Verify chain
-    cert.VerifyCertificate(serverCert, intCA)
-    cert.VerifyCertificate(intCA, rootCA)
-    fmt.Println("✓ Chain verification successful")
-}
-
-func demonstrateDifferentAlgorithmsExample() {
-    algorithms := []struct {
-        name string
-        createKeyPair func() (interface{}, error)
-    }{
-        {"RSA", func() (interface{}, error) {
-            return keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
-        }},
-        {"ECDSA", func() (interface{}, error) {
-            return keypair.GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
-        }},
-        {"Ed25519", func() (interface{}, error) {
-            return keypair.GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
-        }},
-    }
-    
-    for _, alg := range algorithms {
-        keyPair, err := alg.createKeyPair()
-        if err != nil {
-            log.Fatal(err)
-        }
-        
-        // Create certificate with appropriate key pair type
-        var certificate *cert.Certificate
-        switch kp := keyPair.(type) {
-        case *algo.RSAKeyPair:
-            certificate, _ = cert.CreateSelfSignedCertificate(kp, cert.CertificateRequest{
-                Subject: pkix.Name{CommonName: fmt.Sprintf("%s.example.com", alg.name)},
-            })
-        case *algo.ECDSAKeyPair:
-            certificate, _ = cert.CreateSelfSignedCertificate(kp, cert.CertificateRequest{
-                Subject: pkix.Name{CommonName: fmt.Sprintf("%s.example.com", alg.name)},
-            })
-        case *algo.Ed25519KeyPair:
-            certificate, _ = cert.CreateSelfSignedCertificate(kp, cert.CertificateRequest{
-                Subject: pkix.Name{CommonName: fmt.Sprintf("%s.example.com", alg.name)},
-            })
-        }
-        
-        fmt.Printf("✓ %s certificate: %s\n", alg.name, certificate.Certificate.Subject.CommonName)
-    }
-}
 ```
 
-## Format Support
-
-The certificate module supports both PEM and DER formats with seamless conversion:
-
-### PEM Format (Default)
+#### File Security
 ```go
-// Save and load PEM format (text-based, Base64 encoded)
-certificate.SaveToFile("certificate.pem")
-loadedCert, _ := cert.LoadCertificateFromFile("certificate.pem")
-
-// Get PEM data directly
-pemData := certificate.ToPEM()
+// Certificates saved with appropriate permissions
+certificate.SaveToFile("cert.pem")     // 0644 (world readable)
+privateKey.SaveToFile("key.pem")       // 0600 (owner only)
+p12Bundle.SaveToFile("bundle.p12")     // 0600 (owner only)
 ```
 
-### DER Format (Binary)
+### Performance Recommendations
+
+#### Format Selection
+- **PEM**: Use for configuration files, human inspection, wide compatibility
+- **DER**: Use for performance-critical applications, binary storage, mobile apps
+- **PKCS#12**: Use for secure distribution, enterprise environments
+
+#### Certificate Storage
 ```go
-// Save and load DER format (binary, more compact)
-certificate.SaveToDERFile("certificate.der")
-derCert, _ := cert.LoadCertificateFromDERFile("certificate.der")
+// For high-performance applications, prefer DER format
+certificate.SaveToDERFile("high_perf_cert.der")
 
-// Get DER data directly
-derData := certificate.ToDER() // ~30% smaller than PEM
+// For configuration and compatibility, use PEM
+certificate.SaveToFile("config_cert.pem")
+
+// For secure distribution with private keys, use PKCS#12
+pkcs12.SaveCertToP12(cert, privateKey, "secure_bundle.p12", password)
 ```
 
-### Format Conversion
+#### Caching Strategies
 ```go
-// Convert between formats
-derBytes, _ := cert.ConvertPEMToDER(pemData)
-pemBytes, _ := cert.ConvertDERToPEM(derData)
+// Cache parsed certificates to avoid repeated parsing
+type CertificateCache struct {
+    cache map[string]*cert.Certificate
+    mutex sync.RWMutex
+}
 
-// Parse from either format
-pemCert, _ := cert.ParseCertificateFromPEM(pemData)
-derCert, _ := cert.ParseCertificateFromDER(derData)
+func (c *CertificateCache) GetCertificate(path string) (*cert.Certificate, error) {
+    c.mutex.RLock()
+    if cached, exists := c.cache[path]; exists {
+        c.mutex.RUnlock()
+        return cached, nil
+    }
+    c.mutex.RUnlock()
+
+    // Load and cache certificate
+    certificate, err := cert.LoadCertificateFromFile(path)
+    if err != nil {
+        return nil, err
+    }
+
+    c.mutex.Lock()
+    c.cache[path] = certificate
+    c.mutex.Unlock()
+
+    return certificate, nil
+}
 ```
 
-**Format Comparison:**
-- **PEM**: Text-based, human-readable, larger file size, widely supported
-- **DER**: Binary format, ~30% smaller, faster parsing, used in Java keystores
+### Error Handling Patterns
 
-## Integration with Other Modules
+```go
+// Comprehensive error handling for certificate operations
+certificate, err := cert.CreateSelfSignedCertificate(keyPair, request)
+if err != nil {
+    switch {
+    case errors.Is(err, cert.ErrInvalidKeyPair):
+        return fmt.Errorf("invalid key pair: %w", err)
+    case errors.Is(err, cert.ErrInvalidCertificateRequest):
+        return fmt.Errorf("invalid certificate request: %w", err)
+    case errors.Is(err, cert.ErrCertificateCreationFailed):
+        return fmt.Errorf("certificate creation failed: %w", err)
+    default:
+        return fmt.Errorf("unexpected error: %w", err)
+    }
+}
 
-Certificates work seamlessly with:
-- **[KeyPair Module](KeyPair.md)**: Generate certificates using any supported key algorithm
-- **[Signing Module](Signing.md)**: Use certificates for document signing and verification
+// Validation error handling
+err = cert.VerifyCertificate(serverCert, caCert)
+if err != nil {
+    switch {
+    case errors.Is(err, cert.ErrCertificateExpired):
+        log.Printf("Certificate expired: %v", err)
+    case errors.Is(err, cert.ErrInvalidSignature):
+        log.Printf("Invalid certificate signature: %v", err)
+    case errors.Is(err, cert.ErrUnknownCA):
+        log.Printf("Unknown certificate authority: %v", err)
+    default:
+        log.Printf("Certificate validation failed: %v", err)
+    }
+}
+```
 
 ---
 
-> 📖 **Related Documentation**: [KeyPair Module](KeyPair.md) | [Signing Module](Signing.md) | [Main README](../README.md)
-
-For complete project documentation and development commands, see the main [README](../README.md).
+For complete working examples demonstrating all these features, see the `main.go` file in this directory.
+For integration with other modules, see the main project [README](../../README.md).
