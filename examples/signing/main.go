@@ -4,6 +4,10 @@ package main
 
 import (
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
@@ -11,56 +15,88 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
+	"github.com/jasoet/gopki/keypair/format"
 	"github.com/jasoet/gopki/signing"
 )
 
 func main() {
-	fmt.Println("=== GoPKI Document Signing Example ===")
-	fmt.Println()
+	fmt.Println("=== GoPKI Document Signing Module - Comprehensive Examples ===")
+	fmt.Println("Demonstrating hybrid approach: PKCS#7 for RSA/ECDSA, raw signatures for Ed25519 (not PKCS#7)")
 
 	// Create output directory
-	if err := os.MkdirAll("examples/signing/output", 0755); err != nil {
+	if err := os.MkdirAll("output", 0755); err != nil {
 		log.Fatal("Failed to create output directory:", err)
 	}
 
-	// Demonstrate different signing algorithms
-	demonstrateRSASigning()
-	demonstrateECDSASigning()
-	demonstrateEd25519Signing()
+	// Execute all signing examples
+	fmt.Println("\n🔐 PART 1: Multi-Algorithm Document Signing")
+	fmt.Println(strings.Repeat("=", 60))
+	demonstrateMultiAlgorithmSigning()
 
-	// Demonstrate advanced features
-	demonstrateSigningWithOptions()
+	fmt.Println("\n📋 PART 2: Advanced Signing Options")
+	fmt.Println(strings.Repeat("=", 60))
+	demonstrateAdvancedSigningOptions()
+
+	fmt.Println("\n✅ PART 3: Signature Verification & Security")
+	fmt.Println(strings.Repeat("=", 60))
 	demonstrateSignatureVerification()
+
+	fmt.Println("\n📝 PART 4: Multi-Party Signatures (Co-signing)")
+	fmt.Println(strings.Repeat("=", 60))
 	demonstrateMultipleSignatures()
 
-	// Demonstrate PKCS#7 formats
-	// TODO: Update to use new API without formats package
-	// demonstratePKCS7Example()
+	fmt.Println("\n🔒 PART 5: PKCS#7 Format & Certificate Chains")
+	fmt.Println(strings.Repeat("=", 60))
+	demonstratePKCS7FormatExamples()
 
-	fmt.Println("\n✅ All examples completed successfully!")
-	fmt.Println("Check the 'examples/signing/output' directory for output files.")
+	fmt.Println("\n🚀 PART 6: Performance & Large Documents")
+	fmt.Println(strings.Repeat("=", 60))
+	demonstratePerformanceComparison()
+
+	fmt.Println("\n📁 PART 7: File Operations & Detached Signatures")
+	fmt.Println(strings.Repeat("=", 60))
+	demonstrateFileOperations()
+
+	fmt.Println("\n\n=" + strings.Repeat("=", 58) + "=")
+	fmt.Println("✅ ALL EXAMPLES COMPLETED SUCCESSFULLY!")
+	fmt.Println("📁 Output files saved in: ./output/")
+	fmt.Println("🔍 Review signature formats and certificate integration")
+	fmt.Println("=" + strings.Repeat("=", 58) + "=")
+}
+
+func demonstrateMultiAlgorithmSigning() {
+	fmt.Println("1. RSA Document Signing (PKCS#7 Format)")
+	fmt.Println("----------------------------------------")
+	demonstrateRSASigning()
+
+	fmt.Println("2. ECDSA Document Signing (PKCS#7 Format)")
+	fmt.Println("-----------------------------------------")
+	demonstrateECDSASigning()
+
+	fmt.Println("3. Ed25519 Document Signing (Raw Signatures - Not PKCS#7)")
+	fmt.Println("---------------------------------------------------------")
+	demonstrateEd25519Signing()
 }
 
 func demonstrateRSASigning() {
-	fmt.Println("1. RSA Document Signing")
-	fmt.Println("------------------------")
-
-	// Generate RSA key pair
-	keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+	// Generate RSA key pair using the generic API
+	keyManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
 	if err != nil {
 		log.Fatal("Failed to generate RSA key pair:", err)
 	}
-	fmt.Println("✓ Generated 2048-bit RSA key pair")
+	keyPair := keyManager.KeyPair()
+	fmt.Println("✓ Generated 2048-bit RSA key pair using type-safe API")
 
 	// Create a certificate for signing
 	certificate, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
 		Subject: pkix.Name{
-			CommonName:         "Document Signer",
+			CommonName:         "RSA Document Signer",
 			Organization:       []string{"Example Corp"},
 			OrganizationalUnit: []string{"Security Division"},
 			Country:            []string{"US"},
@@ -82,7 +118,7 @@ func demonstrateRSASigning() {
 		"currency": "USD"
 	}`)
 
-	// Sign the document
+	// Sign the document using PKCS#7 format
 	signature, err := signing.SignData(document, keyPair, certificate)
 	if err != nil {
 		log.Fatal("Failed to sign document:", err)
@@ -91,8 +127,9 @@ func demonstrateRSASigning() {
 		signature.Algorithm,
 		signing.HashAlgorithmToString(signature.HashAlgorithm))
 
-	// Save signature
-	saveSignature(signature, "examples/signing/output/rsa_signature.json")
+	// Save signature with PKCS#7 format details
+	saveSignature(signature, "output/rsa_signature.json")
+	fmt.Printf("  Format: %s (industry standard)\n", signature.Format)
 
 	// Verify the signature
 	err = signing.VerifySignature(document, signature, signing.DefaultVerifyOptions())
@@ -102,22 +139,20 @@ func demonstrateRSASigning() {
 	fmt.Println("✓ Signature verification successful")
 
 	// Save the certificate and keys
-	certificate.SaveToFile("examples/signing/output/rsa_signer.crt")
-	keypair.ToPEMFiles(keyPair, "examples/signing/output/rsa_private.pem", "examples/signing/output/rsa_public.pem")
+	certificate.SaveToFile("output/rsa_signer.crt")
+	format.ToPEMFiles(keyPair, "output/rsa_private.pem", "output/rsa_public.pem")
 
 	fmt.Println()
 }
 
 func demonstrateECDSASigning() {
-	fmt.Println("2. ECDSA Document Signing")
-	fmt.Println("-------------------------")
-
-	// Generate ECDSA key pair with P-256 curve
-	keyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
+	// Generate ECDSA key pair with P-256 curve using generic API
+	keyManager, err := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
 	if err != nil {
 		log.Fatal("Failed to generate ECDSA key pair:", err)
 	}
-	fmt.Println("✓ Generated ECDSA key pair (P-256 curve)")
+	keyPair := keyManager.KeyPair()
+	fmt.Println("✓ Generated ECDSA key pair (P-256 curve) using type-safe API")
 
 	// Create a certificate
 	certificate, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
@@ -135,11 +170,13 @@ func demonstrateECDSASigning() {
 	// Document to sign
 	document := []byte("This is a confidential document that requires ECDSA signature.")
 
-	// Sign with specific options
+	// Sign with PKCS#7 detached format options
 	opts := signing.SignOptions{
 		HashAlgorithm:      crypto.SHA256,
-		Format:             signing.FormatRaw,
+		Format:             signing.FormatPKCS7Detached,
 		IncludeCertificate: true,
+		IncludeChain:       false,
+		Detached:           true,
 		Attributes: map[string]interface{}{
 			"documentType": "confidential",
 			"signedAt":     time.Now().Format(time.RFC3339),
@@ -164,22 +201,21 @@ func demonstrateECDSASigning() {
 	}
 	fmt.Println("✓ Signature verification successful")
 
-	// Save signature
-	saveSignature(signature, "examples/signing/output/ecdsa_signature.json")
+	// Save signature with format details
+	saveSignature(signature, "output/ecdsa_signature.json")
+	fmt.Printf("  Format: %s (detached PKCS#7)\n", signature.Format)
 
 	fmt.Println()
 }
 
 func demonstrateEd25519Signing() {
-	fmt.Println("3. Ed25519 Document Signing")
-	fmt.Println("---------------------------")
-
-	// Generate Ed25519 key pair
-	keyPair, err := algo.GenerateEd25519KeyPair()
+	// Generate Ed25519 key pair using generic API
+	keyManager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Config{})
 	if err != nil {
 		log.Fatal("Failed to generate Ed25519 key pair:", err)
 	}
-	fmt.Println("✓ Generated Ed25519 key pair")
+	keyPair := keyManager.KeyPair()
+	fmt.Println("✓ Generated Ed25519 key pair using type-safe API")
 
 	// Create a certificate
 	certificate, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
@@ -221,24 +257,27 @@ func demonstrateEd25519Signing() {
 	verificationTime := time.Since(startTime)
 	fmt.Printf("✓ Verified signature in %v\n", verificationTime)
 
-	// Save signature
-	saveSignature(signature, "examples/signing/output/ed25519_signature.json")
+	// Save signature with hybrid approach details
+	saveSignature(signature, "output/ed25519_signature.json")
+	fmt.Printf("  Format: %s (hybrid approach - raw signature stored in PKCS#7 format field)\n", signature.Format)
+	fmt.Println("  Note: Ed25519 uses raw signatures, not PKCS#7, since RFC 8419 is not implemented by libraries")
 
 	fmt.Println()
 }
 
-func demonstrateSigningWithOptions() {
-	fmt.Println("4. Advanced Signing Options")
-	fmt.Println("---------------------------")
+func demonstrateAdvancedSigningOptions() {
+	fmt.Println("1. Certificate Chains & Advanced Options")
+	fmt.Println("-----------------------------------------")
 
-	// Generate key pair
-	keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize3072)
+	// Generate key pair for CA
+	caKeyManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize3072)
 	if err != nil {
-		log.Fatal("Failed to generate key pair:", err)
+		log.Fatal("Failed to generate CA key pair:", err)
 	}
+	caKeyPair := caKeyManager.KeyPair()
 
 	// Create CA certificate
-	caCert, err := cert.CreateCACertificate(keyPair, cert.CertificateRequest{
+	caCert, err := cert.CreateCACertificate(caKeyPair, cert.CertificateRequest{
 		Subject: pkix.Name{
 			CommonName:   "Example CA",
 			Organization: []string{"Example Corp"},
@@ -253,12 +292,13 @@ func demonstrateSigningWithOptions() {
 	fmt.Println("✓ Created CA certificate")
 
 	// Create signing certificate signed by CA
-	signerKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+	signerKeyManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
 	if err != nil {
 		log.Fatal("Failed to generate signer key pair:", err)
 	}
+	signerKeyPair := signerKeyManager.KeyPair()
 
-	signerCert, err := cert.SignCertificate(caCert, keyPair, cert.CertificateRequest{
+	signerCert, err := cert.SignCertificate(caCert, caKeyPair, cert.CertificateRequest{
 		Subject: pkix.Name{
 			CommonName:   "Document Signer",
 			Organization: []string{"Example Corp"},
@@ -276,9 +316,10 @@ func demonstrateSigningWithOptions() {
 	// Sign with chain included
 	opts := signing.SignOptions{
 		HashAlgorithm:      crypto.SHA384, // Stronger hash for 3072-bit key
-		Format:             signing.FormatRaw,
+		Format:             signing.FormatPKCS7,
 		IncludeCertificate: true,
 		IncludeChain:       true,
+		ExtraCertificates:  []*x509.Certificate{caCert.Certificate},
 		Attributes: map[string]interface{}{
 			"version":    "1.0",
 			"author":     "John Doe",
@@ -311,23 +352,26 @@ func demonstrateSigningWithOptions() {
 	}
 	fmt.Println("✓ Verified signature with certificate chain")
 
+	saveSignature(signature, "output/chain_signature.json")
+
 	fmt.Println()
 }
 
 func demonstrateSignatureVerification() {
-	fmt.Println("5. Signature Verification Scenarios")
-	fmt.Println("-----------------------------------")
+	fmt.Println("1. Security Testing & Tamper Detection")
+	fmt.Println("--------------------------------------")
 
 	// Generate key pair
-	keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+	keyManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
 	if err != nil {
 		log.Fatal("Failed to generate key pair:", err)
 	}
+	keyPair := keyManager.KeyPair()
 
 	// Create certificate with specific key usage
 	certificate, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
 		Subject: pkix.Name{
-			CommonName: "Verification Test",
+			CommonName: "Security Test Signer",
 		},
 		ValidFor: 365 * 24 * time.Hour,
 	})
@@ -370,7 +414,8 @@ func demonstrateSignatureVerification() {
 	fmt.Println("✓ Test 3: Modified signature detected")
 
 	// Test 4: Wrong certificate
-	wrongKeyPair, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
+	wrongKeyManager, _ := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	wrongKeyPair := wrongKeyManager.KeyPair()
 	wrongCert, _ := cert.CreateSelfSignedCertificate(wrongKeyPair, cert.CertificateRequest{
 		Subject:  pkix.Name{CommonName: "Wrong Signer"},
 		ValidFor: 365 * 24 * time.Hour,
@@ -391,8 +436,8 @@ func demonstrateSignatureVerification() {
 }
 
 func demonstrateMultipleSignatures() {
-	fmt.Println("6. Multiple Signatures (Co-signing)")
-	fmt.Println("-----------------------------------")
+	fmt.Println("1. Multi-Party Document Signing")
+	fmt.Println("-------------------------------")
 
 	document := []byte("Multi-party agreement requiring multiple signatures")
 
@@ -405,7 +450,8 @@ func demonstrateMultipleSignatures() {
 	}{}
 
 	// Signer 1: RSA
-	rsaKeyPair, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
+	rsaKeyManager, _ := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	rsaKeyPair := rsaKeyManager.KeyPair()
 	rsaCert, _ := cert.CreateSelfSignedCertificate(rsaKeyPair, cert.CertificateRequest{
 		Subject:  pkix.Name{CommonName: "Alice (RSA)"},
 		ValidFor: 365 * 24 * time.Hour,
@@ -418,7 +464,8 @@ func demonstrateMultipleSignatures() {
 	}{"Alice", "RSA", rsaKeyPair, rsaCert})
 
 	// Signer 2: ECDSA
-	ecdsaKeyPair, _ := algo.GenerateECDSAKeyPair(algo.P256)
+	ecdsaKeyManager, _ := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
+	ecdsaKeyPair := ecdsaKeyManager.KeyPair()
 	ecdsaCert, _ := cert.CreateSelfSignedCertificate(ecdsaKeyPair, cert.CertificateRequest{
 		Subject:  pkix.Name{CommonName: "Bob (ECDSA)"},
 		ValidFor: 365 * 24 * time.Hour,
@@ -431,7 +478,8 @@ func demonstrateMultipleSignatures() {
 	}{"Bob", "ECDSA", ecdsaKeyPair, ecdsaCert})
 
 	// Signer 3: Ed25519
-	ed25519KeyPair, _ := algo.GenerateEd25519KeyPair()
+	ed25519KeyManager, _ := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Config{})
+	ed25519KeyPair := ed25519KeyManager.KeyPair()
 	ed25519Cert, _ := cert.CreateSelfSignedCertificate(ed25519KeyPair, cert.CertificateRequest{
 		Subject:  pkix.Name{CommonName: "Charlie (Ed25519)"},
 		ValidFor: 365 * 24 * time.Hour,
@@ -489,12 +537,271 @@ func demonstrateMultipleSignatures() {
 			"hash":      signing.HashAlgorithmToString(sig.HashAlgorithm),
 			"signature": base64.StdEncoding.EncodeToString(sig.Data),
 			"digest":    base64.StdEncoding.EncodeToString(sig.Digest),
+			"format":    string(sig.Format),
 		}
 		multiSig["signatures"] = append(multiSig["signatures"].([]map[string]interface{}), sigData)
 	}
 
-	saveJSON(multiSig, "examples/signing/output/multi_signature.json")
+	saveJSON(multiSig, "output/multi_signature.json")
 	fmt.Println("\n✓ Multi-signature document saved")
+
+	fmt.Println()
+}
+
+func demonstratePKCS7FormatExamples() {
+	fmt.Println("1. PKCS#7 Format Demonstrations")
+	fmt.Println("-------------------------------")
+
+	// Generate key pair and certificate
+	keyManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		log.Fatal("Failed to generate key pair:", err)
+	}
+	keyPair := keyManager.KeyPair()
+
+	certificate, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName:   "PKCS#7 Document Signer",
+			Organization: []string{"Example Corp"},
+		},
+		ValidFor: 365 * 24 * time.Hour,
+	})
+	if err != nil {
+		log.Fatal("Failed to create certificate:", err)
+	}
+	fmt.Printf("✓ Created certificate for: %s\n", certificate.Certificate.Subject.CommonName)
+
+	document := []byte("Important contract requiring PKCS#7 signature")
+
+	// Test attached PKCS#7
+	fmt.Println("\n--- Attached PKCS#7 ---")
+	attachedOpts := signing.SignOptions{
+		HashAlgorithm:      crypto.SHA256,
+		Format:             signing.FormatPKCS7,
+		IncludeCertificate: true,
+		Detached:           false,
+	}
+
+	attachedSig, err := signing.SignDocument(document, keyPair, certificate, attachedOpts)
+	if err != nil {
+		log.Fatal("Failed to create attached PKCS#7:", err)
+	}
+	fmt.Printf("✓ Created attached PKCS#7 signature (%d bytes)\n", len(attachedSig.Data))
+
+	// Verify attached PKCS#7
+	err = signing.VerifySignature(document, attachedSig, signing.DefaultVerifyOptions())
+	if err != nil {
+		log.Fatal("Attached PKCS#7 verification failed:", err)
+	}
+	fmt.Println("✓ Attached PKCS#7 verified successfully")
+
+	// Test detached PKCS#7
+	fmt.Println("\n--- Detached PKCS#7 ---")
+	detachedOpts := signing.SignOptions{
+		HashAlgorithm:      crypto.SHA384,
+		Format:             signing.FormatPKCS7Detached,
+		IncludeCertificate: true,
+		Detached:           true,
+	}
+
+	detachedSig, err := signing.SignDocument(document, keyPair, certificate, detachedOpts)
+	if err != nil {
+		log.Fatal("Failed to create detached PKCS#7:", err)
+	}
+	fmt.Printf("✓ Created detached PKCS#7 signature (%d bytes)\n", len(detachedSig.Data))
+
+	// Verify detached PKCS#7
+	err = signing.VerifySignature(document, detachedSig, signing.DefaultVerifyOptions())
+	if err != nil {
+		log.Fatal("Detached PKCS#7 verification failed:", err)
+	}
+	fmt.Println("✓ Detached PKCS#7 verified successfully")
+
+	// Save PKCS#7 signatures
+	os.WriteFile("output/pkcs7_attached.p7s", attachedSig.Data, 0644)
+	os.WriteFile("output/pkcs7_detached.p7s", detachedSig.Data, 0644)
+	fmt.Println("\n✓ PKCS#7 signatures saved to output/ directory")
+
+	fmt.Println()
+}
+
+func demonstratePerformanceComparison() {
+	fmt.Println("1. Algorithm Performance Comparison")
+	fmt.Println("----------------------------------")
+
+	// Test data - 100KB document
+	testData := make([]byte, 100*1024)
+	for i := range testData {
+		testData[i] = byte(i % 256)
+	}
+	fmt.Printf("Testing with %d KB document\n", len(testData)/1024)
+
+	algorithms := []struct {
+		name    string
+		keyPair interface{}
+		cert    *cert.Certificate
+	}{}
+
+	// RSA
+	rsaKeyManager, _ := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	rsaKeyPair := rsaKeyManager.KeyPair()
+	rsaCert, _ := cert.CreateSelfSignedCertificate(rsaKeyPair, cert.CertificateRequest{
+		Subject:  pkix.Name{CommonName: "RSA Perf Test"},
+		ValidFor: 24 * time.Hour,
+	})
+	algorithms = append(algorithms, struct {
+		name    string
+		keyPair interface{}
+		cert    *cert.Certificate
+	}{"RSA-2048", rsaKeyPair, rsaCert})
+
+	// ECDSA
+	ecdsaKeyManager, _ := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
+	ecdsaKeyPair := ecdsaKeyManager.KeyPair()
+	ecdsaCert, _ := cert.CreateSelfSignedCertificate(ecdsaKeyPair, cert.CertificateRequest{
+		Subject:  pkix.Name{CommonName: "ECDSA Perf Test"},
+		ValidFor: 24 * time.Hour,
+	})
+	algorithms = append(algorithms, struct {
+		name    string
+		keyPair interface{}
+		cert    *cert.Certificate
+	}{"ECDSA-P256", ecdsaKeyPair, ecdsaCert})
+
+	// Ed25519
+	ed25519KeyManager, _ := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Config{})
+	ed25519KeyPair := ed25519KeyManager.KeyPair()
+	ed25519Cert, _ := cert.CreateSelfSignedCertificate(ed25519KeyPair, cert.CertificateRequest{
+		Subject:  pkix.Name{CommonName: "Ed25519 Perf Test"},
+		ValidFor: 24 * time.Hour,
+	})
+	algorithms = append(algorithms, struct {
+		name    string
+		keyPair interface{}
+		cert    *cert.Certificate
+	}{"Ed25519", ed25519KeyPair, ed25519Cert})
+
+	fmt.Printf("\n%-12s %-12s %-12s %-8s\n", "Algorithm", "Sign Time", "Verify Time", "Sig Size")
+	fmt.Println(strings.Repeat("-", 50))
+
+	for _, alg := range algorithms {
+		var signature *signing.Signature
+		var err error
+
+		// Measure signing time
+		startTime := time.Now()
+		switch kp := alg.keyPair.(type) {
+		case *algo.RSAKeyPair:
+			signature, err = signing.SignData(testData, kp, alg.cert)
+		case *algo.ECDSAKeyPair:
+			signature, err = signing.SignData(testData, kp, alg.cert)
+		case *algo.Ed25519KeyPair:
+			signature, err = signing.SignData(testData, kp, alg.cert)
+		}
+		signTime := time.Since(startTime)
+
+		if err != nil {
+			log.Printf("Failed to sign with %s: %v", alg.name, err)
+			continue
+		}
+
+		// Measure verification time
+		startTime = time.Now()
+		err = signing.VerifySignature(testData, signature, signing.DefaultVerifyOptions())
+		verifyTime := time.Since(startTime)
+
+		if err != nil {
+			log.Printf("Failed to verify with %s: %v", alg.name, err)
+			continue
+		}
+
+		fmt.Printf("%-12s %-12v %-12v %-8d\n",
+			alg.name, signTime, verifyTime, len(signature.Data))
+	}
+
+	fmt.Println()
+}
+
+func demonstrateFileOperations() {
+	fmt.Println("1. File Signing & Detached Signatures")
+	fmt.Println("-------------------------------------")
+
+	// Generate key pair
+	keyManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		log.Fatal("Failed to generate key pair:", err)
+	}
+	keyPair := keyManager.KeyPair()
+
+	certificate, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "File Signer",
+		},
+		ValidFor: 365 * 24 * time.Hour,
+	})
+	if err != nil {
+		log.Fatal("Failed to create certificate:", err)
+	}
+
+	// Create a test file
+	testFileContent := []byte(`This is a test document that will be signed.
+It contains multiple lines and represents a real file that needs
+digital signature protection for integrity and authenticity.`)
+
+	err = os.WriteFile("output/test_document.txt", testFileContent, 0644)
+	if err != nil {
+		log.Fatal("Failed to create test file:", err)
+	}
+	fmt.Println("✓ Created test document file")
+
+	// Sign the file
+	signature, err := signing.SignFile("output/test_document.txt", keyPair, certificate)
+	if err != nil {
+		log.Fatal("Failed to sign file:", err)
+	}
+	fmt.Printf("✓ Signed file using %s\n", signature.Algorithm)
+
+	// Save signature
+	saveSignature(signature, "output/document_signature.json")
+
+	// Verify file signature by reading the file again
+	fileData, err := os.ReadFile("output/test_document.txt")
+	if err != nil {
+		log.Fatal("Failed to read test file:", err)
+	}
+
+	err = signing.VerifySignature(fileData, signature, signing.DefaultVerifyOptions())
+	if err != nil {
+		log.Fatal("File signature verification failed:", err)
+	}
+	fmt.Println("✓ File signature verified successfully")
+
+	// Demonstrate detached signature verification
+	fmt.Println("\n--- Detached Signature Test ---")
+
+	// Create a raw signature for detached verification
+	hasher := crypto.SHA256.New()
+	hasher.Write(testFileContent)
+	digest := hasher.Sum(nil)
+
+	rawSigBytes, err := keyPair.PrivateKey.Sign(rand.Reader, digest, crypto.SHA256)
+	if err != nil {
+		log.Fatal("Failed to create raw signature:", err)
+	}
+
+	// Save raw signature bytes
+	err = os.WriteFile("output/test_document.sig", rawSigBytes, 0644)
+	if err != nil {
+		log.Fatal("Failed to save signature file:", err)
+	}
+	fmt.Println("✓ Created detached signature file")
+
+	// Verify detached signature
+	err = signing.VerifyDetachedSignature(testFileContent, rawSigBytes, certificate.Certificate, crypto.SHA256)
+	if err != nil {
+		log.Fatal("Detached signature verification failed:", err)
+	}
+	fmt.Println("✓ Detached signature verified successfully")
 
 	fmt.Println()
 }
@@ -508,11 +815,14 @@ func saveSignature(sig *signing.Signature, filename string) {
 		"format":        string(sig.Format),
 		"signature":     base64.StdEncoding.EncodeToString(sig.Data),
 		"digest":        base64.StdEncoding.EncodeToString(sig.Digest),
+		"timestamp":     time.Now().Format(time.RFC3339),
 	}
 
 	if sig.Certificate != nil {
 		data["signerCN"] = sig.Certificate.Subject.CommonName
 		data["issuerCN"] = sig.Certificate.Issuer.CommonName
+		data["validFrom"] = sig.Certificate.NotBefore.Format(time.RFC3339)
+		data["validUntil"] = sig.Certificate.NotAfter.Format(time.RFC3339)
 	}
 
 	if sig.Metadata != nil {
@@ -535,98 +845,3 @@ func saveJSON(data interface{}, filename string) {
 		return
 	}
 }
-
-// TODO: Update to use new API without formats package
-/*
-func demonstratePKCS7Example() {
-	fmt.Println("7. PKCS#7/CMS Format Examples")
-	fmt.Println("=============================")
-
-	// Generate key pair and certificate
-	keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
-	if err != nil {
-		log.Fatal("Failed to generate key pair:", err)
-	}
-
-	certificate, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
-		Subject: pkix.Name{
-			CommonName:   "PKCS#7 Document Signer",
-			Organization: []string{"Example Corp"},
-		},
-		ValidFor: 365 * 24 * time.Hour,
-	})
-	if err != nil {
-		log.Fatal("Failed to create certificate:", err)
-	}
-	fmt.Printf("✓ Created certificate for: %s\n", certificate.Certificate.Subject.CommonName)
-
-	document := []byte("Important contract requiring PKCS#7 signature")
-
-	// Test attached PKCS#7
-	fmt.Println("\n--- Attached PKCS#7 ---")
-	attachedFormat := formats.NewPKCS7Format(false)
-
-	attachedOpts := formats.SignOptions{
-		HashAlgorithm:      crypto.SHA256,
-		IncludeCertificate: true,
-	}
-
-	attachedSig, err := attachedFormat.Sign(document, keyPair.PrivateKey, certificate.Certificate, attachedOpts)
-	if err != nil {
-		log.Fatal("Failed to create attached PKCS#7:", err)
-	}
-	fmt.Printf("✓ Created attached PKCS#7 signature (%d bytes)\n", len(attachedSig))
-
-	// Verify attached PKCS#7
-	attachedVerifyOpts := formats.VerifyOptions{}
-	err = attachedFormat.Verify(document, attachedSig, certificate.Certificate, attachedVerifyOpts)
-	if err != nil {
-		log.Fatal("Attached PKCS#7 verification failed:", err)
-	}
-	fmt.Println("✓ Attached PKCS#7 verified successfully")
-
-	// Test detached PKCS#7
-	fmt.Println("\n--- Detached PKCS#7 ---")
-	detachedFormat := formats.NewPKCS7Format(true)
-
-	detachedOpts := formats.SignOptions{
-		HashAlgorithm:      crypto.SHA384,
-		IncludeCertificate: true,
-	}
-
-	detachedSig, err := detachedFormat.Sign(document, keyPair.PrivateKey, certificate.Certificate, detachedOpts)
-	if err != nil {
-		log.Fatal("Failed to create detached PKCS#7:", err)
-	}
-	fmt.Printf("✓ Created detached PKCS#7 signature (%d bytes)\n", len(detachedSig))
-
-	// Verify detached PKCS#7
-	detachedVerifyOpts := formats.VerifyOptions{}
-	err = detachedFormat.Verify(document, detachedSig, certificate.Certificate, detachedVerifyOpts)
-	if err != nil {
-		log.Fatal("Detached PKCS#7 verification failed:", err)
-	}
-	fmt.Println("✓ Detached PKCS#7 verified successfully")
-
-	// Parse and display info
-	attachedInfo, _ := attachedFormat.Parse(attachedSig)
-	detachedInfo, _ := detachedFormat.Parse(detachedSig)
-
-	fmt.Printf("\nAttached PKCS#7 info:\n")
-	fmt.Printf("  Algorithm: %s\n", attachedInfo.Algorithm)
-	fmt.Printf("  Detached: %v\n", attachedInfo.Detached)
-	fmt.Printf("  Certificate: %s\n", attachedInfo.Certificate.Subject.CommonName)
-
-	fmt.Printf("\nDetached PKCS#7 info:\n")
-	fmt.Printf("  Algorithm: %s\n", detachedInfo.Algorithm)
-	fmt.Printf("  Detached: %v\n", detachedInfo.Detached)
-	fmt.Printf("  Certificate: %s\n", detachedInfo.Certificate.Subject.CommonName)
-
-	// Save PKCS#7 signatures
-	os.WriteFile("examples/signing/output/pkcs7_attached.p7s", attachedSig, 0644)
-	os.WriteFile("examples/signing/output/pkcs7_detached.p7s", detachedSig, 0644)
-	fmt.Println("\n✓ PKCS#7 signatures saved to examples/signing/output/ directory")
-
-	fmt.Println()
-}
-*/
