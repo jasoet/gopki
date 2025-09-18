@@ -15,7 +15,7 @@ import (
 	"github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
-	"go.mozilla.org/pkcs7"
+	"github.com/smallstep/pkcs7"
 )
 
 // SignDocument signs a document using the provided key pair and certificate.

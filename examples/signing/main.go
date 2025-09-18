@@ -17,7 +17,6 @@ import (
 	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
 	"github.com/jasoet/gopki/signing"
-	"github.com/jasoet/gopki/signing/formats"
 )
 
 func main() {
@@ -40,7 +39,8 @@ func main() {
 	demonstrateMultipleSignatures()
 
 	// Demonstrate PKCS#7 formats
-	demonstratePKCS7Example()
+	// TODO: Update to use new API without formats package
+	// demonstratePKCS7Example()
 
 	fmt.Println("\n✅ All examples completed successfully!")
 	fmt.Println("Check the 'examples/signing/output' directory for output files.")
@@ -536,6 +536,8 @@ func saveJSON(data interface{}, filename string) {
 	}
 }
 
+// TODO: Update to use new API without formats package
+/*
 func demonstratePKCS7Example() {
 	fmt.Println("7. PKCS#7/CMS Format Examples")
 	fmt.Println("=============================")
@@ -627,3 +629,4 @@ func demonstratePKCS7Example() {
 
 	fmt.Println()
 }
+*/

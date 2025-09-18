@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"time"
 
-	"go.mozilla.org/pkcs7"
+	"github.com/smallstep/pkcs7"
 )
 
 // VerifySignature verifies a signature against the original data.

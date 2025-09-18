@@ -36,7 +36,7 @@ import (
 	"fmt"
 	"time"
 
-	"go.mozilla.org/pkcs7"
+	"github.com/smallstep/pkcs7"
 )
 
 type CMS []byte
