@@ -2,6 +2,9 @@ package cert
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rsa"
 	"crypto/x509/pkix"
 	"os"
 	"testing"
@@ -14,10 +17,11 @@ import (
 // TestDERFormatSupport tests all DER format functionality
 func TestDERFormatSupport(t *testing.T) {
 	// Generate test key pair
-	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
+	keyPair := manager.KeyPair()
 
 	// Create test certificate
 	certificate, err := CreateSelfSignedCertificate(keyPair, CertificateRequest{
@@ -50,10 +54,11 @@ func TestDERFormatSupport(t *testing.T) {
 // TestDERFileSaveAndLoad tests saving and loading DER files
 func TestDERFileSaveAndLoad(t *testing.T) {
 	// Generate test certificate
-	keyPair, err := keypair.GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
+	manager, err := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
+	keyPair := manager.KeyPair()
 
 	originalCert, err := CreateSelfSignedCertificate(keyPair, CertificateRequest{
 		Subject: pkix.Name{
@@ -112,10 +117,11 @@ func TestDERFileSaveAndLoad(t *testing.T) {
 // TestDERParsing tests direct DER data parsing
 func TestDERParsing(t *testing.T) {
 	// Create test certificate
-	keyPair, err := keypair.GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
+	manager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey]("")
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
+	keyPair := manager.KeyPair()
 
 	originalCert, err := CreateSelfSignedCertificate(keyPair, CertificateRequest{
 		Subject: pkix.Name{
@@ -152,10 +158,11 @@ func TestDERParsing(t *testing.T) {
 
 // TestToDERToPEMMethods tests the ToDER() and ToPEM() methods
 func TestToDERToPEMMethods(t *testing.T) {
-	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
+	keyPair := manager.KeyPair()
 
 	certificate, err := CreateSelfSignedCertificate(keyPair, CertificateRequest{
 		Subject: pkix.Name{
@@ -205,10 +212,11 @@ func TestToDERToPEMMethods(t *testing.T) {
 
 // TestPEMToDERConversion tests format conversion functions
 func TestPEMToDERConversion(t *testing.T) {
-	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
+	keyPair := manager.KeyPair()
 
 	originalCert, err := CreateSelfSignedCertificate(keyPair, CertificateRequest{
 		Subject: pkix.Name{

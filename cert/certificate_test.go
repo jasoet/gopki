@@ -13,7 +13,7 @@ import (
 
 func TestCreateSelfSignedCertificate(t *testing.T) {
 	t.Run("RSA self-signed certificate", func(t *testing.T) {
-		keyPair, err := algo.GenerateRSAKeyPair(2048)
+		keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA key pair: %v", err)
 		}
@@ -100,7 +100,7 @@ func TestCreateSelfSignedCertificate(t *testing.T) {
 }
 
 func TestCreateCACertificate(t *testing.T) {
-	keyPair, err := algo.GenerateRSAKeyPair(2048)
+	keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key pair: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestCreateCACertificate(t *testing.T) {
 
 func TestSignCertificate(t *testing.T) {
 	// Create CA
-	caKeyPair, err := algo.GenerateRSAKeyPair(2048)
+	caKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		t.Fatalf("Failed to generate CA key pair: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestSignCertificate(t *testing.T) {
 	}
 
 	// Create server key pair
-	serverKeyPair, err := algo.GenerateRSAKeyPair(2048)
+	serverKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		t.Fatalf("Failed to generate server key pair: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestSignCertificate(t *testing.T) {
 
 func TestVerifyCertificate(t *testing.T) {
 	// Create CA
-	caKeyPair, err := algo.GenerateRSAKeyPair(2048)
+	caKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		t.Fatalf("Failed to generate CA key pair: %v", err)
 	}
@@ -214,7 +214,7 @@ func TestVerifyCertificate(t *testing.T) {
 	}
 
 	// Create and sign a certificate
-	serverKeyPair, err := algo.GenerateRSAKeyPair(2048)
+	serverKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		t.Fatalf("Failed to generate server key pair: %v", err)
 	}
@@ -238,7 +238,7 @@ func TestVerifyCertificate(t *testing.T) {
 	}
 
 	// Test verification with wrong CA
-	wrongCaKeyPair, _ := algo.GenerateRSAKeyPair(2048)
+	wrongCaKeyPair, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	wrongCaRequest := CertificateRequest{
 		Subject: pkix.Name{
 			CommonName: "Wrong CA",
@@ -261,7 +261,7 @@ func TestCertificateFileOperations(t *testing.T) {
 	tempDir := t.TempDir()
 	certFile := filepath.Join(tempDir, "test.pem")
 
-	keyPair, err := algo.GenerateRSAKeyPair(2048)
+	keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
@@ -305,7 +305,7 @@ func TestCertificateFileOperations(t *testing.T) {
 }
 
 func TestParseCertificateFromPEM(t *testing.T) {
-	keyPair, err := algo.GenerateRSAKeyPair(2048)
+	keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
@@ -350,7 +350,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7
 }
 
 func TestCertificateDefaultValues(t *testing.T) {
-	keyPair, err := algo.GenerateRSAKeyPair(2048)
+	keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
