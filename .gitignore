@@ -232,6 +232,7 @@ examples/signing/signing
 examples/certificates/certificates
 examples/encryption/encryption
 
+compatibility/testdata/
 
 # Node.js / Semantic Release
 node_modules/

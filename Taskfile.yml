@@ -21,6 +21,9 @@ tasks:
       - 'echo "  task test              - Run tests with race detection and coverage"'
       - 'echo "  task test:quick        - Run tests without race detection (faster)"'
       - 'echo ""'
+      - 'echo "Compatibility Testing:"'
+      - 'echo "  task test:compatibility        - Run OpenSSL compatibility tests"'
+      - 'echo ""'
       - 'echo "Code Analysis:"'
       - 'echo "  task lint              - Run go vet static analysis"'
       - 'echo "  task lint:full         - Run golangci-lint comprehensive check"'
@@ -96,6 +99,19 @@ tasks:
       - output/coverage.out
       - output/coverage.html
     silent: true
+
+  test:compatibility:
+    desc: Run OpenSSL compatibility tests
+    env:
+      CGO_ENABLED: 1
+    cmds:
+      - mkdir -p output/
+      - |
+        echo "🔗 Running OpenSSL Compatibility Tests..."
+        echo "   This tests interoperability between GoPKI and OpenSSL"
+      - go test -mod=mod ./compatibility/... -v
+      - 'echo "✅ OpenSSL compatibility tests completed"'
+    silent: false
 
 
   # Code Quality Tasks
