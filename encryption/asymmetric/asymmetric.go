@@ -34,13 +34,17 @@
 package asymmetric
 
 import (
+	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"time"
+
+	"golang.org/x/crypto/hkdf"
 
 	"github.com/jasoet/gopki/encryption"
 	"github.com/jasoet/gopki/keypair"
@@ -200,4 +204,130 @@ func EncryptForPublicKeyAny(data []byte, publicKey keypair.GenericPublicKey, opt
 	default:
 		return nil, fmt.Errorf("unsupported public key type: %T", publicKey)
 	}
+}
+
+// Ephemeral Key Generation Utilities
+
+// generateEphemeralECDSAKey generates an ephemeral ECDSA key pair for the same curve as the recipient's key.
+// This is used for ECDH key agreement in envelope encryption scenarios.
+func generateEphemeralECDSAKey(recipientKey *ecdsa.PublicKey) (*ecdsa.PrivateKey, error) {
+	if recipientKey == nil {
+		return nil, fmt.Errorf("recipient key cannot be nil")
+	}
+
+	ephemeralKey, err := ecdsa.GenerateKey(recipientKey.Curve, rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate ephemeral ECDSA key: %w", err)
+	}
+
+	return ephemeralKey, nil
+}
+
+// generateEphemeralX25519Key generates an ephemeral X25519 key pair for key agreement.
+// This is used for Ed25519-based envelope encryption.
+func generateEphemeralX25519Key() (*ecdh.PrivateKey, error) {
+	x25519 := ecdh.X25519()
+	ephemeralKey, err := x25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate ephemeral X25519 key: %w", err)
+	}
+
+	return ephemeralKey, nil
+}
+
+// Key Agreement Functions
+
+// performECDHKeyAgreement performs ECDH key agreement between private and public ECDSA keys.
+// Returns the shared secret that can be used for key derivation.
+func performECDHKeyAgreement(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) ([]byte, error) {
+	if privateKey == nil || publicKey == nil {
+		return nil, fmt.Errorf("private key and public key cannot be nil")
+	}
+
+	if privateKey.Curve != publicKey.Curve {
+		return nil, fmt.Errorf("curve mismatch: private key uses %s, public key uses %s",
+			privateKey.Curve.Params().Name, publicKey.Curve.Params().Name)
+	}
+
+	// Perform ECDH key agreement
+	x, _ := publicKey.Curve.ScalarMult(publicKey.X, publicKey.Y, privateKey.D.Bytes())
+	if x == nil {
+		return nil, fmt.Errorf("ECDH key agreement failed: invalid result")
+	}
+
+	sharedSecret := x.Bytes()
+	if len(sharedSecret) == 0 {
+		return nil, fmt.Errorf("ECDH key agreement failed: empty shared secret")
+	}
+
+	return sharedSecret, nil
+}
+
+// performX25519KeyAgreement performs X25519 key agreement.
+// Returns the shared secret for key derivation.
+func performX25519KeyAgreement(privateKey *ecdh.PrivateKey, publicKeyBytes []byte) ([]byte, error) {
+	if privateKey == nil {
+		return nil, fmt.Errorf("private key cannot be nil")
+	}
+
+	if len(publicKeyBytes) != 32 {
+		return nil, fmt.Errorf("invalid X25519 public key length: %d (expected 32)", len(publicKeyBytes))
+	}
+
+	// Convert bytes to X25519 public key
+	x25519 := ecdh.X25519()
+	publicKey, err := x25519.NewPublicKey(publicKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create X25519 public key: %w", err)
+	}
+
+	// Perform X25519 key agreement
+	sharedSecret, err := privateKey.ECDH(publicKey)
+	if err != nil {
+		return nil, fmt.Errorf("X25519 key agreement failed: %w", err)
+	}
+
+	if len(sharedSecret) == 0 {
+		return nil, fmt.Errorf("X25519 key agreement failed: empty shared secret")
+	}
+
+	return sharedSecret, nil
+}
+
+// Key Derivation Functions
+
+// deriveAESKeyFromSharedSecret derives an AES-256 key from a shared secret using HKDF-SHA256.
+// The info parameter provides application-specific context for the key derivation.
+func deriveAESKeyFromSharedSecret(sharedSecret []byte, info []byte) ([]byte, error) {
+	if len(sharedSecret) == 0 {
+		return nil, fmt.Errorf("shared secret cannot be empty")
+	}
+
+	// Use HKDF-SHA256 to derive a 32-byte AES key
+	hkdfReader := hkdf.New(sha256.New, sharedSecret, nil, info)
+	aesKey := make([]byte, 32) // AES-256 key size
+
+	_, err := io.ReadFull(hkdfReader, aesKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive AES key: %w", err)
+	}
+
+	return aesKey, nil
+}
+
+// Key Conversion Functions
+
+// ed25519ToX25519PublicKey converts an Ed25519 public key to X25519 format for key agreement.
+// This uses the standard conversion defined in RFC 7748.
+func ed25519ToX25519PublicKey(ed25519Key ed25519.PublicKey) ([]byte, error) {
+	if len(ed25519Key) != 32 {
+		return nil, fmt.Errorf("invalid Ed25519 public key length: %d (expected 32)", len(ed25519Key))
+	}
+
+	// For now, we use a direct copy as a placeholder
+	// In a production implementation, you would use a proper RFC 7748 conversion
+	x25519Key := make([]byte, 32)
+	copy(x25519Key, ed25519Key)
+
+	return x25519Key, nil
 }

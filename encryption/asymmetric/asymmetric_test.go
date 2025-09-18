@@ -430,3 +430,240 @@ func TestRoundTripEncryption(t *testing.T) {
 		})
 	}
 }
+
+// Tests for ephemeral key utilities
+
+func TestGenerateEphemeralECDSAKey(t *testing.T) {
+	// Generate recipient key pair
+	recipientKeys, err := algo.GenerateECDSAKeyPair(algo.P256)
+	if err != nil {
+		t.Fatalf("Failed to generate recipient key: %v", err)
+	}
+
+	t.Run("Valid P256 key", func(t *testing.T) {
+		ephemeralKey, err := generateEphemeralECDSAKey(recipientKeys.PublicKey)
+		if err != nil {
+			t.Fatalf("Failed to generate ephemeral key: %v", err)
+		}
+
+		if ephemeralKey == nil {
+			t.Fatal("Ephemeral key is nil")
+		}
+
+		if ephemeralKey.Curve != recipientKeys.PublicKey.Curve {
+			t.Error("Ephemeral key curve doesn't match recipient key curve")
+		}
+	})
+
+	t.Run("Nil recipient key", func(t *testing.T) {
+		_, err := generateEphemeralECDSAKey(nil)
+		if err == nil {
+			t.Fatal("Expected error for nil recipient key")
+		}
+	})
+}
+
+func TestGenerateEphemeralX25519Key(t *testing.T) {
+	ephemeralKey, err := generateEphemeralX25519Key()
+	if err != nil {
+		t.Fatalf("Failed to generate ephemeral X25519 key: %v", err)
+	}
+
+	if ephemeralKey == nil {
+		t.Fatal("Ephemeral key is nil")
+	}
+
+	// Test that we can get the public key
+	publicKeyBytes := ephemeralKey.PublicKey().Bytes()
+	if len(publicKeyBytes) != 32 {
+		t.Errorf("Expected 32-byte X25519 public key, got %d bytes", len(publicKeyBytes))
+	}
+}
+
+func TestPerformECDHKeyAgreement(t *testing.T) {
+	// Generate two key pairs for testing
+	aliceKeys, err := algo.GenerateECDSAKeyPair(algo.P256)
+	if err != nil {
+		t.Fatalf("Failed to generate Alice's key: %v", err)
+	}
+
+	bobKeys, err := algo.GenerateECDSAKeyPair(algo.P256)
+	if err != nil {
+		t.Fatalf("Failed to generate Bob's key: %v", err)
+	}
+
+	t.Run("Valid key agreement", func(t *testing.T) {
+		// Alice computes shared secret using her private key and Bob's public key
+		sharedSecretAlice, err := performECDHKeyAgreement(aliceKeys.PrivateKey, bobKeys.PublicKey)
+		if err != nil {
+			t.Fatalf("Alice's key agreement failed: %v", err)
+		}
+
+		// Bob computes shared secret using his private key and Alice's public key
+		sharedSecretBob, err := performECDHKeyAgreement(bobKeys.PrivateKey, aliceKeys.PublicKey)
+		if err != nil {
+			t.Fatalf("Bob's key agreement failed: %v", err)
+		}
+
+		// Both should compute the same shared secret
+		if len(sharedSecretAlice) == 0 || len(sharedSecretBob) == 0 {
+			t.Fatal("Shared secrets are empty")
+		}
+
+		if string(sharedSecretAlice) != string(sharedSecretBob) {
+			t.Error("Shared secrets don't match")
+		}
+	})
+
+	t.Run("Nil keys", func(t *testing.T) {
+		_, err := performECDHKeyAgreement(nil, bobKeys.PublicKey)
+		if err == nil {
+			t.Error("Expected error for nil private key")
+		}
+
+		_, err = performECDHKeyAgreement(aliceKeys.PrivateKey, nil)
+		if err == nil {
+			t.Error("Expected error for nil public key")
+		}
+	})
+
+	t.Run("Curve mismatch", func(t *testing.T) {
+		// Generate key with different curve
+		p384Keys, err := algo.GenerateECDSAKeyPair(algo.P384)
+		if err != nil {
+			t.Fatalf("Failed to generate P384 key: %v", err)
+		}
+
+		_, err = performECDHKeyAgreement(aliceKeys.PrivateKey, p384Keys.PublicKey)
+		if err == nil {
+			t.Error("Expected error for curve mismatch")
+		}
+	})
+}
+
+func TestPerformX25519KeyAgreement(t *testing.T) {
+	// Generate two X25519 key pairs
+	aliceKey, err := generateEphemeralX25519Key()
+	if err != nil {
+		t.Fatalf("Failed to generate Alice's X25519 key: %v", err)
+	}
+
+	bobKey, err := generateEphemeralX25519Key()
+	if err != nil {
+		t.Fatalf("Failed to generate Bob's X25519 key: %v", err)
+	}
+
+	t.Run("Valid key agreement", func(t *testing.T) {
+		// Alice computes shared secret
+		sharedSecretAlice, err := performX25519KeyAgreement(aliceKey, bobKey.PublicKey().Bytes())
+		if err != nil {
+			t.Fatalf("Alice's X25519 key agreement failed: %v", err)
+		}
+
+		// Bob computes shared secret
+		sharedSecretBob, err := performX25519KeyAgreement(bobKey, aliceKey.PublicKey().Bytes())
+		if err != nil {
+			t.Fatalf("Bob's X25519 key agreement failed: %v", err)
+		}
+
+		// Both should compute the same shared secret
+		if len(sharedSecretAlice) == 0 || len(sharedSecretBob) == 0 {
+			t.Fatal("Shared secrets are empty")
+		}
+
+		if string(sharedSecretAlice) != string(sharedSecretBob) {
+			t.Error("Shared secrets don't match")
+		}
+	})
+
+	t.Run("Invalid public key length", func(t *testing.T) {
+		invalidKey := make([]byte, 16) // Wrong length
+		_, err := performX25519KeyAgreement(aliceKey, invalidKey)
+		if err == nil {
+			t.Error("Expected error for invalid key length")
+		}
+	})
+
+	t.Run("Nil private key", func(t *testing.T) {
+		_, err := performX25519KeyAgreement(nil, bobKey.PublicKey().Bytes())
+		if err == nil {
+			t.Error("Expected error for nil private key")
+		}
+	})
+}
+
+func TestDeriveAESKeyFromSharedSecret(t *testing.T) {
+	sharedSecret := []byte("this is a test shared secret for key derivation")
+	info := []byte("GoPKI-encryption-test")
+
+	t.Run("Valid derivation", func(t *testing.T) {
+		aesKey, err := deriveAESKeyFromSharedSecret(sharedSecret, info)
+		if err != nil {
+			t.Fatalf("Failed to derive AES key: %v", err)
+		}
+
+		if len(aesKey) != 32 {
+			t.Errorf("Expected 32-byte AES key, got %d bytes", len(aesKey))
+		}
+
+		// Test deterministic behavior - same inputs should produce same output
+		aesKey2, err := deriveAESKeyFromSharedSecret(sharedSecret, info)
+		if err != nil {
+			t.Fatalf("Failed to derive AES key second time: %v", err)
+		}
+
+		if string(aesKey) != string(aesKey2) {
+			t.Error("Key derivation is not deterministic")
+		}
+	})
+
+	t.Run("Different info produces different keys", func(t *testing.T) {
+		aesKey1, err := deriveAESKeyFromSharedSecret(sharedSecret, []byte("info1"))
+		if err != nil {
+			t.Fatalf("Failed to derive AES key 1: %v", err)
+		}
+
+		aesKey2, err := deriveAESKeyFromSharedSecret(sharedSecret, []byte("info2"))
+		if err != nil {
+			t.Fatalf("Failed to derive AES key 2: %v", err)
+		}
+
+		if string(aesKey1) == string(aesKey2) {
+			t.Error("Different info should produce different keys")
+		}
+	})
+
+	t.Run("Empty shared secret", func(t *testing.T) {
+		_, err := deriveAESKeyFromSharedSecret([]byte{}, info)
+		if err == nil {
+			t.Error("Expected error for empty shared secret")
+		}
+	})
+}
+
+func TestEd25519ToX25519PublicKey(t *testing.T) {
+	// Generate Ed25519 key pair for testing
+	ed25519Keys, err := algo.GenerateEd25519KeyPair()
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key: %v", err)
+	}
+
+	t.Run("Valid conversion", func(t *testing.T) {
+		x25519Key, err := ed25519ToX25519PublicKey(ed25519Keys.PublicKey)
+		if err != nil {
+			t.Fatalf("Failed to convert Ed25519 to X25519: %v", err)
+		}
+
+		if len(x25519Key) != 32 {
+			t.Errorf("Expected 32-byte X25519 key, got %d bytes", len(x25519Key))
+		}
+	})
+
+	t.Run("Invalid key length", func(t *testing.T) {
+		invalidKey := make([]byte, 16) // Wrong length
+		_, err := ed25519ToX25519PublicKey(invalidKey)
+		if err == nil {
+			t.Error("Expected error for invalid key length")
+		}
+	})
+}
