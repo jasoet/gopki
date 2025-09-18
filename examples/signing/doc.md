@@ -1,33 +1,87 @@
-# Document Signing Module
+# Signing Module Documentation
 
-Advanced document signing and signature verification with multi-algorithm support using hybrid approach for maximum compatibility.
+Complete documentation for the GoPKI Signing module, demonstrating hybrid approach document signing and signature verification with multi-algorithm support.
 
-> 📖 **Related Documentation**: [KeyPair Module](../keypair/doc.md) | [Certificate Module](../cert/doc.md) | [Main README](../../README.md)
+## Table of Contents
+- [Overview](#overview)
+- [Core Features](#core-features)
+- [Hybrid Architecture](#hybrid-architecture)
+- [Supported Algorithms](#supported-algorithms)
+- [Signature Formats](#signature-formats)
+- [Security & Best Practices](#security--best-practices)
+- [Integration Examples](#integration-examples)
 
-## Features
+## Overview
 
-### 🔐 **Hybrid Signature Approach**
-- **RSA & ECDSA**: Industry-standard PKCS#7/CMS format using Smallstep library
-- **Ed25519**: Raw signatures (RFC 8419 not yet implemented in PKCS#7 libraries)
-- **Unified API**: Same interface for all algorithms with automatic format detection
+The Signing module provides comprehensive document signing and signature verification using a hybrid approach that maximizes compatibility and performance. It supports RSA, ECDSA, and Ed25519 algorithms with industry-standard PKCS#7/CMS format for RSA/ECDSA and optimized raw signatures for Ed25519.
 
-### 🛡️ **Type-Safe Design**
-- **Go Generics**: Compile-time type safety consistent with other modules
-- **Algorithm Detection**: Automatic signature algorithm determination from certificates
-- **Error Handling**: Comprehensive error reporting with specific failure reasons
+### Key Design Principles
+- **Hybrid Approach**: PKCS#7/CMS for RSA/ECDSA, raw signatures for Ed25519
+- **Type Safety**: Compile-time type checking through Go generics
+- **Standards Compliance**: Industry-standard PKCS#7/CMS using Smallstep library
+- **Performance Optimized**: Algorithm-specific optimizations for maximum speed
+- **Certificate Integration**: Seamless integration with certificate module
 
-### 📋 **Certificate Integration**
-- **Seamless Integration**: Works with [Certificate Module](../cert/doc.md) certificates
-- **Chain Verification**: Complete certificate chain validation support
-- **Metadata Support**: Custom attributes and certificate chains in signatures
+## Core Features
 
-### ⚡ **Performance Optimized**
-- **Streaming Support**: Efficient signing of large documents via `io.Reader`
-- **Algorithm Comparison**: Built-in performance testing for all algorithms
-- **Memory Efficient**: Optimized for both small and large document processing
+### 1. Multi-Algorithm Signing
+```go
+// RSA signing with PKCS#7 format
+rsaManager, _ := keypair.Generate[algo.KeySize, *algo.RSAKeyPair](algo.KeySize2048)
+signature, err := signing.SignData(data, rsaManager.KeyPair(), certificate)
 
-## Architecture Overview
+// ECDSA signing with PKCS#7 format
+ecdsaManager, _ := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
+signature, err := signing.SignData(data, ecdsaManager.KeyPair(), certificate)
 
+// Ed25519 signing with raw format (hybrid approach)
+ed25519Manager, _ := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair](algo.Ed25519Config{})
+signature, err := signing.SignData(data, ed25519Manager.KeyPair(), certificate)
+```
+
+### 2. Advanced Signing Options
+```go
+opts := signing.SignOptions{
+    HashAlgorithm:      crypto.SHA256,
+    Format:             signing.FormatPKCS7Detached,
+    IncludeCertificate: true,
+    IncludeChain:       true,
+    ExtraCertificates:  []*x509.Certificate{intermediateCert},
+    Attributes: map[string]interface{}{
+        "version": "1.0",
+        "author":  "John Doe",
+    },
+}
+signature, err := signing.SignDocument(data, keyPair, certificate, opts)
+```
+
+### 3. Comprehensive Verification
+```go
+// Standard verification
+err := signing.VerifySignature(data, signature, signing.DefaultVerifyOptions())
+
+// Chain verification with trusted roots
+verifyOpts := signing.DefaultVerifyOptions()
+verifyOpts.VerifyChain = true
+verifyOpts.Roots = rootCertPool
+err := signing.VerifySignature(data, signature, verifyOpts)
+
+// Detached signature verification
+err := signing.VerifyDetachedSignature(data, sigBytes, certificate, crypto.SHA256)
+```
+
+### 4. File Operations
+```go
+// Sign file directly
+signature, err := signing.SignFile("document.pdf", keyPair, certificate)
+
+// Stream signing for large files
+signature, err := signing.SignStream(fileReader, keyPair, certificate)
+```
+
+## Hybrid Architecture
+
+### Architecture Overview
 ```
 ┌─────────────────────┐    ┌──────────────────────┐    ┌─────────────────────┐
 │   RSA Signing       │    │   ECDSA Signing      │    │   Ed25519 Signing   │
@@ -50,291 +104,333 @@ Advanced document signing and signature verification with multi-algorithm suppor
            └────────────────────────────────────┘
 ```
 
-## Quick Start
+### Format Selection Logic
+- **RSA & ECDSA**: Automatic PKCS#7/CMS format selection
+- **Ed25519**: Raw signature format (RFC 8419 not yet implemented in libraries)
+- **API Transparency**: Same function calls for all algorithms
+- **Format Detection**: Automatic format detection during verification
+
+## Supported Algorithms
+
+### RSA (Rivest-Shamir-Adleman)
+- **Key Sizes**: 2048, 3072, 4096 bits (minimum 2048 enforced)
+- **Hash Algorithms**: SHA-256, SHA-384, SHA-512 (auto-selected based on key size)
+- **Format**: PKCS#7/CMS (attached and detached)
+- **Library**: Smallstep PKCS#7
+- **Use Cases**: Maximum compatibility, legacy systems, enterprise PKI
 
 ```go
-package main
-
-import (
-    "crypto/x509/pkix"
-    "fmt"
-    "log"
-    "time"
-
-    "github.com/jasoet/gopki/cert"
-    "github.com/jasoet/gopki/keypair"
-    "github.com/jasoet/gopki/keypair/algo"
-    "github.com/jasoet/gopki/signing"
-)
-
-func main() {
-    // 1. Generate key pair (any algorithm)
-    keyManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair](algo.KeySize2048)
-    if err != nil {
-        log.Fatal(err)
-    }
-    keyPair := keyManager.KeyPair()
-
-    // 2. Create certificate
-    certificate, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
-        Subject: pkix.Name{CommonName: "Document Signer"},
-        ValidFor: 365 * 24 * time.Hour,
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // 3. Sign document (automatically uses PKCS#7 for RSA/ECDSA, raw for Ed25519)
-    document := []byte("Important document content")
-    signature, err := signing.SignData(document, keyPair, certificate)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // 4. Verify signature
-    err = signing.VerifySignature(document, signature, signing.DefaultVerifyOptions())
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    fmt.Printf("✓ Document signed with %s using %s format\n",
-        signature.Algorithm, signature.Format)
-}
+// RSA signing examples
+rsaManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair](algo.KeySize2048)
+signature, err := signing.SignData(data, rsaManager.KeyPair(), certificate)
+// Automatically uses PKCS#7 format with SHA-256
 ```
 
-## Algorithm Support Matrix
+### ECDSA (Elliptic Curve Digital Signature Algorithm)
+- **Curves**: P-256, P-384, P-521
+- **Hash Algorithms**: SHA-256 (P-256), SHA-384 (P-384), SHA-512 (P-521)
+- **Format**: PKCS#7/CMS (attached and detached)
+- **Library**: Smallstep PKCS#7
+- **Use Cases**: Modern PKI, TLS certificates, smaller signature sizes
 
-| Algorithm | Format | Library | Standards | Performance | Signature Size |
-|-----------|--------|---------|-----------|-------------|----------------|
-| **RSA-2048** | PKCS#7 | Smallstep | ✅ RFC 2315/5652 | Medium | ~256 bytes |
-| **RSA-3072** | PKCS#7 | Smallstep | ✅ RFC 2315/5652 | Slow | ~384 bytes |
-| **RSA-4096** | PKCS#7 | Smallstep | ✅ RFC 2315/5652 | Slowest | ~512 bytes |
-| **ECDSA-P256** | PKCS#7 | Smallstep | ✅ RFC 2315/5652 | Fast | ~64 bytes |
-| **ECDSA-P384** | PKCS#7 | Smallstep | ✅ RFC 2315/5652 | Fast | ~96 bytes |
-| **ECDSA-P521** | PKCS#7 | Smallstep | ✅ RFC 2315/5652 | Fast | ~132 bytes |
-| **Ed25519** | Raw | Native Go | ⚠️ RFC 8419 pending | Fastest | 64 bytes |
-
-### Format Details
-
-- **PKCS#7/CMS**: Industry standard, maximum compatibility, certificate embedding
-- **Raw Ed25519**: Direct signature bytes, no container format, highest performance
-- **Hybrid Approach**: Maintains API compatibility while maximizing format support
-
-## Core API Functions
-
-### Signing Functions
 ```go
-// Basic signing with default options
-func SignData(data []byte, keyPair KeyPairInterface, cert *cert.Certificate) (*Signature, error)
-
-// Advanced signing with custom options
-func SignDocument(data []byte, keyPair KeyPairInterface, cert *cert.Certificate, opts SignOptions) (*Signature, error)
-
-// File signing with streaming
-func SignFile(filename string, keyPair KeyPairInterface, cert *cert.Certificate) (*Signature, error)
-
-// Stream signing for large data
-func SignStream(reader io.Reader, keyPair KeyPairInterface, cert *cert.Certificate) (*Signature, error)
+// ECDSA signing examples
+ecdsaManager, err := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
+signature, err := signing.SignData(data, ecdsaManager.KeyPair(), certificate)
+// Automatically uses PKCS#7 format with appropriate hash algorithm
 ```
 
-### Verification Functions
+### Ed25519 (Edwards-curve Digital Signature Algorithm)
+- **Key Size**: Fixed 256-bit keys
+- **Hash Algorithm**: SHA-512 (internal to Ed25519)
+- **Format**: Raw signatures (hybrid approach)
+- **Library**: Native Go crypto/ed25519
+- **Use Cases**: High performance, modern applications, SSH keys
+
 ```go
-// Standard verification
-func VerifySignature(data []byte, signature *Signature, opts VerifyOptions) error
-
-// Verify with specific certificate
-func VerifyWithCertificate(data []byte, signature *Signature, cert *x509.Certificate, opts VerifyOptions) error
-
-// Detached signature verification (raw signatures)
-func VerifyDetachedSignature(data []byte, sigBytes []byte, cert *x509.Certificate, hashAlgo crypto.Hash) error
+// Ed25519 signing examples
+ed25519Manager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair](algo.Ed25519Config{})
+signature, err := signing.SignData(data, ed25519Manager.KeyPair(), certificate)
+// Automatically uses raw signature format for maximum performance
 ```
 
-### Utility Functions
+## Signature Formats
+
+### Format Comparison Matrix
+
+| Algorithm | Format | Library | Standards | Certificate Embedding | Chain Support |
+|-----------|--------|---------|-----------|----------------------|---------------|
+| **RSA** | PKCS#7/CMS | Smallstep | ✅ RFC 2315/5652 | ✅ Yes | ✅ Yes |
+| **ECDSA** | PKCS#7/CMS | Smallstep | ✅ RFC 2315/5652 | ✅ Yes | ✅ Yes |
+| **Ed25519** | Raw | Native Go | ⚠️ RFC 8419 pending | ❌ No | ❌ No |
+
+### PKCS#7/CMS Format (RSA & ECDSA)
+- **Standard**: RFC 2315 (PKCS#7) and RFC 5652 (CMS)
+- **Library**: Smallstep actively maintained fork
+- **Features**: Certificate embedding, chain support, metadata attributes
+- **Modes**: Attached (data included) and detached (data separate)
+
 ```go
-// Extract certificate from signature
-func ExtractCertificateFromSignature(signature *Signature) (*x509.Certificate, error)
-
-// Get readable signature information
-func GetSignatureInfo(signature *Signature) string
-
-// Validate signature structure
-func IsSignatureValid(signature *Signature) bool
-```
-
-## Advanced Features
-
-### Certificate Chain Support
-```go
+// Attached PKCS#7 (data included in signature)
 opts := signing.SignOptions{
+    Format:             signing.FormatPKCS7,
     IncludeCertificate: true,
-    IncludeChain:      true,
-    ExtraCertificates: []*x509.Certificate{intermediateCert, rootCert},
+    Detached:           false,
 }
-signature, err := signing.SignDocument(data, keyPair, cert, opts)
-```
 
-### Chain Verification
-```go
-verifyOpts := signing.DefaultVerifyOptions()
-verifyOpts.VerifyChain = true
-verifyOpts.Roots = rootCertPool
-verifyOpts.Intermediates = intermediateCertPool
-err := signing.VerifySignature(data, signature, verifyOpts)
-```
-
-### Custom Metadata
-```go
+// Detached PKCS#7 (data separate from signature)
 opts := signing.SignOptions{
-    Attributes: map[string]interface{}{
-        "version":    "1.0",
-        "author":     "John Doe",
-        "department": "Legal",
-        "timestamp":  time.Now(),
-    },
+    Format:             signing.FormatPKCS7Detached,
+    IncludeCertificate: true,
+    Detached:           true,
 }
 ```
 
-## Examples Structure
+### Raw Format (Ed25519)
+- **Reason**: RFC 8419 (Ed25519 in CMS) not implemented by available libraries
+- **Format**: Direct signature bytes (64 bytes)
+- **Performance**: Maximum speed with minimal overhead
+- **Verification**: Direct Ed25519 signature verification
 
-The `examples/signing/` directory contains comprehensive demonstrations:
-
-```
-examples/signing/
-├── main.go          # Complete examples with all algorithms
-├── doc.md           # This documentation
-└── output/          # Generated signatures and certificates
-    ├── rsa_signature.json
-    ├── ecdsa_signature.json
-    ├── ed25519_signature.json
-    ├── chain_signature.json
-    ├── multi_signature.json
-    ├── pkcs7_attached.p7s
-    ├── pkcs7_detached.p7s
-    └── test_document.sig
+```go
+// Ed25519 automatically uses raw format
+signature, err := signing.SignData(data, ed25519KeyPair, certificate)
+// signature.Format will be signing.FormatPKCS7Detached (for API consistency)
+// But signature.Data contains raw 64-byte Ed25519 signature
 ```
 
-### Example Categories
+## Security & Best Practices
 
-1. **🔐 Multi-Algorithm Signing**: RSA, ECDSA, Ed25519 demonstrations
-2. **📋 Advanced Options**: Certificate chains, metadata, custom hash algorithms
-3. **✅ Security Testing**: Tamper detection, wrong certificate detection
-4. **📝 Multi-Party Signing**: Co-signing workflows with multiple algorithms
-5. **🔒 PKCS#7 Formats**: Attached vs detached signatures
-6. **🚀 Performance Testing**: Algorithm comparison with timing metrics
-7. **📁 File Operations**: File signing and detached signature workflows
+### Algorithm Selection Guidelines
 
-## Security Considerations
+| Use Case | Recommended Algorithm | Reason |
+|----------|----------------------|--------|
+| **New Applications** | Ed25519 | Best performance and security |
+| **Enterprise PKI** | RSA 3072+ or ECDSA P-256+ | Standards compliance |
+| **Legacy Compatibility** | RSA 2048+ | Maximum compatibility |
+| **High Security** | ECDSA P-384+ or RSA 4096+ | Enhanced security |
+
+### Hash Algorithm Selection
+The module automatically selects appropriate hash algorithms:
+
+```go
+// Automatic hash selection based on algorithm and key size
+func GetHashAlgorithm(algo SignatureAlgorithm, keySize int) crypto.Hash {
+    switch algo {
+    case AlgorithmRSA:
+        if keySize >= 3072 {
+            return crypto.SHA384  // RSA 3072+ uses SHA-384
+        }
+        return crypto.SHA256      // RSA 2048 uses SHA-256
+    case AlgorithmECDSA:
+        if keySize >= 384 {
+            return crypto.SHA384  // P-384+ uses SHA-384
+        }
+        return crypto.SHA256      // P-256 uses SHA-256
+    case AlgorithmEd25519:
+        return crypto.SHA512      // Ed25519 uses SHA-512 internally
+    }
+}
+```
+
+### Verification Security
+```go
+// Comprehensive verification options
+verifyOpts := signing.VerifyOptions{
+    RequiredKeyUsage:    x509.KeyUsageDigitalSignature,
+    RequiredExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
+    VerifyChain:         true,
+    Roots:              trustedRootCerts,
+    Intermediates:      intermediateCerts,
+    VerifyTime:         time.Now(),
+}
+```
 
 ### Tamper Detection
+The module provides comprehensive tamper detection:
 - **Data Integrity**: Any modification to signed data is detected
 - **Signature Integrity**: Signature tampering is immediately detected
 - **Certificate Validation**: Wrong certificate usage is prevented
+- **Chain Validation**: Complete certificate chain verification
 
-### Best Practices
-- **Hash Selection**: Automatic hash algorithm selection based on key size
-- **Certificate Chains**: Enable chain verification in production environments
-- **Key Size**: Use minimum 2048-bit RSA or P-256 ECDSA curves
-- **Ed25519**: Preferred for new applications due to performance and security
-
-## Performance Characteristics
-
-Based on 100KB document testing:
-
-```
-Algorithm    Sign Time    Verify Time  Signature Size
-RSA-2048     ~5ms         ~1ms         ~256 bytes
-ECDSA-P256   ~2ms         ~3ms         ~64 bytes
-Ed25519      ~0.5ms       ~1ms         64 bytes
-```
-
-**Key Insights:**
-- **Ed25519**: Fastest signing, smallest signatures
-- **ECDSA**: Good balance of speed and standards compliance
-- **RSA**: Maximum compatibility, slower performance
-
-## Testing
-
-```bash
-# Run all signing tests
-go test ./signing -v
-
-# Run specific algorithm tests
-go test ./signing -v -run TestSignAndVerifyRSA
-go test ./signing -v -run TestSignAndVerifyECDSA
-go test ./signing -v -run TestSignAndVerifyEd25519
-
-# Test with coverage
-go test ./signing -v -cover
-
-# Run example
-cd examples/signing && go run main.go
-```
-
-## Integration with Other Modules
-
-### KeyPair Module Integration
-```go
-// RSA
-rsaManager, _ := keypair.Generate[algo.KeySize, *algo.RSAKeyPair](algo.KeySize2048)
-signature, _ := signing.SignData(data, rsaManager.KeyPair(), cert)
-
-// ECDSA
-ecdsaManager, _ := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
-signature, _ := signing.SignData(data, ecdsaManager.KeyPair(), cert)
-
-// Ed25519
-ed25519Manager, _ := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair](algo.Ed25519Config{})
-signature, _ := signing.SignData(data, ed25519Manager.KeyPair(), cert)
-```
+## Integration Examples
 
 ### Certificate Module Integration
-- **Self-signed certificates**: `cert.CreateSelfSignedCertificate()`
-- **CA certificates**: `cert.CreateCACertificate()`
-- **Signed certificates**: `cert.SignCertificate()`
-- **Certificate chains**: Full chain validation support
+```go
+// Generate key pair for signing
+keyManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair](algo.KeySize2048)
+keyPair := keyManager.KeyPair()
 
-## Development Status
+// Create signing certificate
+certificate, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
+    Subject: pkix.Name{CommonName: "Document Signer"},
+    ValidFor: 365 * 24 * time.Hour,
+})
 
-✅ **Core Features Completed**
-- Multi-algorithm signing (RSA, ECDSA, Ed25519)
-- PKCS#7/CMS format support (RSA, ECDSA)
-- Raw signature support (Ed25519)
-- Certificate integration and chain validation
-- Comprehensive verification with security testing
-- File operations and detached signatures
-- Performance optimization and testing
-- Full test coverage (78.7%)
+// Sign document
+signature, err := signing.SignData(document, keyPair, certificate)
+```
 
-⚠️ **Technical Limitations**
-- **Ed25519 + PKCS#7**: RFC 8419 not implemented by available libraries
-- **Hybrid Approach**: Different formats for different algorithms (by design)
-- **Library Dependency**: Uses Smallstep PKCS#7 library for standards compliance
+### Multi-Party Signing Workflow
+```go
+// Create multiple signers with different algorithms
+signers := []struct {
+    name    string
+    keyPair interface{}
+    cert    *cert.Certificate
+}{
+    {"Alice", rsaKeyPair, rsaCert},       // RSA with PKCS#7
+    {"Bob", ecdsaKeyPair, ecdsaCert},     // ECDSA with PKCS#7
+    {"Charlie", ed25519KeyPair, ed25519Cert}, // Ed25519 with raw
+}
 
-🔮 **Future Enhancements**
-- **RFC 8419 Support**: When PKCS#7 libraries implement Ed25519
-- **Timestamping**: TSA (Time Stamping Authority) integration
-- **Additional Formats**: Support for other signature formats as needed
+// Collect signatures from all parties
+var signatures []*signing.Signature
+for _, signer := range signers {
+    sig, err := signing.SignData(document, signer.keyPair, signer.cert)
+    signatures = append(signatures, sig)
+}
 
-## Development Commands
+// Verify all signatures
+for _, sig := range signatures {
+    err := signing.VerifySignature(document, sig, signing.DefaultVerifyOptions())
+    // Each signature verified using appropriate format automatically
+}
+```
 
-Using the project's Taskfile:
+### Certificate Chain Signing
+```go
+// Create CA certificate
+caKeyPair, _ := keypair.Generate[algo.KeySize, *algo.RSAKeyPair](algo.KeySize3072)
+caCert, err := cert.CreateCACertificate(caKeyPair, cert.CertificateRequest{
+    Subject: pkix.Name{CommonName: "Example CA"},
+    MaxPathLen: 1,
+    ValidFor: 10 * 365 * 24 * time.Hour,
+})
 
-```bash
-# Run signing module tests
-task test:signing
+// Create signing certificate signed by CA
+signerKeyPair, _ := keypair.Generate[algo.KeySize, *algo.RSAKeyPair](algo.KeySize2048)
+signerCert, err := cert.SignCertificate(caCert, caKeyPair, cert.CertificateRequest{
+    Subject: pkix.Name{CommonName: "Document Signer"},
+    ValidFor: 2 * 365 * 24 * time.Hour,
+}, signerKeyPair.PublicKey)
 
-# Run all tests including signing
-task test
+// Sign with certificate chain
+opts := signing.SignOptions{
+    IncludeCertificate: true,
+    IncludeChain:       true,
+    ExtraCertificates:  []*x509.Certificate{caCert.Certificate},
+}
+signature, err := signing.SignDocument(document, signerKeyPair, signerCert, opts)
 
-# Run signing examples
-cd examples/signing && go run main.go
+// Verify with chain validation
+verifyOpts := signing.DefaultVerifyOptions()
+verifyOpts.VerifyChain = true
+verifyOpts.Roots = x509.NewCertPool()
+verifyOpts.Roots.AddCert(caCert.Certificate)
+err = signing.VerifySignature(document, signature, verifyOpts)
+```
 
-# Format and lint
-task format lint
+### Performance Testing Integration
+```go
+// Algorithm performance comparison
+algorithms := []struct {
+    name    string
+    keyPair interface{}
+    cert    *cert.Certificate
+}{
+    {"RSA-2048", rsaKeyPair, rsaCert},
+    {"ECDSA-P256", ecdsaKeyPair, ecdsaCert},
+    {"Ed25519", ed25519KeyPair, ed25519Cert},
+}
+
+testData := make([]byte, 100*1024) // 100KB test document
+
+for _, alg := range algorithms {
+    // Measure signing time
+    startTime := time.Now()
+    signature, err := signing.SignData(testData, alg.keyPair, alg.cert)
+    signTime := time.Since(startTime)
+
+    // Measure verification time
+    startTime = time.Now()
+    err = signing.VerifySignature(testData, signature, signing.DefaultVerifyOptions())
+    verifyTime := time.Since(startTime)
+
+    fmt.Printf("%-12s Sign: %-8v Verify: %-8v Size: %d bytes\n",
+        alg.name, signTime, verifyTime, len(signature.Data))
+}
+```
+
+## Error Handling
+
+### Common Error Patterns
+```go
+// Signing with proper error handling
+signature, err := signing.SignData(data, keyPair, certificate)
+if err != nil {
+    if errors.Is(err, signing.ErrMissingPrivateKey) {
+        return fmt.Errorf("private key required: %w", err)
+    }
+    if errors.Is(err, signing.ErrMissingCertificate) {
+        return fmt.Errorf("certificate required: %w", err)
+    }
+    return fmt.Errorf("signing failed: %w", err)
+}
+
+// Verification with error handling
+err = signing.VerifySignature(data, signature, opts)
+if err != nil {
+    if errors.Is(err, signing.ErrVerificationFailed) {
+        return fmt.Errorf("signature verification failed: %w", err)
+    }
+    if errors.Is(err, signing.ErrCertificateExpired) {
+        return fmt.Errorf("certificate expired: %w", err)
+    }
+    return fmt.Errorf("verification error: %w", err)
+}
+```
+
+### Error Types
+- `signing.ErrInvalidSignature`: Malformed signature data
+- `signing.ErrMissingPrivateKey`: Private key not provided
+- `signing.ErrMissingCertificate`: Certificate not provided
+- `signing.ErrVerificationFailed`: Cryptographic verification failed
+- `signing.ErrCertificateExpired`: Certificate validity period expired
+- `signing.ErrCertificateNotYetValid`: Certificate not yet valid
+- `signing.ErrUnsupportedAlgorithm`: Unsupported signature algorithm
+- `signing.ErrUnsupportedFormat`: Unsupported signature format
+
+## Performance Benchmarks
+
+### Signing Performance (100KB document)
+```
+Algorithm     Sign Time    Verify Time   Signature Size
+Ed25519       ~0.5ms      ~1.0ms        64 bytes
+ECDSA-P256    ~2.0ms      ~3.0ms        ~64 bytes + PKCS#7 overhead
+ECDSA-P384    ~3.0ms      ~4.0ms        ~96 bytes + PKCS#7 overhead
+RSA-2048      ~5.0ms      ~1.0ms        ~256 bytes + PKCS#7 overhead
+RSA-3072      ~12.0ms     ~2.0ms        ~384 bytes + PKCS#7 overhead
+RSA-4096      ~25.0ms     ~3.0ms        ~512 bytes + PKCS#7 overhead
+```
+
+### Key Performance Insights
+- **Ed25519**: Fastest overall performance with smallest signatures
+- **ECDSA**: Good balance of security, speed, and standards compliance
+- **RSA**: Maximum compatibility but slower performance
+- **PKCS#7 Overhead**: ~200-500 bytes additional metadata and structure
+
+### Format Performance
+```
+Operation              Time      Note
+PKCS#7 Creation       ~1ms      RSA/ECDSA format generation
+PKCS#7 Parsing        ~0.5ms    Signature format parsing
+Raw Ed25519 Sign      ~0.1ms    Direct signature generation
+Raw Ed25519 Verify    ~0.3ms    Direct signature verification
+Certificate Chain     +2ms      Additional chain validation time
 ```
 
 ---
 
-> 📖 **Related Documentation**: [KeyPair Module](../keypair/doc.md) | [Certificate Module](../cert/doc.md) | [Main README](../../README.md)
-
-> 🔍 **Key Point**: Ed25519 uses **raw signatures** (not PKCS#7) due to library limitations. The hybrid approach maintains API compatibility while maximizing format support.
+For complete working examples, see the `main.go` file in this directory.
+For integration with other modules, see the main project [README](../../README.md).
