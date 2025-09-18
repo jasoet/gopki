@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/jasoet/gopki/keypair/algo"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDefaultEncryptOptions(t *testing.T) {
@@ -202,7 +202,7 @@ func TestEncodeData(t *testing.T) {
 func TestDecodeDataWithKey(t *testing.T) {
 	t.Run("EmptyData", func(t *testing.T) {
 		// Generate a test key and certificate
-		rsaKeys, err := algo.GenerateRSAKeyPair(2048)
+		rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA key pair: %v", err)
 		}
@@ -224,7 +224,7 @@ func TestDecodeDataWithKey(t *testing.T) {
 
 	t.Run("InvalidCMSData", func(t *testing.T) {
 		// Generate a test key and certificate
-		rsaKeys, err := algo.GenerateRSAKeyPair(2048)
+		rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA key pair: %v", err)
 		}
@@ -245,7 +245,7 @@ func TestDecodeDataWithKey(t *testing.T) {
 
 	t.Run("TypeSafety", func(t *testing.T) {
 		// This test ensures the generic constraint works at compile time
-		rsaKeys, err := algo.GenerateRSAKeyPair(2048)
+		rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA key pair: %v", err)
 		}
@@ -377,7 +377,7 @@ func TestEncryptedDataStructure(t *testing.T) {
 
 func TestRecipientInfoStructure(t *testing.T) {
 	// Test that RecipientInfo struct can be created and used
-	rsaKeys, err := algo.GenerateRSAKeyPair(2048)
+	rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key pair: %v", err)
 	}

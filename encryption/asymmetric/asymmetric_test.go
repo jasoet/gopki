@@ -16,7 +16,7 @@ func TestEncrypt(t *testing.T) {
 	opts := encryption.DefaultEncryptOptions()
 
 	t.Run("RSA", func(t *testing.T) {
-		rsaKeys, err := algo.GenerateRSAKeyPair(2048)
+		rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA key pair: %v", err)
 		}
@@ -104,7 +104,7 @@ func TestDecrypt(t *testing.T) {
 	decryptOpts := encryption.DefaultDecryptOptions()
 
 	t.Run("RSA", func(t *testing.T) {
-		rsaKeys, err := algo.GenerateRSAKeyPair(2048)
+		rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA key pair: %v", err)
 		}
@@ -193,7 +193,7 @@ func TestEncryptForPublicKey(t *testing.T) {
 	opts := encryption.DefaultEncryptOptions()
 
 	t.Run("RSA", func(t *testing.T) {
-		rsaKeys, err := algo.GenerateRSAKeyPair(2048)
+		rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA key pair: %v", err)
 		}
@@ -317,7 +317,7 @@ func TestDecryptWithPrivateKey(t *testing.T) {
 		Data:      []byte("test"),
 	}
 
-	rsaKeys, err := algo.GenerateRSAKeyPair(2048)
+	rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key pair: %v", err)
 	}
@@ -367,7 +367,7 @@ func TestRoundTripEncryption(t *testing.T) {
 
 	for _, data := range testData {
 		t.Run("RSA", func(t *testing.T) {
-			rsaKeys, err := algo.GenerateRSAKeyPair(2048)
+			rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 			if err != nil {
 				t.Fatalf("Failed to generate RSA key pair: %v", err)
 			}

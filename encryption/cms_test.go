@@ -13,7 +13,7 @@ import (
 
 func TestNewCMSImplementation(t *testing.T) {
 	// Generate RSA key pair
-	rsaKeys, err := algo.GenerateRSAKeyPair(2048)
+	rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key pair: %v", err)
 	}

@@ -19,7 +19,7 @@ func TestGenericPrivateKeyTypes(t *testing.T) {
 
 	t.Run("RSAPrivateKey", func(t *testing.T) {
 		// Generate RSA key pair
-		rsaKeys, err := algo.GenerateRSAKeyPair(2048)
+		rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA key pair: %v", err)
 		}
@@ -63,7 +63,7 @@ func TestGenericPrivateKeyTypes(t *testing.T) {
 		// primarily supports RSA for envelope encryption
 
 		// Generate RSA key pair for actual testing
-		rsaKeys, err := algo.GenerateRSAKeyPair(2048)
+		rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA key pair: %v", err)
 		}

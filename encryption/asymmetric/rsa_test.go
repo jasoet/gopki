@@ -9,7 +9,7 @@ import (
 )
 
 func TestEncryptWithRSA(t *testing.T) {
-	rsaKeys, err := algo.GenerateRSAKeyPair(2048)
+	rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key pair: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestEncryptWithRSA(t *testing.T) {
 }
 
 func TestDecryptWithRSA(t *testing.T) {
-	rsaKeys, err := algo.GenerateRSAKeyPair(2048)
+	rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key pair: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestDecryptWithRSA(t *testing.T) {
 
 	t.Run("WrongKeyPair", func(t *testing.T) {
 		// Generate different key pair
-		wrongKeys, err := algo.GenerateRSAKeyPair(2048)
+		wrongKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 		if err != nil {
 			t.Fatalf("Failed to generate wrong RSA key pair: %v", err)
 		}
@@ -204,12 +204,12 @@ func TestRSARoundTrip(t *testing.T) {
 		keySize  algo.KeySize
 		dataSize int
 	}{
-		{"RSA2048_Small", 2048, 10},
-		{"RSA2048_Medium", 2048, 100},
-		{"RSA2048_Max", 2048, 190}, // Max for 2048-bit RSA
-		{"RSA3072_Small", 3072, 10},
-		{"RSA3072_Medium", 3072, 200},
-		{"RSA3072_Max", 3072, 318}, // Max for 3072-bit RSA
+		{"RSA2048_Small", algo.KeySize2048, 10},
+		{"RSA2048_Medium", algo.KeySize2048, 100},
+		{"RSA2048_Max", algo.KeySize2048, 190}, // Max for 2048-bit RSA
+		{"RSA3072_Small", algo.KeySize3072, 10},
+		{"RSA3072_Medium", algo.KeySize3072, 200},
+		{"RSA3072_Max", algo.KeySize3072, 318}, // Max for 3072-bit RSA
 	}
 
 	opts := encryption.DefaultEncryptOptions()
@@ -257,9 +257,9 @@ func TestRSADataSizeLimits(t *testing.T) {
 		keySize  algo.KeySize
 		maxBytes int
 	}{
-		{"RSA2048", 2048, 190},
-		{"RSA3072", 3072, 318},
-		{"RSA4096", 4096, 446},
+		{"RSA2048", algo.KeySize2048, 190},
+		{"RSA3072", algo.KeySize3072, 318},
+		{"RSA4096", algo.KeySize4096, 446},
 	}
 
 	opts := encryption.DefaultEncryptOptions()
@@ -289,7 +289,7 @@ func TestRSADataSizeLimits(t *testing.T) {
 }
 
 func TestRSAWithMetadata(t *testing.T) {
-	rsaKeys, err := algo.GenerateRSAKeyPair(2048)
+	rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key pair: %v", err)
 	}
