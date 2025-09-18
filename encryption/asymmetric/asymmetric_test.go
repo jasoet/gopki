@@ -653,32 +653,7 @@ func TestDeriveAESKeyFromSharedSecret(t *testing.T) {
 	})
 }
 
-func TestEd25519ToX25519PublicKey(t *testing.T) {
-	// Generate Ed25519 key pair for testing
-	ed25519Keys, err := algo.GenerateEd25519KeyPair()
-	if err != nil {
-		t.Fatalf("Failed to generate Ed25519 key: %v", err)
-	}
-
-	t.Run("Valid conversion", func(t *testing.T) {
-		x25519Key, err := ed25519ToX25519PublicKey(ed25519Keys.PublicKey)
-		if err != nil {
-			t.Fatalf("Failed to convert Ed25519 to X25519: %v", err)
-		}
-
-		if len(x25519Key) != 32 {
-			t.Errorf("Expected 32-byte X25519 key, got %d bytes", len(x25519Key))
-		}
-	})
-
-	t.Run("Invalid key length", func(t *testing.T) {
-		invalidKey := make([]byte, 16) // Wrong length
-		_, err := ed25519ToX25519PublicKey(invalidKey)
-		if err == nil {
-			t.Error("Expected error for invalid key length")
-		}
-	})
-}
+// Ed25519 to X25519 conversion tests removed - functionality disabled due to key derivation incompatibility
 
 // Integration tests for EncryptForPublicKey → DecryptWithPrivateKey round trips
 func TestEncryptForPublicKeyRoundTrip(t *testing.T) {

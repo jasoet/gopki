@@ -348,16 +348,7 @@ func deriveAESKeyFromSharedSecret(sharedSecret []byte, info []byte) ([]byte, err
 	return aesKey, nil
 }
 
-// Key Conversion Functions
-
-// ed25519ToX25519PublicKey converts an Ed25519 public key to X25519 format for key agreement.
-// This uses the standard conversion defined in RFC 7748.
-//
-// Note: This function is now a wrapper around the more comprehensive
-// Ed25519ToX25519PublicKey function in keyconv.go for backward compatibility.
-func ed25519ToX25519PublicKey(ed25519Key ed25519.PublicKey) ([]byte, error) {
-	return Ed25519ToX25519PublicKey(ed25519Key)
-}
+// Key Conversion Functions - Ed25519 conversion removed due to incompatibility
 
 // encryptForECDSAPublicKey encrypts data for an ECDSA public key using ephemeral ECDH key agreement.
 // This function mirrors the logic from EncryptWithECDSA but works with just the public key.
