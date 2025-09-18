@@ -160,11 +160,13 @@ func EncryptForPublicKey[T keypair.PublicKey](data []byte, publicKey T, opts enc
 			Metadata:  opts.Metadata,
 		}, nil
 
-	case *ecdsa.PublicKey, ed25519.PublicKey:
-		// For ECDSA and Ed25519, we need to generate ephemeral keys
-		// This is more complex, so for now return an error
-		// TODO: Implement ephemeral key generation and key agreement
-		return nil, fmt.Errorf("EncryptForPublicKey not yet implemented for %T - use Encrypt with key pair instead", publicKey)
+	case *ecdsa.PublicKey:
+		// For ECDSA, use ephemeral ECDH key agreement + AES-GCM
+		return encryptForECDSAPublicKey(data, pk, opts)
+
+	case ed25519.PublicKey:
+		// For Ed25519, use ephemeral X25519 key agreement + AES-GCM
+		return encryptForEd25519PublicKey(data, pk, opts)
 
 	default:
 		return nil, fmt.Errorf("unsupported public key type: %T", publicKey)
@@ -172,14 +174,45 @@ func EncryptForPublicKey[T keypair.PublicKey](data []byte, publicKey T, opts enc
 }
 
 // DecryptWithPrivateKey decrypts data using a private key.
-// This is not typically used for asymmetric encryption - use Decrypt with key pair instead.
+// This function supports RSA-OAEP, ECDH, and X25519 algorithms by dispatching
+// to the appropriate decryption method based on the private key type and algorithm.
 //
 // Type parameter:
 //   - T: Private key type constrained to keypair.PrivateKey interface
 //
-// Returns an error as this operation is not supported for asymmetric encryption.
+// Parameters:
+//   - encrypted: The encrypted data to decrypt
+//   - privateKey: The private key to use for decryption
+//   - opts: Decryption options
+//
+// Returns:
+//   - []byte: The decrypted plaintext data
+//   - error: Any error that occurred during decryption
 func DecryptWithPrivateKey[T keypair.PrivateKey](encrypted *encryption.EncryptedData, privateKey T, opts encryption.DecryptOptions) ([]byte, error) {
-	return nil, fmt.Errorf("DecryptWithPrivateKey not supported for asymmetric encryption - use Decrypt with key pair instead")
+	switch pk := any(privateKey).(type) {
+	case *rsa.PrivateKey:
+		// For RSA, decrypt directly using OAEP
+		if encrypted.Algorithm != encryption.AlgorithmRSAOAEP {
+			return nil, fmt.Errorf("expected RSA-OAEP algorithm for RSA private key, got %s", encrypted.Algorithm)
+		}
+
+		plaintext, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, pk, encrypted.Data, nil)
+		if err != nil {
+			return nil, fmt.Errorf("RSA-OAEP decryption failed: %w", err)
+		}
+		return plaintext, nil
+
+	case *ecdsa.PrivateKey:
+		// For ECDSA, use ECDH key agreement
+		return decryptWithECDSAPrivateKey(encrypted, pk, opts)
+
+	case ed25519.PrivateKey:
+		// For Ed25519, use X25519 key agreement
+		return decryptWithEd25519PrivateKey(encrypted, pk, opts)
+
+	default:
+		return nil, fmt.Errorf("unsupported private key type: %T", privateKey)
+	}
 }
 
 // SupportedAlgorithms returns the encryption algorithms supported by this package.
@@ -330,4 +363,176 @@ func ed25519ToX25519PublicKey(ed25519Key ed25519.PublicKey) ([]byte, error) {
 	copy(x25519Key, ed25519Key)
 
 	return x25519Key, nil
+}
+
+// encryptForECDSAPublicKey encrypts data for an ECDSA public key using ephemeral ECDH key agreement.
+// This function mirrors the logic from EncryptWithECDSA but works with just the public key.
+func encryptForECDSAPublicKey(data []byte, publicKey *ecdsa.PublicKey, opts encryption.EncryptOptions) (*encryption.EncryptedData, error) {
+	// Convert ECDSA public key to ECDH format
+	ecdhPublicKey, err := publicKey.ECDH()
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert ECDSA public key to ECDH: %w", err)
+	}
+
+	// Generate ephemeral key pair for sender
+	curve := ecdhPublicKey.Curve()
+	ephemeralPrivateKey, err := curve.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate ephemeral key: %w", err)
+	}
+
+	// Perform ECDH key agreement
+	sharedSecret, err := ephemeralPrivateKey.ECDH(ecdhPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("ECDH key agreement failed: %w", err)
+	}
+
+	// Derive AES key from shared secret using helper function
+	aesKey := deriveAESKey(sharedSecret)
+
+	// Encrypt data using AES-GCM
+	encryptedData, iv, tag, err := encryptAESGCM(data, aesKey)
+	if err != nil {
+		return nil, fmt.Errorf("AES-GCM encryption failed: %w", err)
+	}
+
+	// Include ephemeral public key for recipient
+	ephemeralPublicKeyBytes := ephemeralPrivateKey.PublicKey().Bytes()
+
+	return &encryption.EncryptedData{
+		Algorithm:    encryption.AlgorithmECDH,
+		Format:       opts.Format,
+		Data:         encryptedData,
+		EncryptedKey: ephemeralPublicKeyBytes, // Store ephemeral public key
+		IV:           iv,
+		Tag:          tag,
+		Timestamp:    time.Now(),
+		Metadata:     opts.Metadata,
+	}, nil
+}
+
+// encryptForEd25519PublicKey encrypts data for an Ed25519 public key using ephemeral X25519 key agreement.
+// This function mirrors the logic from EncryptWithEd25519 but works with just the public key.
+func encryptForEd25519PublicKey(data []byte, publicKey ed25519.PublicKey, opts encryption.EncryptOptions) (*encryption.EncryptedData, error) {
+	// Convert Ed25519 public key to X25519 format
+	x25519PublicKeyBytes, err := ed25519ToX25519PublicKey(publicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert Ed25519 to X25519: %w", err)
+	}
+
+	// Create X25519 public key from bytes
+	curve := ecdh.X25519()
+	x25519PublicKey, err := curve.NewPublicKey(x25519PublicKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create X25519 public key: %w", err)
+	}
+
+	// Generate ephemeral key pair for forward secrecy
+	ephemeralPrivateKey, err := curve.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate ephemeral X25519 key: %w", err)
+	}
+
+	// Perform X25519 key agreement between ephemeral key and recipient's public key
+	sharedSecret, err := ephemeralPrivateKey.ECDH(x25519PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("X25519 key agreement failed: %w", err)
+	}
+
+	// Derive AES key from shared secret using helper function
+	aesKey := deriveAESKey(sharedSecret)
+
+	// Encrypt data using AES-GCM
+	encryptedData, iv, tag, err := encryptAESGCM(data, aesKey)
+	if err != nil {
+		return nil, fmt.Errorf("AES-GCM encryption failed: %w", err)
+	}
+
+	return &encryption.EncryptedData{
+		Algorithm:    encryption.AlgorithmX25519,
+		Format:       opts.Format,
+		Data:         encryptedData,
+		EncryptedKey: ephemeralPrivateKey.PublicKey().Bytes(), // Store ephemeral public key
+		IV:           iv,
+		Tag:          tag,
+		Timestamp:    time.Now(),
+		Metadata:     opts.Metadata,
+	}, nil
+}
+
+// decryptWithECDSAPrivateKey decrypts ECDH encrypted data using an ECDSA private key.
+// This function mirrors the logic from DecryptWithECDSA but works with just the private key.
+func decryptWithECDSAPrivateKey(encrypted *encryption.EncryptedData, privateKey *ecdsa.PrivateKey, opts encryption.DecryptOptions) ([]byte, error) {
+	if encrypted.Algorithm != encryption.AlgorithmECDH {
+		return nil, fmt.Errorf("expected ECDH algorithm for ECDSA private key, got %s", encrypted.Algorithm)
+	}
+
+	// Convert ECDSA private key to ECDH
+	ecdhPrivateKey, err := privateKey.ECDH()
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert ECDSA private key to ECDH: %w", err)
+	}
+
+	// Parse ephemeral public key from ECDH bytes
+	curve := ecdhPrivateKey.Curve()
+	ephemeralECDHKey, err := curve.NewPublicKey(encrypted.EncryptedKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse ephemeral public key: %w", err)
+	}
+
+	// Perform ECDH key agreement
+	sharedSecret, err := ecdhPrivateKey.ECDH(ephemeralECDHKey)
+	if err != nil {
+		return nil, fmt.Errorf("ECDH key agreement failed: %w", err)
+	}
+
+	// Derive AES key from shared secret using helper function
+	aesKey := deriveAESKey(sharedSecret)
+
+	// Decrypt data using AES-GCM
+	plaintext, err := decryptAESGCM(encrypted.Data, aesKey, encrypted.IV, encrypted.Tag)
+	if err != nil {
+		return nil, fmt.Errorf("AES-GCM decryption failed: %w", err)
+	}
+
+	return plaintext, nil
+}
+
+// decryptWithEd25519PrivateKey decrypts X25519 encrypted data using an Ed25519 private key.
+// This function mirrors the logic from DecryptWithEd25519 but works with just the private key.
+func decryptWithEd25519PrivateKey(encrypted *encryption.EncryptedData, privateKey ed25519.PrivateKey, opts encryption.DecryptOptions) ([]byte, error) {
+	if encrypted.Algorithm != encryption.AlgorithmX25519 {
+		return nil, fmt.Errorf("expected X25519 algorithm for Ed25519 private key, got %s", encrypted.Algorithm)
+	}
+
+	// Convert Ed25519 private key to X25519 format
+	curve := ecdh.X25519()
+	seed := privateKey.Seed()
+	x25519PrivateKey, err := curve.NewPrivateKey(seed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create X25519 private key from Ed25519 seed: %w", err)
+	}
+
+	// Parse ephemeral public key from encrypted data
+	ephemeralX25519Key, err := curve.NewPublicKey(encrypted.EncryptedKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse ephemeral X25519 public key: %w", err)
+	}
+
+	// Perform X25519 key agreement
+	sharedSecret, err := x25519PrivateKey.ECDH(ephemeralX25519Key)
+	if err != nil {
+		return nil, fmt.Errorf("X25519 key agreement failed: %w", err)
+	}
+
+	// Derive AES key from shared secret using helper function
+	aesKey := deriveAESKey(sharedSecret)
+
+	// Decrypt data using AES-GCM
+	plaintext, err := decryptAESGCM(encrypted.Data, aesKey, encrypted.IV, encrypted.Tag)
+	if err != nil {
+		return nil, fmt.Errorf("AES-GCM decryption failed: %w", err)
+	}
+
+	return plaintext, nil
 }

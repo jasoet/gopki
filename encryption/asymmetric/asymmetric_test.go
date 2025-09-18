@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -217,9 +218,12 @@ func TestEncryptForPublicKey(t *testing.T) {
 			t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 		}
 
-		_, err = EncryptForPublicKey(data, ecdsaKeys.PublicKey, opts)
-		if err == nil {
-			t.Error("Expected error for ECDSA public key encryption (not yet implemented)")
+		encrypted, err := EncryptForPublicKey(data, ecdsaKeys.PublicKey, opts)
+		if err != nil {
+			t.Fatalf("ECDSA public key encryption failed: %v", err)
+		}
+		if encrypted.Algorithm != encryption.AlgorithmECDH {
+			t.Errorf("Expected ECDH algorithm, got %s", encrypted.Algorithm)
 		}
 	})
 
@@ -229,9 +233,12 @@ func TestEncryptForPublicKey(t *testing.T) {
 			t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 		}
 
-		_, err = EncryptForPublicKey(data, ed25519Keys.PublicKey, opts)
-		if err == nil {
-			t.Error("Expected error for Ed25519 public key encryption (not yet implemented)")
+		encrypted, err := EncryptForPublicKey(data, ed25519Keys.PublicKey, opts)
+		if err != nil {
+			t.Fatalf("Ed25519 public key encryption failed: %v", err)
+		}
+		if encrypted.Algorithm != encryption.AlgorithmX25519 {
+			t.Errorf("Expected X25519 algorithm, got %s", encrypted.Algorithm)
 		}
 	})
 
@@ -280,12 +287,12 @@ func TestEncryptForPublicKeyAny(t *testing.T) {
 			t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 		}
 
-		_, err = EncryptForPublicKeyAny(data, ecdsaKeys.PublicKey, opts)
-		if err == nil {
-			t.Error("Expected error for ECDSA public key encryption (not yet implemented)")
+		encrypted, err := EncryptForPublicKeyAny(data, ecdsaKeys.PublicKey, opts)
+		if err != nil {
+			t.Fatalf("ECDSA public key encryption failed: %v", err)
 		}
-		if !strings.Contains(err.Error(), "not yet implemented") {
-			t.Errorf("Expected 'not yet implemented' error, got: %v", err)
+		if encrypted.Algorithm != encryption.AlgorithmECDH {
+			t.Errorf("Expected ECDH algorithm, got %s", encrypted.Algorithm)
 		}
 	})
 
@@ -295,9 +302,12 @@ func TestEncryptForPublicKeyAny(t *testing.T) {
 			t.Fatalf("Failed to generate Ed25519 key: %v", err)
 		}
 
-		_, err = EncryptForPublicKeyAny(data, publicKey, opts)
-		if err == nil {
-			t.Error("Expected error for Ed25519 public key encryption (not yet implemented)")
+		encrypted, err := EncryptForPublicKeyAny(data, publicKey, opts)
+		if err != nil {
+			t.Fatalf("Ed25519 public key encryption failed: %v", err)
+		}
+		if encrypted.Algorithm != encryption.AlgorithmX25519 {
+			t.Errorf("Expected X25519 algorithm, got %s", encrypted.Algorithm)
 		}
 	})
 
@@ -664,6 +674,251 @@ func TestEd25519ToX25519PublicKey(t *testing.T) {
 		_, err := ed25519ToX25519PublicKey(invalidKey)
 		if err == nil {
 			t.Error("Expected error for invalid key length")
+		}
+	})
+}
+
+// Integration tests for EncryptForPublicKey → DecryptWithPrivateKey round trips
+func TestEncryptForPublicKeyRoundTrip(t *testing.T) {
+	testData := [][]byte{
+		[]byte("Hello, World!"),
+		[]byte(""),
+		[]byte("Large data content for testing encryption and decryption with multiple algorithms including ECDSA and Ed25519"),
+		make([]byte, 1024), // Large data
+	}
+
+	opts := encryption.DefaultEncryptOptions()
+	decryptOpts := encryption.DefaultDecryptOptions()
+
+	t.Run("RSA", func(t *testing.T) {
+		// Generate RSA key pair
+		rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+		if err != nil {
+			t.Fatalf("Failed to generate RSA key pair: %v", err)
+		}
+
+		for i, data := range testData {
+			if len(data) > 190 { // RSA size limit for 2048-bit key
+				continue // Skip large data for RSA
+			}
+
+			t.Run(fmt.Sprintf("Data%d", i), func(t *testing.T) {
+				// Encrypt with public key
+				encrypted, err := EncryptForPublicKey(data, rsaKeys.PublicKey, opts)
+				if err != nil {
+					t.Fatalf("Encryption failed: %v", err)
+				}
+
+				// Decrypt with private key
+				decrypted, err := DecryptWithPrivateKey(encrypted, rsaKeys.PrivateKey, decryptOpts)
+				if err != nil {
+					t.Fatalf("Decryption failed: %v", err)
+				}
+
+				// Verify data integrity
+				if !strings.EqualFold(string(data), string(decrypted)) {
+					t.Errorf("Data mismatch: expected %q, got %q", string(data), string(decrypted))
+				}
+
+				// Verify algorithm
+				if encrypted.Algorithm != encryption.AlgorithmRSAOAEP {
+					t.Errorf("Expected RSA-OAEP algorithm, got %s", encrypted.Algorithm)
+				}
+			})
+		}
+	})
+
+	t.Run("ECDSA", func(t *testing.T) {
+		curves := []algo.ECDSACurve{algo.P256, algo.P384, algo.P521}
+		curveNames := []string{"P256", "P384", "P521"}
+
+		for curveIdx, curve := range curves {
+			t.Run(curveNames[curveIdx], func(t *testing.T) {
+				// Generate ECDSA key pair
+				ecdsaKeys, err := algo.GenerateECDSAKeyPair(curve)
+				if err != nil {
+					t.Fatalf("Failed to generate ECDSA key pair: %v", err)
+				}
+
+				for i, data := range testData {
+					t.Run(fmt.Sprintf("Data%d", i), func(t *testing.T) {
+						// Encrypt with public key
+						encrypted, err := EncryptForPublicKey(data, ecdsaKeys.PublicKey, opts)
+						if err != nil {
+							t.Fatalf("Encryption failed: %v", err)
+						}
+
+						// Decrypt with private key
+						decrypted, err := DecryptWithPrivateKey(encrypted, ecdsaKeys.PrivateKey, decryptOpts)
+						if err != nil {
+							t.Fatalf("Decryption failed: %v", err)
+						}
+
+						// Verify data integrity
+						if !strings.EqualFold(string(data), string(decrypted)) {
+							t.Errorf("Data mismatch: expected %q, got %q", string(data), string(decrypted))
+						}
+
+						// Verify algorithm
+						if encrypted.Algorithm != encryption.AlgorithmECDH {
+							t.Errorf("Expected ECDH algorithm, got %s", encrypted.Algorithm)
+						}
+
+						// Verify ephemeral key is present
+						if len(encrypted.EncryptedKey) == 0 {
+							t.Error("Ephemeral key missing from encrypted data")
+						}
+
+						// Verify IV and Tag are present
+						if len(encrypted.IV) == 0 {
+							t.Error("IV missing from encrypted data")
+						}
+						if len(encrypted.Tag) == 0 {
+							t.Error("Tag missing from encrypted data")
+						}
+					})
+				}
+			})
+		}
+	})
+
+	t.Run("Ed25519", func(t *testing.T) {
+		// Generate Ed25519 key pair
+		ed25519Keys, err := algo.GenerateEd25519KeyPair()
+		if err != nil {
+			t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
+		}
+
+		for i, data := range testData {
+			t.Run(fmt.Sprintf("Data%d", i), func(t *testing.T) {
+				// Encrypt with public key
+				encrypted, err := EncryptForPublicKey(data, ed25519Keys.PublicKey, opts)
+				if err != nil {
+					t.Fatalf("Encryption failed: %v", err)
+				}
+
+				// Decrypt with private key
+				decrypted, err := DecryptWithPrivateKey(encrypted, ed25519Keys.PrivateKey, decryptOpts)
+				if err != nil {
+					t.Fatalf("Decryption failed: %v", err)
+				}
+
+				// Verify data integrity
+				if !strings.EqualFold(string(data), string(decrypted)) {
+					t.Errorf("Data mismatch: expected %q, got %q", string(data), string(decrypted))
+				}
+
+				// Verify algorithm
+				if encrypted.Algorithm != encryption.AlgorithmX25519 {
+					t.Errorf("Expected X25519 algorithm, got %s", encrypted.Algorithm)
+				}
+
+				// Verify ephemeral key is present
+				if len(encrypted.EncryptedKey) == 0 {
+					t.Error("Ephemeral key missing from encrypted data")
+				}
+
+				// Verify IV and Tag are present
+				if len(encrypted.IV) == 0 {
+					t.Error("IV missing from encrypted data")
+				}
+				if len(encrypted.Tag) == 0 {
+					t.Error("Tag missing from encrypted data")
+				}
+			})
+		}
+	})
+}
+
+// Test cross-key decryption should fail
+func TestEncryptForPublicKeyCrossKeyDecryption(t *testing.T) {
+	data := []byte("test data")
+	opts := encryption.DefaultEncryptOptions()
+	decryptOpts := encryption.DefaultDecryptOptions()
+
+	// Generate different key pairs
+	ecdsaKeys1, _ := algo.GenerateECDSAKeyPair(algo.P256)
+	ecdsaKeys2, _ := algo.GenerateECDSAKeyPair(algo.P256)
+	ed25519Keys1, _ := algo.GenerateEd25519KeyPair()
+	ed25519Keys2, _ := algo.GenerateEd25519KeyPair()
+
+	t.Run("ECDSA cross-key", func(t *testing.T) {
+		// Encrypt with first key
+		encrypted, err := EncryptForPublicKey(data, ecdsaKeys1.PublicKey, opts)
+		if err != nil {
+			t.Fatalf("Encryption failed: %v", err)
+		}
+
+		// Try to decrypt with second key (should fail)
+		_, err = DecryptWithPrivateKey(encrypted, ecdsaKeys2.PrivateKey, decryptOpts)
+		if err == nil {
+			t.Error("Expected decryption to fail with wrong key")
+		}
+	})
+
+	t.Run("Ed25519 cross-key", func(t *testing.T) {
+		// Encrypt with first key
+		encrypted, err := EncryptForPublicKey(data, ed25519Keys1.PublicKey, opts)
+		if err != nil {
+			t.Fatalf("Encryption failed: %v", err)
+		}
+
+		// Try to decrypt with second key (should fail)
+		_, err = DecryptWithPrivateKey(encrypted, ed25519Keys2.PrivateKey, decryptOpts)
+		if err == nil {
+			t.Error("Expected decryption to fail with wrong key")
+		}
+	})
+}
+
+// Test algorithm mismatch should fail
+func TestEncryptForPublicKeyAlgorithmMismatch(t *testing.T) {
+	decryptOpts := encryption.DefaultDecryptOptions()
+
+	// Generate key pairs
+	rsaKeys, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
+	ecdsaKeys, _ := algo.GenerateECDSAKeyPair(algo.P256)
+	ed25519Keys, _ := algo.GenerateEd25519KeyPair()
+
+	t.Run("RSA key with ECDH algorithm", func(t *testing.T) {
+		// Create fake encrypted data with wrong algorithm
+		encrypted := &encryption.EncryptedData{
+			Algorithm: encryption.AlgorithmECDH,
+			Data:      []byte("fake data"),
+		}
+
+		// Try to decrypt with RSA key (should fail)
+		_, err := DecryptWithPrivateKey(encrypted, rsaKeys.PrivateKey, decryptOpts)
+		if err == nil {
+			t.Error("Expected decryption to fail with algorithm mismatch")
+		}
+	})
+
+	t.Run("ECDSA key with X25519 algorithm", func(t *testing.T) {
+		// Create fake encrypted data with wrong algorithm
+		encrypted := &encryption.EncryptedData{
+			Algorithm: encryption.AlgorithmX25519,
+			Data:      []byte("fake data"),
+		}
+
+		// Try to decrypt with ECDSA key (should fail)
+		_, err := DecryptWithPrivateKey(encrypted, ecdsaKeys.PrivateKey, decryptOpts)
+		if err == nil {
+			t.Error("Expected decryption to fail with algorithm mismatch")
+		}
+	})
+
+	t.Run("Ed25519 key with ECDH algorithm", func(t *testing.T) {
+		// Create fake encrypted data with wrong algorithm
+		encrypted := &encryption.EncryptedData{
+			Algorithm: encryption.AlgorithmECDH,
+			Data:      []byte("fake data"),
+		}
+
+		// Try to decrypt with Ed25519 key (should fail)
+		_, err := DecryptWithPrivateKey(encrypted, ed25519Keys.PrivateKey, decryptOpts)
+		if err == nil {
+			t.Error("Expected decryption to fail with algorithm mismatch")
 		}
 	})
 }
