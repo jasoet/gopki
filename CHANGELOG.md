@@ -1,3 +1,56 @@
+## [1.12.0](https://github.com/jasoet/gopki/compare/v1.11.0...v1.12.0) (2025-09-18)
+
+
+### ✨ Features
+
+* **asymmetric:** add Ed25519 <-> X25519 key conversion utilities with comprehensive tests ([d76912c](https://github.com/jasoet/gopki/commit/d76912c08c7d82d5d97e66ea30226f75390368c7))
+* **asymmetric:** implement ECDSA and Ed25519 encryption/decryption with ephemeral keys ([e7e89ce](https://github.com/jasoet/gopki/commit/e7e89ceee3f4e8ac0b2a988dea1ce372afd2004c))
+* **encryption:** enable ECDSA public key and certificate-based encryption, improve Ed25519 error messages ([4b838e7](https://github.com/jasoet/gopki/commit/4b838e7330b4bea2d67b0681472ff107f53f4eab))
+
+
+### 🐛 Bug Fixes
+
+* **signing:** enhance PKCS[#7](https://github.com/jasoet/gopki/issues/7) verification for content and certificate validation ([f1f7252](https://github.com/jasoet/gopki/commit/f1f7252206a6e2646f5bd4ba0557f32d57007b45))
+
+
+### 📚 Documentation
+
+* **certificates:** restructure certificate module documentation ([63ddf08](https://github.com/jasoet/gopki/commit/63ddf08dd9c736801eaa409398103d6e77b0343b)), closes [PKCS#12](https://github.com/jasoet/PKCS/issues/12)
+* **examples:** add comprehensive PKCS[#12](https://github.com/jasoet/gopki/issues/12) documentation and examples ([168e014](https://github.com/jasoet/gopki/commit/168e0144f0d1e9dc543ce737603fdbb40c3c1527))
+* **examples:** enhance encryption examples, add implementation notes and detailed summaries ([000080e](https://github.com/jasoet/gopki/commit/000080eb86a25c9e199fadf9541ac271a68dbddd))
+* **examples:** expand Signing module documentation ([0cf1034](https://github.com/jasoet/gopki/commit/0cf103488159224ea826fdd5f0180dc1b54c4c70))
+* **examples:** revamp encryption examples with multi-algorithm support and CMS compliance ([a3bed05](https://github.com/jasoet/gopki/commit/a3bed0556a283ede7a7d0e8dec97530452b8d1e3))
+* **examples:** update signing module examples and documentation ([431b3ff](https://github.com/jasoet/gopki/commit/431b3ffe450dca976d6fb35b2b8d29fbd5fd0d22)), closes [PKCS#7](https://github.com/jasoet/PKCS/issues/7) [PKCS#7](https://github.com/jasoet/PKCS/issues/7)
+* restructure documentation and rebuild comprehensive project docs ([c636eab](https://github.com/jasoet/gopki/commit/c636eab1d86dec70f4f33a503ed5d357b3a84dd6))
+
+
+### ♻️ Refactoring
+
+* **examples:** enhance keypair module examples with comprehensive, structured use cases ([44e6af4](https://github.com/jasoet/gopki/commit/44e6af47e2d0e4f0a42a4351788a29f9bf08b56f))
+
+
+### ✅ Tests
+
+* **asymmetric:** add tests for ephemeral key utilities, key agreement, and AES key derivation ([d292e00](https://github.com/jasoet/gopki/commit/d292e001a91f1187e98b5a18835ca102a75d0bd9))
+* **cert/keypair:** refactor key pair generation and format handling for consistency ([8f14c47](https://github.com/jasoet/gopki/commit/8f14c47d9af68a29b2109bc908b58f81fe12f068))
+* **cert/signing:** remove redundant test cases for certificate and signing modules ([3fbff22](https://github.com/jasoet/gopki/commit/3fbff229548d28d5628785281979f453284f35cf))
+* **cert:** refactor test keypair generation for consistency ([f9c8580](https://github.com/jasoet/gopki/commit/f9c85803de6429ced33d9301722a4db453198352))
+* **encryption:** add edge case tests for invalid encrypt and decrypt options ([9078c5e](https://github.com/jasoet/gopki/commit/9078c5ee1521ed41872231eae3b3fbf2ce154bb9))
+* **encryption:** add unit tests for certificate, envelope, and encryption functionality ([2f65412](https://github.com/jasoet/gopki/commit/2f65412a071000cbef9570ea33beedda62e84bcd))
+* **encryption:** replace hardcoded key sizes with algo.KeySize constants ([96372b3](https://github.com/jasoet/gopki/commit/96372b35abf7d028ad1358795ec6e8b50af49e6e))
+* **keypair:** adopt Manager for key generation in tests and remove unused envelope test file ([45c6148](https://github.com/jasoet/gopki/commit/45c61482b05f4493c80160fb043495f3aec49407))
+* **pkcs12:** add comprehensive integration tests for PKCS[#12](https://github.com/jasoet/gopki/issues/12) functionality ([6f4ef8c](https://github.com/jasoet/gopki/commit/6f4ef8cb67294d4f1d8ba6352371065cbc9ce86c))
+* **pkcs12:** add extensive unit tests for key pair and certificate functionalities ([19dd5f5](https://github.com/jasoet/gopki/commit/19dd5f55843ec06decd5df8ffafaae4eb5ea4ecf)), closes [PKCS#12](https://github.com/jasoet/PKCS/issues/12)
+* **pkcs12:** refactor integration tests to use Manager for key generation ([3c467ef](https://github.com/jasoet/gopki/commit/3c467eff98d3cb7888f37fc9a4e376c7b72de3a7))
+
+
+### 🔧 Miscellaneous
+
+* add and configure golangci-lint for comprehensive code quality and security checks ([be68b7e](https://github.com/jasoet/gopki/commit/be68b7e99740faca1f56c73d35bc75353602f990))
+* **asymmetric:** remove Ed25519 <-> X25519 key conversion utilities and related tests ([9ff8096](https://github.com/jasoet/gopki/commit/9ff809681667afbf5cea7c0d1b418f66523adf15))
+* **docs:** add MIT license and update README with table of contents and feature examples ([9e5a9cf](https://github.com/jasoet/gopki/commit/9e5a9cff5db26731a408731b553426db7a7f0097))
+* **taskfile:** add support for encryption examples and unify build configuration ([903e0f8](https://github.com/jasoet/gopki/commit/903e0f88ed8ff416c0fe74f6bd5fab56db735f50))
+
 ## [1.11.0](https://github.com/jasoet/gopki/compare/v1.10.0...v1.11.0) (2025-09-17)
 
 
