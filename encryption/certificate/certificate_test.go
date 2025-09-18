@@ -268,9 +268,6 @@ func TestDecryptDocument(t *testing.T) {
 	})
 }
 
-func TestEncryptForMultipleCertificates(t *te
-}
-
 func TestEncryptForMultipleCertificates(t *testing.T) {
 	testData := []byte("test document for multiple recipients")
 	opts := encryption.DefaultEncryptOptions()
