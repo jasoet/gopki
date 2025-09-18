@@ -776,3 +776,328 @@ func TestConvertP12ToPEM(t *testing.T) {
 		}
 	})
 }
+
+// TestToP12KeyPairFileErrorHandling tests error handling in ToP12KeyPairFile function
+func TestToP12KeyPairFileErrorHandling(t *testing.T) {
+	tempDir := t.TempDir()
+	password := "test123"
+
+	// Generate RSA key pair for testing
+	manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA keys: %v", err)
+	}
+	rsaKeys := manager.KeyPair()
+
+	// Create a test certificate
+	certificate := createTestCertificate(t, rsaKeys)
+
+	t.Run("NilKeyPairError", func(t *testing.T) {
+		filename := filepath.Join(tempDir, "nil_keypair.p12")
+		err := ToP12KeyPairFile[*algo.RSAKeyPair](nil, certificate, filename, password)
+		if err == nil {
+			t.Error("Expected error when key pair is nil")
+		}
+		if err != nil && !contains(err.Error(), "key pair is required") {
+			t.Errorf("Expected 'key pair is required' error, got: %v", err)
+		}
+	})
+
+	t.Run("NilCertificateError", func(t *testing.T) {
+		filename := filepath.Join(tempDir, "nil_cert.p12")
+		err := ToP12KeyPairFile(rsaKeys, nil, filename, password)
+		if err == nil {
+			t.Error("Expected error when certificate is nil")
+		}
+		if err != nil && !contains(err.Error(), "certificate is required") {
+			t.Errorf("Expected 'certificate is required' error, got: %v", err)
+		}
+	})
+
+	t.Run("EmptyPasswordError", func(t *testing.T) {
+		filename := filepath.Join(tempDir, "empty_password.p12")
+		err := ToP12KeyPairFile(rsaKeys, certificate, filename, "")
+		if err == nil {
+			t.Error("Expected error when password is empty")
+		}
+		if err != nil && !contains(err.Error(), "password is required") {
+			t.Errorf("Expected password error, got: %v", err)
+		}
+	})
+
+	t.Run("MultipleAlgorithmTypes", func(t *testing.T) {
+		// Test ECDSA
+		ecdsaManager, err := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
+		if err != nil {
+			t.Fatalf("Failed to generate ECDSA keys: %v", err)
+		}
+		ecdsaKeys := ecdsaManager.KeyPair()
+		ecdsaCert := createTestCertificate(t, ecdsaKeys)
+
+		ecdsaFilename := filepath.Join(tempDir, "ecdsa_test.p12")
+		err = ToP12KeyPairFile(ecdsaKeys, ecdsaCert, ecdsaFilename, password)
+		if err != nil {
+			t.Errorf("Failed to create ECDSA P12 file: %v", err)
+		}
+
+		// Verify file was created
+		if _, err := os.Stat(ecdsaFilename); os.IsNotExist(err) {
+			t.Error("ECDSA P12 file was not created")
+		}
+
+		// Test Ed25519
+		ed25519Manager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey]("")
+		if err != nil {
+			t.Fatalf("Failed to generate Ed25519 keys: %v", err)
+		}
+		ed25519Keys := ed25519Manager.KeyPair()
+		ed25519Cert := createTestCertificate(t, ed25519Keys)
+
+		ed25519Filename := filepath.Join(tempDir, "ed25519_test.p12")
+		err = ToP12KeyPairFile(ed25519Keys, ed25519Cert, ed25519Filename, password)
+		if err != nil {
+			t.Errorf("Failed to create Ed25519 P12 file: %v", err)
+		}
+
+		// Verify file was created
+		if _, err := os.Stat(ed25519Filename); os.IsNotExist(err) {
+			t.Error("Ed25519 P12 file was not created")
+		}
+	})
+
+	t.Run("FilePermissions", func(t *testing.T) {
+		filename := filepath.Join(tempDir, "permissions_test.p12")
+		err := ToP12KeyPairFile(rsaKeys, certificate, filename, password)
+		if err != nil {
+			t.Errorf("Failed to create P12 file: %v", err)
+			return
+		}
+
+		// Check file exists
+		fileInfo, err := os.Stat(filename)
+		if err != nil {
+			t.Errorf("Failed to stat P12 file: %v", err)
+			return
+		}
+
+		// Verify file has content
+		if fileInfo.Size() == 0 {
+			t.Error("P12 file should not be empty")
+		}
+	})
+
+	t.Run("OverwriteExistingFile", func(t *testing.T) {
+		filename := filepath.Join(tempDir, "overwrite_test.p12")
+
+		// Create file first time
+		err := ToP12KeyPairFile(rsaKeys, certificate, filename, password)
+		if err != nil {
+			t.Errorf("Failed to create P12 file first time: %v", err)
+			return
+		}
+
+		// Get file info
+		firstInfo, err := os.Stat(filename)
+		if err != nil {
+			t.Errorf("Failed to stat first P12 file: %v", err)
+			return
+		}
+
+		// Wait a moment to ensure different timestamp
+		time.Sleep(10 * time.Millisecond)
+
+		// Overwrite the file
+		err = ToP12KeyPairFile(rsaKeys, certificate, filename, password)
+		if err != nil {
+			t.Errorf("Failed to overwrite P12 file: %v", err)
+			return
+		}
+
+		// Verify file was overwritten (check that it still exists)
+		secondInfo, err := os.Stat(filename)
+		if err != nil {
+			t.Errorf("Failed to stat overwritten P12 file: %v", err)
+			return
+		}
+
+		if secondInfo.Size() == 0 {
+			t.Error("Overwritten P12 file should not be empty")
+		}
+
+		// Files should have similar sizes (both contain the same key and cert)
+		sizeDiff := secondInfo.Size() - firstInfo.Size()
+		if sizeDiff < -100 || sizeDiff > 100 {
+			t.Errorf("Overwritten file size differs significantly: first=%d, second=%d", firstInfo.Size(), secondInfo.Size())
+		}
+	})
+}
+
+// TestConvertP12KeyPairToPEMErrorHandling tests error handling in ConvertP12KeyPairToPEM
+func TestConvertP12KeyPairToPEMErrorHandling(t *testing.T) {
+	tempDir := t.TempDir()
+	password := "test123"
+
+	t.Run("NonExistentFile", func(t *testing.T) {
+		nonExistentFile := filepath.Join(tempDir, "nonexistent.p12")
+		privateKeyFile := filepath.Join(tempDir, "private.pem")
+		certFile := filepath.Join(tempDir, "cert.pem")
+
+		err := ConvertP12KeyPairToPEM(nonExistentFile, password, privateKeyFile, certFile)
+		if err == nil {
+			t.Error("Expected error when P12 file does not exist")
+		}
+		if err != nil && !contains(err.Error(), "failed to read P12 file") {
+			t.Errorf("Expected file read error, got: %v", err)
+		}
+	})
+
+	t.Run("InvalidP12Data", func(t *testing.T) {
+		// Create a file with invalid P12 data
+		invalidP12File := filepath.Join(tempDir, "invalid.p12")
+		err := os.WriteFile(invalidP12File, []byte("this is not valid P12 data"), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create invalid P12 file: %v", err)
+		}
+
+		privateKeyFile := filepath.Join(tempDir, "private_invalid.pem")
+		certFile := filepath.Join(tempDir, "cert_invalid.pem")
+
+		err = ConvertP12KeyPairToPEM(invalidP12File, password, privateKeyFile, certFile)
+		if err == nil {
+			t.Error("Expected error when P12 data is invalid")
+		}
+		if err != nil && !contains(err.Error(), "failed to load P12 with any key type") {
+			t.Errorf("Expected P12 load error, got: %v", err)
+		}
+	})
+
+	t.Run("WrongPassword", func(t *testing.T) {
+		// First create a valid P12 file
+		manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+		if err != nil {
+			t.Fatalf("Failed to generate RSA keys: %v", err)
+		}
+		rsaKeys := manager.KeyPair()
+		certificate := createTestCertificate(t, rsaKeys)
+
+		p12File := filepath.Join(tempDir, "correct_password.p12")
+		err = ToP12KeyPairFile(rsaKeys, certificate, p12File, password)
+		if err != nil {
+			t.Fatalf("Failed to create P12 file: %v", err)
+		}
+
+		// Try to convert with wrong password
+		privateKeyFile := filepath.Join(tempDir, "private_wrong_pwd.pem")
+		certFile := filepath.Join(tempDir, "cert_wrong_pwd.pem")
+
+		err = ConvertP12KeyPairToPEM(p12File, "wrongpassword", privateKeyFile, certFile)
+		if err == nil {
+			t.Error("Expected error when using wrong password")
+		}
+	})
+
+	t.Run("EmptyPrivateKeyFile", func(t *testing.T) {
+		// Create a valid P12 file
+		manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+		if err != nil {
+			t.Fatalf("Failed to generate RSA keys: %v", err)
+		}
+		rsaKeys := manager.KeyPair()
+		certificate := createTestCertificate(t, rsaKeys)
+
+		p12File := filepath.Join(tempDir, "empty_private_key.p12")
+		err = ToP12KeyPairFile(rsaKeys, certificate, p12File, password)
+		if err != nil {
+			t.Fatalf("Failed to create P12 file: %v", err)
+		}
+
+		// Convert with empty private key file (should still work for cert only)
+		certFile := filepath.Join(tempDir, "cert_only.pem")
+		err = ConvertP12KeyPairToPEM(p12File, password, "", certFile)
+		if err != nil {
+			t.Errorf("Should be able to convert cert only: %v", err)
+		}
+
+		// Verify cert file was created
+		if _, err := os.Stat(certFile); os.IsNotExist(err) {
+			t.Error("Certificate file was not created")
+		}
+	})
+
+	t.Run("EmptyCertFile", func(t *testing.T) {
+		// Create a valid P12 file
+		manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+		if err != nil {
+			t.Fatalf("Failed to generate RSA keys: %v", err)
+		}
+		rsaKeys := manager.KeyPair()
+		certificate := createTestCertificate(t, rsaKeys)
+
+		p12File := filepath.Join(tempDir, "empty_cert.p12")
+		err = ToP12KeyPairFile(rsaKeys, certificate, p12File, password)
+		if err != nil {
+			t.Fatalf("Failed to create P12 file: %v", err)
+		}
+
+		// Convert with empty cert file (should still work for key only)
+		privateKeyFile := filepath.Join(tempDir, "private_only.pem")
+		err = ConvertP12KeyPairToPEM(p12File, password, privateKeyFile, "")
+		if err != nil {
+			t.Errorf("Should be able to convert key only: %v", err)
+		}
+
+		// Verify private key file was created
+		if _, err := os.Stat(privateKeyFile); os.IsNotExist(err) {
+			t.Error("Private key file was not created")
+		}
+	})
+}
+
+// Helper function to create a test certificate for a given key pair
+func createTestCertificate(t *testing.T, keyPair keypair.GenericKeyPair) *x509.Certificate {
+	t.Helper()
+
+	template := &x509.Certificate{
+		Subject: pkix.Name{
+			CommonName:   "Test Certificate",
+			Organization: []string{"Test Org"},
+			Country:      []string{"US"},
+		},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		SerialNumber: big.NewInt(1),
+	}
+
+	var publicKey any
+	var privateKey any
+
+	switch kp := keyPair.(type) {
+	case *algo.RSAKeyPair:
+		publicKey = kp.PublicKey
+		privateKey = kp.PrivateKey
+	case *algo.ECDSAKeyPair:
+		publicKey = kp.PublicKey
+		privateKey = kp.PrivateKey
+	case *algo.Ed25519KeyPair:
+		publicKey = kp.PublicKey
+		privateKey = kp.PrivateKey
+	default:
+		t.Fatalf("Unsupported key pair type: %T", keyPair)
+		return nil
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, publicKey, privateKey)
+	if err != nil {
+		t.Fatalf("Failed to create certificate: %v", err)
+	}
+
+	certificate, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatalf("Failed to parse certificate: %v", err)
+	}
+
+	return certificate
+}
+
