@@ -21,9 +21,9 @@ func main() {
 		log.Fatal("Failed to create output directory:", err)
 	}
 
-	// Generate a key pair for the CA using unified API
+	// Generate a key pair for the CA using algo function
 	fmt.Println("Generating CA key pair...")
-	caKeyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	caKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		log.Fatalf("Failed to generate CA key pair: %v", err)
 	}
@@ -54,9 +54,9 @@ func main() {
 	}
 	fmt.Println("CA certificate saved to output/ca-cert.pem")
 
-	// Generate a key pair for the server certificate using unified API
+	// Generate a key pair for the server certificate using algo function
 	fmt.Println("Generating server key pair...")
-	serverKeyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	serverKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		log.Fatalf("Failed to generate server key pair: %v", err)
 	}
@@ -100,7 +100,7 @@ func main() {
 
 	// Create a self-signed certificate example
 	fmt.Println("Creating self-signed certificate...")
-	selfSignedKeyPair, err := keypair.GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
+	selfSignedKeyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
 	if err != nil {
 		log.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
@@ -129,17 +129,17 @@ func main() {
 
 	// Save key pairs to files as well
 	fmt.Println("Saving key pairs...")
-	err = keypair.ToFiles(caKeyPair, "output/ca_private.pem", "output/ca_public.pem")
+	err = keypair.ToPEMFiles(caKeyPair, "output/ca_private.pem", "output/ca_public.pem")
 	if err != nil {
 		log.Fatalf("Failed to save CA key pair: %v", err)
 	}
 
-	err = keypair.ToFiles(serverKeyPair, "output/server_private.pem", "output/server_public.pem")
+	err = keypair.ToPEMFiles(serverKeyPair, "output/server_private.pem", "output/server_public.pem")
 	if err != nil {
 		log.Fatalf("Failed to save server key pair: %v", err)
 	}
 
-	err = keypair.ToFiles(selfSignedKeyPair, "output/selfsigned_private.pem", "output/selfsigned_public.pem")
+	err = keypair.ToPEMFiles(selfSignedKeyPair, "output/selfsigned_private.pem", "output/selfsigned_public.pem")
 	if err != nil {
 		log.Fatalf("Failed to save self-signed key pair: %v", err)
 	}

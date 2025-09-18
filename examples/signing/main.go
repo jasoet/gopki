@@ -49,7 +49,7 @@ func demonstrateRSASigning() {
 	fmt.Println("------------------------")
 
 	// Generate RSA key pair
-	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		log.Fatal("Failed to generate RSA key pair:", err)
 	}
@@ -61,7 +61,7 @@ func demonstrateRSASigning() {
 			CommonName:         "Document Signer",
 			Organization:       []string{"Example Corp"},
 			OrganizationalUnit: []string{"Security Division"},
-			Country:           []string{"US"},
+			Country:            []string{"US"},
 		},
 		EmailAddress: []string{"signer@example.com"},
 		ValidFor:     365 * 24 * time.Hour,
@@ -101,7 +101,7 @@ func demonstrateRSASigning() {
 
 	// Save the certificate and keys
 	certificate.SaveToFile("examples/signing/output/rsa_signer.crt")
-	keypair.ToFiles(keyPair, "examples/signing/output/rsa_private.pem", "examples/signing/output/rsa_public.pem")
+	keypair.ToPEMFiles(keyPair, "examples/signing/output/rsa_private.pem", "examples/signing/output/rsa_public.pem")
 
 	fmt.Println()
 }
@@ -111,7 +111,7 @@ func demonstrateECDSASigning() {
 	fmt.Println("-------------------------")
 
 	// Generate ECDSA key pair with P-256 curve
-	keyPair, err := keypair.GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
+	keyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
 	if err != nil {
 		log.Fatal("Failed to generate ECDSA key pair:", err)
 	}
@@ -173,7 +173,7 @@ func demonstrateEd25519Signing() {
 	fmt.Println("---------------------------")
 
 	// Generate Ed25519 key pair
-	keyPair, err := keypair.GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
+	keyPair, err := algo.GenerateEd25519KeyPair()
 	if err != nil {
 		log.Fatal("Failed to generate Ed25519 key pair:", err)
 	}
@@ -230,7 +230,7 @@ func demonstrateSigningWithOptions() {
 	fmt.Println("---------------------------")
 
 	// Generate key pair
-	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](3072)
+	keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize3072)
 	if err != nil {
 		log.Fatal("Failed to generate key pair:", err)
 	}
@@ -251,7 +251,7 @@ func demonstrateSigningWithOptions() {
 	fmt.Println("✓ Created CA certificate")
 
 	// Create signing certificate signed by CA
-	signerKeyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	signerKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		log.Fatal("Failed to generate signer key pair:", err)
 	}
@@ -317,7 +317,7 @@ func demonstrateSignatureVerification() {
 	fmt.Println("-----------------------------------")
 
 	// Generate key pair
-	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		log.Fatal("Failed to generate key pair:", err)
 	}
@@ -368,7 +368,7 @@ func demonstrateSignatureVerification() {
 	fmt.Println("✓ Test 3: Modified signature detected")
 
 	// Test 4: Wrong certificate
-	wrongKeyPair, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	wrongKeyPair, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	wrongCert, _ := cert.CreateSelfSignedCertificate(wrongKeyPair, cert.CertificateRequest{
 		Subject:  pkix.Name{CommonName: "Wrong Signer"},
 		ValidFor: 365 * 24 * time.Hour,
@@ -403,7 +403,7 @@ func demonstrateMultipleSignatures() {
 	}{}
 
 	// Signer 1: RSA
-	rsaKeyPair, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	rsaKeyPair, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	rsaCert, _ := cert.CreateSelfSignedCertificate(rsaKeyPair, cert.CertificateRequest{
 		Subject:  pkix.Name{CommonName: "Alice (RSA)"},
 		ValidFor: 365 * 24 * time.Hour,
@@ -416,7 +416,7 @@ func demonstrateMultipleSignatures() {
 	}{"Alice", "RSA", rsaKeyPair, rsaCert})
 
 	// Signer 2: ECDSA
-	ecdsaKeyPair, _ := keypair.GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
+	ecdsaKeyPair, _ := algo.GenerateECDSAKeyPair(algo.P256)
 	ecdsaCert, _ := cert.CreateSelfSignedCertificate(ecdsaKeyPair, cert.CertificateRequest{
 		Subject:  pkix.Name{CommonName: "Bob (ECDSA)"},
 		ValidFor: 365 * 24 * time.Hour,
@@ -429,7 +429,7 @@ func demonstrateMultipleSignatures() {
 	}{"Bob", "ECDSA", ecdsaKeyPair, ecdsaCert})
 
 	// Signer 3: Ed25519
-	ed25519KeyPair, _ := keypair.GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
+	ed25519KeyPair, _ := algo.GenerateEd25519KeyPair()
 	ed25519Cert, _ := cert.CreateSelfSignedCertificate(ed25519KeyPair, cert.CertificateRequest{
 		Subject:  pkix.Name{CommonName: "Charlie (Ed25519)"},
 		ValidFor: 365 * 24 * time.Hour,
@@ -476,7 +476,7 @@ func demonstrateMultipleSignatures() {
 
 	// Save multi-signature document
 	multiSig := map[string]interface{}{
-		"document": base64.StdEncoding.EncodeToString(document),
+		"document":   base64.StdEncoding.EncodeToString(document),
 		"signatures": []map[string]interface{}{},
 	}
 
@@ -501,11 +501,11 @@ func demonstrateMultipleSignatures() {
 
 func saveSignature(sig *signing.Signature, filename string) {
 	data := map[string]interface{}{
-		"algorithm":    string(sig.Algorithm),
+		"algorithm":     string(sig.Algorithm),
 		"hashAlgorithm": signing.HashAlgorithmToString(sig.HashAlgorithm),
-		"format":       string(sig.Format),
-		"signature":    base64.StdEncoding.EncodeToString(sig.Data),
-		"digest":       base64.StdEncoding.EncodeToString(sig.Digest),
+		"format":        string(sig.Format),
+		"signature":     base64.StdEncoding.EncodeToString(sig.Data),
+		"digest":        base64.StdEncoding.EncodeToString(sig.Digest),
 	}
 
 	if sig.Certificate != nil {
@@ -539,7 +539,7 @@ func demonstratePKCS7Example() {
 	fmt.Println("=============================")
 
 	// Generate key pair and certificate
-	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		log.Fatal("Failed to generate key pair:", err)
 	}

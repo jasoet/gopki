@@ -12,7 +12,6 @@ import (
 	"github.com/jasoet/gopki/encryption/asymmetric"
 	certenc "github.com/jasoet/gopki/encryption/certificate"
 	"github.com/jasoet/gopki/encryption/envelope"
-	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
 )
 
@@ -47,7 +46,7 @@ func demonstrateRSAEncryption() {
 	fmt.Println("----------------------")
 
 	// Generate RSA key pair
-	rsaKeys, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		log.Fatal("Failed to generate RSA key pair:", err)
 	}
@@ -101,7 +100,7 @@ func demonstrateEnvelopeEncryption() {
 	fmt.Println("-----------------------------------")
 
 	// Generate RSA key pair for envelope encryption
-	rsaKeys, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		log.Fatal("Failed to generate RSA key pair:", err)
 	}
@@ -146,7 +145,7 @@ func demonstrateCertificateBasedEncryption() {
 	fmt.Println("-------------------------------")
 
 	// Generate key pair for certificate
-	rsaKeys, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		log.Fatal("Failed to generate RSA key pair:", err)
 	}
@@ -200,7 +199,7 @@ func demonstrateFormatSupport() {
 	fmt.Println("----------------------------")
 
 	// Generate key pair
-	rsaKeys, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		log.Fatal("Failed to generate RSA key pair:", err)
 	}
@@ -268,17 +267,17 @@ func demonstrateMultiRecipientEncryption() {
 	fmt.Println("-------------------------------------")
 
 	// Generate RSA key pairs for multiple recipients (using RSA only due to known issues with ECDSA/Ed25519)
-	alice, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	alice, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		log.Fatal("Failed to generate Alice's key pair:", err)
 	}
 
-	bob, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	bob, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		log.Fatal("Failed to generate Bob's key pair:", err)
 	}
 
-	charlie, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	charlie, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
 		log.Fatal("Failed to generate Charlie's key pair:", err)
 	}
