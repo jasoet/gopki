@@ -24,6 +24,37 @@ go get github.com/jasoet/gopki
 
 **Requirements**: Go 1.24.5 or later
 
+## 📑 Table of Contents
+
+- [🚀 Key Features](#-key-features)
+- [📦 Installation](#-installation)
+- [🏗️ Architecture](#-architecture)
+- [🚀 Quick Start](#-quick-start)
+  - [Generate RSA Key Pairs](#generate-rsa-key-pairs)
+  - [Create Self-Signed Certificate](#create-self-signed-certificate)
+  - [Sign Documents](#sign-documents)
+  - [Encrypt Data](#encrypt-data)
+- [📚 Comprehensive Examples](#-comprehensive-examples)
+- [🔧 Core Modules](#-core-modules)
+  - [1. keypair/ - Foundation Module](#1-keypair---foundation-module)
+  - [2. cert/ - X.509 Certificate Management](#2-cert---x509-certificate-management)
+  - [3. signing/ - Digital Signatures](#3-signing---digital-signatures)
+  - [4. encryption/ - Data Encryption](#4-encryption---data-encryption)
+  - [5. pkcs12/ - PKCS#12 File Management](#5-pkcs12---pkcs12-file-management)
+- [🔢 Algorithm Feature Matrix](#-algorithm-feature-matrix)
+- [🔄 Format Support Matrix](#-format-support-matrix)
+- [🛡️ Security Features](#-security-features)
+- [🧪 Testing and Quality Assurance](#-testing-and-quality-assurance)
+- [📖 Standards Compliance](#-standards-compliance)
+- [🔗 Dependencies](#-dependencies)
+- [💻 Development](#-development)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
+- [🙏 Acknowledgments](#-acknowledgments)
+- [📞 Support](#-support)
+- [🗂️ Project Structure](#-project-structure)
+- [🚀 Production Usage](#-production-usage)
+
 ## 🏗️ Architecture
 
 GoPKI is structured as **five core modules** with strong type relationships:
@@ -53,18 +84,43 @@ GoPKI is structured as **five core modules** with strong type relationships:
 package main
 
 import (
+    "crypto/rsa"
     "fmt"
+    "github.com/jasoet/gopki/keypair"
     "github.com/jasoet/gopki/keypair/algo"
 )
 
 func main() {
-    // Generate RSA key pair with compile-time type safety
+    // Method 1: Direct key generation
     keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
     if err != nil {
         panic(err)
     }
-
     fmt.Printf("Generated %d-bit RSA key pair\n", keyPair.PrivateKey.Size()*8)
+
+    // Method 2: Using KeyPair Manager (Recommended)
+    manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+    if err != nil {
+        panic(err)
+    }
+
+    // Extract keys with type safety
+    privateKey := manager.PrivateKey()
+    publicKey := manager.PublicKey()
+
+    // Convert to PEM format
+    privatePEM, publicPEM, err := manager.ToPEM()
+    if err != nil {
+        panic(err)
+    }
+
+    // Save to files with secure permissions
+    err = manager.SaveToPEM("private.pem", "public.pem")
+    if err != nil {
+        panic(err)
+    }
+
+    fmt.Printf("Generated and saved %d-bit RSA key pair\n", privateKey.Size()*8)
 }
 ```
 
@@ -185,7 +241,9 @@ func main() {
 
 ## 📚 Comprehensive Examples
 
-GoPKI includes extensive examples demonstrating all features:
+GoPKI includes extensive examples demonstrating all features with complete source code, documentation, and test files:
+
+### 🔧 Running Examples
 
 ```bash
 # Install Task runner (recommended)
@@ -201,29 +259,107 @@ task examples:signing      # Document signing with multiple algorithms
 task examples:encryption   # Data encryption with various methods
 ```
 
+### 📂 Example Files & Documentation
+
+| **Module** | **Source Code** | **Documentation** | **Key Test Files** |
+|------------|-----------------|-------------------|-------------------|
+| **Key Management** | [`examples/keypair/main.go`](examples/keypair/main.go) | [`examples/keypair/doc.md`](examples/keypair/doc.md) | [`keypair/algo/*_test.go`](keypair/algo/) |
+| **Certificates** | [`examples/certificates/main.go`](examples/certificates/main.go) | [`examples/certificates/doc.md`](examples/certificates/doc.md) | [`cert/cert_test.go`](cert/cert_test.go) |
+| **Digital Signing** | [`examples/signing/main.go`](examples/signing/main.go) | [`examples/signing/doc.md`](examples/signing/doc.md) | [`signing/signing_test.go`](signing/signing_test.go) |
+| **Data Encryption** | [`examples/encryption/main.go`](examples/encryption/main.go) | [`examples/encryption/doc.md`](examples/encryption/doc.md) | [`encryption/*/test.go`](encryption/) |
+
+### 🎯 Example Features by Module
+
+**🔐 Key Management Examples** ([`examples/keypair/`](examples/keypair/))
+- **KeyPair Manager**: Unified interface for all algorithms with type safety
+- RSA, ECDSA, Ed25519 key generation with compile-time type constraints
+- PEM/DER/SSH format conversions with automatic format detection
+- File operations with secure permissions (0600 for private keys, 0700 for directories)
+- Key validation, comparison, and metadata extraction
+- Loading existing keys from various formats into Manager
+- Cross-algorithm compatibility testing and benchmarking
+
+**📜 Certificate Examples** ([`examples/certificates/`](examples/certificates/))
+- Self-signed certificate creation
+- CA certificate hierarchies with path length constraints
+- Intermediate CA signing workflows
+- Certificate chain verification
+- Subject Alternative Names (DNS, IP, Email)
+
+**✍️ Signing Examples** ([`examples/signing/`](examples/signing/))
+- Multi-algorithm document signing (RSA, ECDSA, Ed25519)
+- PKCS#7/CMS format support (attached/detached)
+- Certificate chain inclusion in signatures
+- Signature verification with certificate validation
+- Performance benchmarking across algorithms
+
+**🔒 Encryption Examples** ([`examples/encryption/`](examples/encryption/))
+- Multi-algorithm encryption (RSA-OAEP, ECDH+AES-GCM, X25519+AES-GCM)
+- Envelope encryption for large data sets
+- Multi-recipient encryption workflows
+- Certificate-based encryption with PKI integration
+- CMS format compliance (RFC 5652)
+- Performance analysis and file-based operations
+
 ## 🔧 Core Modules
 
 ### 1. **keypair/** - Foundation Module
 
-**Type-safe key generation and management**
+**Type-safe key generation and management with KeyPair Manager**
 
 ```go
-// Supported algorithms with compile-time safety
+// Method 1: Direct algorithm usage
 rsaKeys, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)       // RSA 2048/3072/4096-bit
 ecdsaKeys, _ := algo.GenerateECDSAKeyPair(algo.P256)         // ECDSA P-224/256/384/521
 ed25519Keys, _ := algo.GenerateEd25519KeyPair()              // Ed25519
 
-// Format conversions with type safety
-keypair.ToPEMFiles(rsaKeys, "private.pem", "public.pem")     // PEM format
-keypair.ToDERFiles(rsaKeys, "private.der", "public.der")     // DER format
-keypair.ToSSHFiles(rsaKeys, "id_rsa", "id_rsa.pub", "user@example.com", "")  // SSH format
+// Method 2: KeyPair Manager (Recommended) - provides unified interface
+import "crypto/rsa"
+import "crypto/ecdsa"
+import "crypto/ed25519"
+
+// Generate with Manager
+rsaManager, _ := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+ecdsaManager, _ := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
+ed25519Manager, _ := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey]("")
+
+// Extract keys with type safety
+privateKey := rsaManager.PrivateKey()
+publicKey := rsaManager.PublicKey()
+
+// Unified format conversions with Manager
+privatePEM, publicPEM, _ := rsaManager.ToPEM()              // PEM format
+privateDER, publicDER, _ := rsaManager.ToDER()              // DER format
+privateSSH, publicSSH, _ := rsaManager.ToSSH("user@host", "") // SSH format
+
+// Unified file operations with secure permissions
+rsaManager.SaveToPEM("private.pem", "public.pem")           // Save PEM files
+rsaManager.SaveToDER("private.der", "public.der")           // Save DER files
+rsaManager.SaveToSSH("id_rsa", "id_rsa.pub", "user@host", "") // Save SSH files
+
+// Load existing keys into Manager
+loadedManager, _ := keypair.LoadFromPEM[*algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey]("private.pem")
+
+// Validation and key information
+info, _ := rsaManager.GetInfo()                             // Get algorithm metadata
+err := rsaManager.Validate()                               // Validate key pair integrity
+isValid := rsaManager.IsValid()                            // Check manager state
 ```
+
+**KeyPair Manager Benefits:**
+- ✅ **Unified Interface**: Same API across RSA, ECDSA, and Ed25519 algorithms
+- ✅ **Type Safety**: Generic constraints prevent runtime type errors
+- ✅ **Format Agnostic**: Automatic conversion between PEM/DER/SSH formats
+- ✅ **Secure File I/O**: Built-in secure permissions (0600/0700) and atomic operations
+- ✅ **Validation**: Comprehensive key pair integrity and security validation
+- ✅ **Metadata**: Algorithm detection and key information extraction
+- ✅ **Loading**: Support for loading existing keys from any format into Manager
 
 **Security Features:**
 - ✅ Enforced minimum RSA key sizes (≥2048 bits)
-- ✅ Secure file permissions (0600 for private keys)
-- ✅ Memory-safe key handling
-- ✅ Format validation and type safety
+- ✅ Secure file permissions (0600 for private keys, 0700 for directories)
+- ✅ Memory-safe key handling with zero runtime overhead
+- ✅ Format validation and compile-time type safety
 
 ### 2. **cert/** - X.509 Certificate Management
 
@@ -418,6 +554,22 @@ task format:check      # Verify code formatting
 task security:check    # Dependency vulnerability scanning
 ```
 
+### 📋 Core Test Files
+
+| **Module** | **Test Coverage** | **Key Test Files** | **Purpose** |
+|------------|-------------------|-------------------|-------------|
+| **keypair/** | 75.3% | [`keypair/algo/rsa_test.go`](keypair/algo/rsa_test.go)<br>[`keypair/algo/ecdsa_test.go`](keypair/algo/ecdsa_test.go)<br>[`keypair/algo/ed25519_test.go`](keypair/algo/ed25519_test.go) | Algorithm implementations, key generation, format conversion |
+| **cert/** | 74.3% | [`cert/cert_test.go`](cert/cert_test.go)<br>[`cert/ca_test.go`](cert/ca_test.go) | Certificate creation, CA operations, chain verification |
+| **signing/** | 79.8% | [`signing/signing_test.go`](signing/signing_test.go)<br>[`signing/formats/pkcs7_test.go`](signing/formats/pkcs7_test.go) | Document signing, PKCS#7/CMS formats, verification |
+| **encryption/** | 89.1% | [`encryption/asymmetric/asymmetric_test.go`](encryption/asymmetric/asymmetric_test.go)<br>[`encryption/envelope/envelope_test.go`](encryption/envelope/envelope_test.go)<br>[`encryption/certificate/certificate_test.go`](encryption/certificate/certificate_test.go) | Multi-algorithm encryption, envelope encryption, certificate-based workflows |
+| **pkcs12/** | 79.1% | [`pkcs12/pkcs12_test.go`](pkcs12/pkcs12_test.go) | PKCS#12 file operations, password protection, certificate bundling |
+
+### 📖 Developer Documentation
+
+- **[`CLAUDE.md`](CLAUDE.md)** - Development commands, architecture overview, and coding patterns for Claude Code AI
+- **[`CHANGELOG.md`](CHANGELOG.md)** - Version history and release notes
+- **[`examples/*/doc.md`](examples/)** - Detailed documentation for each example module
+
 ## 📖 Standards Compliance
 
 GoPKI implements and adheres to industry standards:
@@ -519,31 +671,73 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Documentation**: Comprehensive examples and API docs included
 - **Issues**: [GitHub Issues](https://github.com/jasoet/gopki/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/jasoet/gopki/discussions)
+- **Questions**: Use GitHub Issues for questions and feature requests
 
 ## 🗂️ Project Structure
 
 ```
 gopki/
-├── keypair/           # Core key management (foundation)
-│   ├── algo/          # Algorithm implementations (RSA, ECDSA, Ed25519)
-│   └── format/        # Format definitions (PEM, DER, SSH)
-├── cert/              # X.509 certificate operations
-├── signing/           # Document signing and verification
-│   └── formats/       # PKCS#7/CMS format support
-├── encryption/        # Data encryption and decryption
-│   ├── asymmetric/    # Asymmetric encryption algorithms
-│   ├── symmetric/     # Symmetric encryption (AES-GCM)
-│   ├── envelope/      # Envelope encryption
-│   └── certificate/   # Certificate-based encryption
-├── pkcs12/           # PKCS#12 file management
-├── examples/         # Comprehensive usage examples
-│   ├── keypair/      # Key generation examples
-│   ├── certificates/ # Certificate creation examples
-│   ├── signing/      # Document signing examples
-│   └── encryption/   # Data encryption examples
-└── docs/             # Additional documentation
+├── keypair/                    # Core key management (foundation) - 75.3% coverage
+│   ├── algo/                   # Algorithm implementations (RSA, ECDSA, Ed25519)
+│   │   ├── rsa.go             # RSA key operations
+│   │   ├── ecdsa.go           # ECDSA operations
+│   │   ├── ed25519.go         # Ed25519 operations
+│   │   ├── rsa_test.go        # RSA algorithm tests
+│   │   ├── ecdsa_test.go      # ECDSA algorithm tests
+│   │   └── ed25519_test.go    # Ed25519 algorithm tests
+│   └── format/                # Format definitions (PEM, DER, SSH)
+├── cert/                      # X.509 certificate operations - 74.3% coverage
+│   ├── cert.go               # Certificate creation and management
+│   ├── ca.go                 # Certificate Authority operations
+│   ├── cert_test.go          # Certificate operation tests
+│   └── ca_test.go            # CA operation tests
+├── signing/                   # Document signing and verification - 79.8% coverage
+│   ├── signing.go            # Core signing functionality
+│   ├── formats/              # PKCS#7/CMS format support
+│   │   └── pkcs7_test.go     # PKCS#7 format tests
+│   └── signing_test.go       # Document signing tests
+├── encryption/                # Data encryption and decryption - 89.1% coverage
+│   ├── asymmetric/           # Asymmetric encryption algorithms
+│   │   ├── asymmetric.go     # Core asymmetric operations
+│   │   ├── rsa_test.go       # RSA encryption tests
+│   │   ├── ecdsa_test.go     # ECDSA encryption tests
+│   │   ├── ed25519_test.go   # Ed25519 encryption tests
+│   │   └── asymmetric_test.go # Integration tests
+│   ├── symmetric/            # Symmetric encryption (AES-GCM)
+│   │   └── symmetric_test.go # AES-GCM tests
+│   ├── envelope/             # Envelope encryption
+│   │   └── envelope_test.go  # Envelope encryption tests
+│   ├── certificate/          # Certificate-based encryption
+│   │   └── certificate_test.go # Certificate encryption tests
+│   ├── encryption_test.go    # Core encryption tests
+│   └── cms_test.go          # CMS format tests
+├── pkcs12/                   # PKCS#12 file management - 79.1% coverage
+│   └── pkcs12_test.go       # PKCS#12 operation tests
+├── examples/                 # Comprehensive usage examples with documentation
+│   ├── keypair/             # Key generation examples
+│   │   ├── main.go          # Key generation demonstration
+│   │   └── doc.md           # Key management documentation
+│   ├── certificates/        # Certificate creation examples
+│   │   ├── main.go          # Certificate creation demonstration
+│   │   └── doc.md           # Certificate management documentation
+│   ├── signing/             # Document signing examples
+│   │   ├── main.go          # Document signing demonstration
+│   │   └── doc.md           # Digital signing documentation
+│   └── encryption/          # Data encryption examples
+│       ├── main.go          # Encryption demonstration
+│       └── doc.md           # Encryption documentation
+├── CLAUDE.md                # Development guide for Claude Code AI
+├── CHANGELOG.md             # Version history and release notes
+└── README.md               # This comprehensive guide
 ```
+
+### 📊 Coverage Summary by Module
+- **encryption/**: 89.1% (highest - most complex cryptographic operations)
+- **signing/**: 79.8% (document signing and PKCS#7/CMS formats)
+- **pkcs12/**: 79.1% (PKCS#12 file operations and bundling)
+- **keypair/**: 75.3% (foundational key management operations)
+- **cert/**: 74.3% (X.509 certificate operations and CA workflows)
+- **Overall**: 79.9% across 844+ individual tests
 
 ## 🚀 Production Usage
 
