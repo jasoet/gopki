@@ -27,6 +27,14 @@ import (
 func main() {
 	fmt.Println("=== GoPKI Data Encryption Module - Comprehensive Examples ===")
 	fmt.Println("Demonstrating type-safe encryption with multi-algorithm support and CMS format compliance")
+	fmt.Println()
+	fmt.Println("📝 Current Implementation Notes:")
+	fmt.Println("   • RSA encryption: Fully supported (direct + envelope)")
+	fmt.Println("   • ECDSA encryption: Limited support (envelope encryption has known issues)")
+	fmt.Println("   • Ed25519 encryption: Limited support (envelope encryption has known issues)")
+	fmt.Println("   • Certificate-based: Works best with RSA keys")
+	fmt.Println("   • CMS format: Basic support, some advanced features pending")
+	fmt.Println()
 
 	// Create output directory
 	if err := os.MkdirAll("output", 0755); err != nil {
@@ -63,9 +71,19 @@ func main() {
 	demonstrateFileOperations()
 
 	fmt.Println("\n\n=" + strings.Repeat("=", 58) + "=")
-	fmt.Println("✅ ALL ENCRYPTION EXAMPLES COMPLETED SUCCESSFULLY!")
+	fmt.Println("✅ ALL ENCRYPTION EXAMPLES COMPLETED!")
 	fmt.Println("📁 Output files saved in: ./output/")
 	fmt.Println("🔍 Review encryption formats and certificate integration")
+	fmt.Println()
+	fmt.Println("📋 Summary of Demonstrated Features:")
+	fmt.Println("   ✅ RSA-OAEP direct encryption")
+	fmt.Println("   ✅ RSA envelope encryption for large data")
+	fmt.Println("   ✅ Certificate-based encryption with RSA")
+	fmt.Println("   ✅ Multi-recipient encryption workflows")
+	fmt.Println("   ✅ Performance analysis and benchmarking")
+	fmt.Println("   ✅ File-based encryption operations")
+	fmt.Println("   ⚠️  ECDSA/Ed25519 envelope encryption (implementation pending)")
+	fmt.Println("   ⚠️  Full CMS encoding/decoding (basic support available)")
 	fmt.Println("=" + strings.Repeat("=", 58) + "=")
 }
 
@@ -181,7 +199,12 @@ func demonstrateECDSAEncryption() {
 		return
 	}
 
-	fmt.Printf("✓ Decrypted: %s\n", string(decrypted[:min(50, len(decrypted))]))
+	// Show complete message for short data, truncate only if very long
+	if len(decrypted) <= 100 {
+		fmt.Printf("✓ Decrypted: %s\n", string(decrypted))
+	} else {
+		fmt.Printf("✓ Decrypted: %s...\n", string(decrypted[:97])+"...")
+	}
 
 	// Save result
 	saveEncryptionResult("ecdsa_hybrid", encrypted, map[string]interface{}{
@@ -206,7 +229,7 @@ func demonstrateEd25519Encryption() {
 
 	// Data for X25519 + AES-GCM encryption
 	data := []byte("Modern Ed25519 message using X25519 key agreement - highest performance encryption")
-	fmt.Printf("  Original data: %s (%d bytes)\n", string(data[:min(50, len(data))]), len(data))
+	fmt.Printf("  Original data: %s (%d bytes)\n", string(data), len(data))
 
 	// X25519-based encryption using envelope encryption
 	opts := encryption.DefaultEncryptOptions()
@@ -252,7 +275,12 @@ func demonstrateEd25519Encryption() {
 		return
 	}
 
-	fmt.Printf("✓ Decrypted in %v: %s\n", decryptionTime, string(decrypted[:min(50, len(decrypted))]))
+	// Show complete message for short data, truncate only if very long
+	if len(decrypted) <= 100 {
+		fmt.Printf("✓ Decrypted in %v: %s\n", decryptionTime, string(decrypted))
+	} else {
+		fmt.Printf("✓ Decrypted in %v: %s...\n", decryptionTime, string(decrypted[:97]))
+	}
 
 	// Save result with timing
 	saveEncryptionResult("ed25519_hybrid", encrypted, map[string]interface{}{
@@ -368,8 +396,8 @@ func demonstrateCertificateBasedEncryption() {
 		cert    *cert.Certificate
 	}{"Alice", aliceKeyPair, aliceCert})
 
-	// Bob - ECDSA
-	bobKeyManager, _ := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
+	// Bob - RSA (using RSA instead of ECDSA due to encryption module limitations)
+	bobKeyManager, _ := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
 	bobKeyPair := bobKeyManager.KeyPair()
 	bobCert, err := cert.CreateSelfSignedCertificate(bobKeyPair, cert.CertificateRequest{
 		Subject: pkix.Name{
@@ -432,9 +460,11 @@ accessed by authorized personnel with valid decryption credentials.`)
 		case *algo.RSAKeyPair:
 			_, err = certenc.DecryptDocument(encrypted, kp, decryptOpts)
 		case *algo.ECDSAKeyPair:
-			_, err = certenc.DecryptDocument(encrypted, kp, decryptOpts)
+			log.Printf("⚠️ ECDSA certificate-based encryption not yet fully supported for %s", user.name)
+			log.Printf("   Using RSA-based users instead to demonstrate functionality")
+			continue
 		case *algo.Ed25519KeyPair:
-			log.Printf("Ed25519 encryption via certificate not yet supported for %s", user.name)
+			log.Printf("⚠️ Ed25519 certificate-based encryption not yet supported for %s", user.name)
 			continue
 		default:
 			log.Printf("Unsupported key type for %s", user.name)
@@ -903,14 +933,17 @@ Distribution outside the organization is strictly prohibited.`),
 		fmt.Printf("  Original size: %d bytes\n", len(file.content))
 		fmt.Printf("  Encrypted size: %d bytes\n", len(encrypted.Data))
 
-		// Save encrypted file in CMS format
-		encryptedPath := fmt.Sprintf("output/encrypted_%s.cms", file.name)
-		cmsData, err := encryption.EncodeData(encrypted)
+		// Save encrypted file in binary format (CMS encoding has specific requirements)
+		encryptedPath := fmt.Sprintf("output/encrypted_%s.bin", file.name)
+		encryptedBytes, err := json.Marshal(encrypted)
 		if err != nil {
-			log.Printf("Failed to encode %s to CMS: %v", file.name, err)
+			log.Printf("Failed to serialize %s: %v", file.name, err)
 			continue
 		}
-		os.WriteFile(encryptedPath, cmsData, 0644)
+		os.WriteFile(encryptedPath, encryptedBytes, 0644)
+
+		// Note: CMS encoding requires specific recipient certificate configuration
+		// For demonstration, we save in JSON format which preserves all encryption metadata
 
 		// Test decryption
 		decryptOpts := encryption.DefaultDecryptOptions()
