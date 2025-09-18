@@ -210,7 +210,7 @@ func genericManagerExample() {
 
 	// Ed25519 Manager with full generic type specification
 	fmt.Printf("   → Creating Ed25519 Manager with generic constraints...\n")
-	ed25519Manager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey]("")
+	ed25519Manager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Default)
 	if err != nil {
 		log.Printf("Failed to create Ed25519 manager: %v\n", err)
 		return

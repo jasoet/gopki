@@ -29,7 +29,7 @@ The KeyPair module provides type-safe cryptographic key pair generation and mana
 // Algorithm-specific API
 rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 ecdsaKeys, err := algo.GenerateECDSAKeyPair(algo.P256)
-ed25519Keys, err := algo.GenerateEd25519KeyPair("")
+ed25519Keys, err := algo.GenerateEd25519KeyPair()
 
 // Generic API with type constraints
 rsaKeys, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](algo.KeySize2048)
@@ -42,7 +42,7 @@ manager := keypair.NewManager()
 // All algorithms through single interface
 rsaKeys, err := manager.GenerateKeyPair("RSA", algo.KeySize2048)
 ecdsaKeys, err := manager.GenerateKeyPair("ECDSA", algo.P256)
-ed25519Keys, err := manager.GenerateKeyPair("Ed25519", "")
+ed25519Keys, err := manager.GenerateKeyPair("Ed25519", algo.Ed25519Default)
 ```
 
 ### 3. Comprehensive Format Support
@@ -77,7 +77,7 @@ ecdsaKeys, err := algo.GenerateECDSAKeyPair(algo.P384)    // P-384 curve
 ecdsaKeys, err := algo.GenerateECDSAKeyPair(algo.P521)    // P-521 curve
 
 // Ed25519 (fixed 256-bit)
-ed25519Keys, err := algo.GenerateEd25519KeyPair("")
+ed25519Keys, err := algo.GenerateEd25519KeyPair()
 ```
 
 ### Generic APIs with Type Constraints
@@ -89,7 +89,7 @@ import "github.com/jasoet/gopki/keypair"
 // Generic key generation with compile-time type safety
 rsaKeys, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](algo.KeySize2048)
 ecdsaKeys, err := keypair.GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
-ed25519Keys, err := keypair.GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
+ed25519Keys, err := keypair.GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair](algo.Ed25519Default)
 ```
 
 ### Manager Pattern
@@ -101,7 +101,7 @@ manager := keypair.NewManager()
 // Runtime algorithm selection with type safety
 rsaKeys, err := manager.GenerateKeyPair("RSA", algo.KeySize2048)
 ecdsaKeys, err := manager.GenerateKeyPair("ECDSA", algo.P256)
-ed25519Keys, err := manager.GenerateKeyPair("Ed25519", "")
+ed25519Keys, err := manager.GenerateKeyPair("Ed25519", algo.Ed25519Default)
 
 // List supported algorithms
 algorithms := manager.SupportedAlgorithms()
@@ -145,7 +145,7 @@ algo.P521  // P-521 curve (521-bit, ~15360-bit RSA equivalent)
 
 ```go
 // Ed25519 uses empty string as config parameter
-ed25519Keys, err := algo.GenerateEd25519KeyPair("")
+ed25519Keys, err := algo.GenerateEd25519KeyPair()
 ```
 
 ## Format Conversion

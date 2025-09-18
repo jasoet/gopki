@@ -74,7 +74,7 @@ func TestGenerate(t *testing.T) {
 		},
 		{
 			name:      "Ed25519",
-			param:     algo.Ed25519Config(""),
+			param:     algo.Ed25519Config(algo.Ed25519Default),
 			keyType:   "*algo.Ed25519KeyPair",
 			algorithm: "Ed25519",
 		},
@@ -516,7 +516,7 @@ func TestLoadFromData(t *testing.T) {
 
 		// Test Ed25519
 		t.Run("Ed25519", func(t *testing.T) {
-			ed25519Manager, err := Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Config(""))
+			ed25519Manager, err := Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Default)
 			if err != nil {
 				t.Fatalf("Failed to generate Ed25519 manager: %v", err)
 			}
@@ -579,7 +579,7 @@ func TestLoadFromData(t *testing.T) {
 
 		// Test Ed25519
 		t.Run("Ed25519", func(t *testing.T) {
-			ed25519Manager, err := Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Config(""))
+			ed25519Manager, err := Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Default)
 			if err != nil {
 				t.Fatalf("Failed to generate Ed25519 manager: %v", err)
 			}
@@ -642,7 +642,7 @@ func TestLoadFromData(t *testing.T) {
 
 		// Test Ed25519
 		t.Run("Ed25519", func(t *testing.T) {
-			ed25519Manager, err := Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Config(""))
+			ed25519Manager, err := Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Default)
 			if err != nil {
 				t.Fatalf("Failed to generate Ed25519 manager: %v", err)
 			}
@@ -710,7 +710,7 @@ func BenchmarkGenerate(b *testing.B) {
 
 	b.Run("Ed25519", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_, err := Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Config(""))
+			_, err := Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Default)
 			if err != nil {
 				b.Fatalf("Generate failed: %v", err)
 			}
@@ -806,7 +806,7 @@ func TestFormatConversionAllTypes(t *testing.T) {
 		{
 			name: "Ed25519",
 			setup: func() (interface{}, error) {
-				return Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Config(""))
+				return Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Default)
 			},
 			testPEM: func(manager interface{}) error {
 				m := manager.(*Manager[*algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey])
@@ -902,7 +902,7 @@ func TestValidationAllTypes(t *testing.T) {
 		{
 			name: "Ed25519",
 			setup: func() (interface{}, error) {
-				return Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Config(""))
+				return Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Default)
 			},
 			testValidate: func(manager interface{}) error {
 				m := manager.(*Manager[*algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey])
@@ -997,11 +997,11 @@ func TestComparisonAllTypes(t *testing.T) {
 		{
 			name: "Ed25519",
 			setup: func() (interface{}, interface{}, error) {
-				m1, err := Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Config(""))
+				m1, err := Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Default)
 				if err != nil {
 					return nil, nil, err
 				}
-				m2, err := Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Config(""))
+				m2, err := Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Default)
 				return m1, m2, err
 			},
 			test: func(manager1, manager2 interface{}) (bool, bool, bool) {
@@ -1058,7 +1058,7 @@ func TestIsValidScenarios(t *testing.T) {
 	})
 
 	t.Run("ValidEd25519Manager", func(t *testing.T) {
-		manager, err := Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Config(""))
+		manager, err := Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Default)
 		if err != nil {
 			t.Fatalf("Failed to generate manager: %v", err)
 		}
