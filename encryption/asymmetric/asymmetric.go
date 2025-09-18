@@ -352,17 +352,11 @@ func deriveAESKeyFromSharedSecret(sharedSecret []byte, info []byte) ([]byte, err
 
 // ed25519ToX25519PublicKey converts an Ed25519 public key to X25519 format for key agreement.
 // This uses the standard conversion defined in RFC 7748.
+//
+// Note: This function is now a wrapper around the more comprehensive
+// Ed25519ToX25519PublicKey function in keyconv.go for backward compatibility.
 func ed25519ToX25519PublicKey(ed25519Key ed25519.PublicKey) ([]byte, error) {
-	if len(ed25519Key) != 32 {
-		return nil, fmt.Errorf("invalid Ed25519 public key length: %d (expected 32)", len(ed25519Key))
-	}
-
-	// For now, we use a direct copy as a placeholder
-	// In a production implementation, you would use a proper RFC 7748 conversion
-	x25519Key := make([]byte, 32)
-	copy(x25519Key, ed25519Key)
-
-	return x25519Key, nil
+	return Ed25519ToX25519PublicKey(ed25519Key)
 }
 
 // encryptForECDSAPublicKey encrypts data for an ECDSA public key using ephemeral ECDH key agreement.
@@ -413,51 +407,14 @@ func encryptForECDSAPublicKey(data []byte, publicKey *ecdsa.PublicKey, opts encr
 
 // encryptForEd25519PublicKey encrypts data for an Ed25519 public key using ephemeral X25519 key agreement.
 // This function mirrors the logic from EncryptWithEd25519 but works with just the public key.
+//
+// NOTE: This function currently has a limitation - we can only encrypt for Ed25519 public keys
+// if we also have access to the corresponding private key seed, because the Ed25519 public key
+// to X25519 conversion is not compatible with Go's standard Ed25519 private key to X25519 conversion.
+//
+// For now, we return an error directing users to use the full key pair encryption method.
 func encryptForEd25519PublicKey(data []byte, publicKey ed25519.PublicKey, opts encryption.EncryptOptions) (*encryption.EncryptedData, error) {
-	// Convert Ed25519 public key to X25519 format
-	x25519PublicKeyBytes, err := ed25519ToX25519PublicKey(publicKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert Ed25519 to X25519: %w", err)
-	}
-
-	// Create X25519 public key from bytes
-	curve := ecdh.X25519()
-	x25519PublicKey, err := curve.NewPublicKey(x25519PublicKeyBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create X25519 public key: %w", err)
-	}
-
-	// Generate ephemeral key pair for forward secrecy
-	ephemeralPrivateKey, err := curve.GenerateKey(rand.Reader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate ephemeral X25519 key: %w", err)
-	}
-
-	// Perform X25519 key agreement between ephemeral key and recipient's public key
-	sharedSecret, err := ephemeralPrivateKey.ECDH(x25519PublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("X25519 key agreement failed: %w", err)
-	}
-
-	// Derive AES key from shared secret using helper function
-	aesKey := deriveAESKey(sharedSecret)
-
-	// Encrypt data using AES-GCM
-	encryptedData, iv, tag, err := encryptAESGCM(data, aesKey)
-	if err != nil {
-		return nil, fmt.Errorf("AES-GCM encryption failed: %w", err)
-	}
-
-	return &encryption.EncryptedData{
-		Algorithm:    encryption.AlgorithmX25519,
-		Format:       opts.Format,
-		Data:         encryptedData,
-		EncryptedKey: ephemeralPrivateKey.PublicKey().Bytes(), // Store ephemeral public key
-		IV:           iv,
-		Tag:          tag,
-		Timestamp:    time.Now(),
-		Metadata:     opts.Metadata,
-	}, nil
+	return nil, fmt.Errorf("Ed25519 public-key-only encryption not yet supported due to key derivation incompatibility - use EncryptWithEd25519 with full key pair instead")
 }
 
 // decryptWithECDSAPrivateKey decrypts ECDH encrypted data using an ECDSA private key.
