@@ -1,3 +1,5 @@
+//go:build compatibility
+
 package keypair
 
 import (

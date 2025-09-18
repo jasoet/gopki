@@ -22,7 +22,7 @@ tasks:
       - 'echo "  task test:quick        - Run tests without race detection (faster)"'
       - 'echo ""'
       - 'echo "Compatibility Testing:"'
-      - 'echo "  task test:compatibility        - Run OpenSSL compatibility tests"'
+      - 'echo "  task test:compatibility        - Run OpenSSL compatibility tests (build tag: compatibility)"'
       - 'echo ""'
       - 'echo "Code Analysis:"'
       - 'echo "  task lint              - Run go vet static analysis"'
@@ -109,7 +109,7 @@ tasks:
       - |
         echo "🔗 Running OpenSSL Compatibility Tests..."
         echo "   This tests interoperability between GoPKI and OpenSSL"
-      - go test -mod=mod ./compatibility/... -v
+      - go test -mod=mod ./compatibility/... -v -tags=compatibility
       - 'echo "✅ OpenSSL compatibility tests completed"'
     silent: false
 
