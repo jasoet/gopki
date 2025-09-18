@@ -2,6 +2,8 @@ package formats
 
 import (
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"testing"
@@ -14,7 +16,11 @@ import (
 
 func TestRawFormat(t *testing.T) {
 	// Generate test key pair and certificate
-	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate key pair: %v", err)
+	}
+	keyPair := manager.KeyPair()
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
@@ -81,7 +87,11 @@ func TestRawFormat(t *testing.T) {
 
 func TestPKCS7Format(t *testing.T) {
 	// Generate test key pair and certificate
-	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate key pair: %v", err)
+	}
+	keyPair := manager.KeyPair()
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
@@ -204,7 +214,11 @@ func TestPKCS7WithDifferentAlgorithms(t *testing.T) {
 		{
 			name: "RSA",
 			generate: func() (interface{}, *cert.Certificate, error) {
-				kp, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+				manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+				if err != nil {
+					t.Fatalf("Failed to generate key pair: %v", err)
+				}
+				kp := manager.KeyPair()
 				if err != nil {
 					return nil, nil, err
 				}
@@ -218,7 +232,11 @@ func TestPKCS7WithDifferentAlgorithms(t *testing.T) {
 		{
 			name: "ECDSA",
 			generate: func() (interface{}, *cert.Certificate, error) {
-				kp, err := keypair.GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
+				manager, err := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
+				if err != nil {
+					t.Fatalf("Failed to generate key pair: %v", err)
+				}
+				kp := manager.KeyPair()
 				if err != nil {
 					return nil, nil, err
 				}
@@ -326,7 +344,11 @@ func TestFormatRegistry(t *testing.T) {
 
 func TestSignOptionsAndVerifyOptions(t *testing.T) {
 	// Test that options are properly used
-	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate key pair: %v", err)
+	}
+	keyPair := manager.KeyPair()
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
@@ -393,7 +415,8 @@ func TestFormatErrors(t *testing.T) {
 	}
 
 	// Test verification with invalid signature
-	keyPair, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	manager, _ := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	keyPair := manager.KeyPair()
 	certificate, _ := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
 		Subject:  pkix.Name{CommonName: "Error Test"},
 		ValidFor: 365 * 24 * time.Hour,
@@ -407,7 +430,6 @@ func TestFormatErrors(t *testing.T) {
 		t.Error("Expected error when verifying invalid PKCS#7 signature")
 	}
 }
-
 
 // TestFormatRegistryList tests the FormatRegistry.List method
 func TestFormatRegistryList(t *testing.T) {

@@ -3,6 +3,9 @@ package signing
 import (
 	"bytes"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rsa"
 	"crypto/x509/pkix"
 	"fmt"
 	"os"
@@ -16,10 +19,11 @@ import (
 
 func TestSignAndVerifyRSA(t *testing.T) {
 	// Generate RSA key pair
-	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key pair: %v", err)
 	}
+	keyPair := manager.KeyPair()
 
 	// Create a self-signed certificate
 	certificate, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
@@ -90,7 +94,11 @@ func TestSignAndVerifyECDSA(t *testing.T) {
 		curveName := fmt.Sprintf("Curve_%d", curve)
 		t.Run(curveName, func(t *testing.T) {
 			// Generate ECDSA key pair
-			keyPair, err := keypair.GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](curve)
+			manager, err := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](curve)
+			if err != nil {
+				t.Fatalf("Failed to generate ECDSA key pair: %v", err)
+			}
+			keyPair := manager.KeyPair()
 			if err != nil {
 				t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 			}
@@ -139,7 +147,11 @@ func TestSignAndVerifyECDSA(t *testing.T) {
 
 func TestSignAndVerifyEd25519(t *testing.T) {
 	// Generate Ed25519 key pair
-	keyPair, err := keypair.GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
+	manager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey]("")
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
+	}
+	keyPair := manager.KeyPair()
 	if err != nil {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
@@ -192,7 +204,11 @@ func TestSignAndVerifyEd25519(t *testing.T) {
 
 func TestCertificateValidation(t *testing.T) {
 	// Generate key pair
-	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA key pair: %v", err)
+	}
+	keyPair := manager.KeyPair()
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
@@ -235,7 +251,11 @@ func TestCertificateValidation(t *testing.T) {
 
 func TestSigningOptions(t *testing.T) {
 	// Generate key pair
-	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA key pair: %v", err)
+	}
+	keyPair := manager.KeyPair()
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
@@ -322,7 +342,11 @@ func TestCrossAlgorithmCompatibility(t *testing.T) {
 		{
 			name: "RSA",
 			generate: func() (interface{}, *cert.Certificate, error) {
-				kp, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+				manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+				if err != nil {
+					t.Fatalf("Failed to generate RSA key pair: %v", err)
+				}
+				kp := manager.KeyPair()
 				if err != nil {
 					return nil, nil, err
 				}
@@ -336,7 +360,11 @@ func TestCrossAlgorithmCompatibility(t *testing.T) {
 		{
 			name: "ECDSA",
 			generate: func() (interface{}, *cert.Certificate, error) {
-				kp, err := keypair.GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
+				manager, err := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
+				if err != nil {
+					t.Fatalf("Failed to generate ECDSA key pair: %v", err)
+				}
+				kp := manager.KeyPair()
 				if err != nil {
 					return nil, nil, err
 				}
@@ -350,7 +378,11 @@ func TestCrossAlgorithmCompatibility(t *testing.T) {
 		{
 			name: "Ed25519",
 			generate: func() (interface{}, *cert.Certificate, error) {
-				kp, err := keypair.GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
+				manager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey]("")
+				if err != nil {
+					t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
+				}
+				kp := manager.KeyPair()
 				if err != nil {
 					return nil, nil, err
 				}
@@ -405,7 +437,11 @@ func TestCrossAlgorithmCompatibility(t *testing.T) {
 
 func TestSignatureInfo(t *testing.T) {
 	// Generate key pair
-	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA key pair: %v", err)
+	}
+	keyPair := manager.KeyPair()
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
@@ -479,7 +515,11 @@ func contains(s, substr string) bool {
 // TestSignFile tests the SignFile function
 func TestSignFile(t *testing.T) {
 	// Generate RSA key pair
-	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA key pair: %v", err)
+	}
+	keyPair := manager.KeyPair()
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key pair: %v", err)
 	}
@@ -549,10 +589,11 @@ func TestSignFile(t *testing.T) {
 // TestSignStream tests the SignStream function
 func TestSignStream(t *testing.T) {
 	// Generate ECDSA key pair for variety
-	keyPair, err := keypair.GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
+	manager, err := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
 	if err != nil {
 		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
+	keyPair := manager.KeyPair()
 
 	// Create a self-signed certificate
 	certificate, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
@@ -602,7 +643,11 @@ func TestSignStream(t *testing.T) {
 	}
 
 	// Test with Ed25519 for different code path
-	ed25519KeyPair, err := keypair.GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
+	ed25519Manager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey]("")
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
+	}
+	ed25519KeyPair := ed25519Manager.KeyPair()
 	if err != nil {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
@@ -638,7 +683,11 @@ func TestSignStream(t *testing.T) {
 // TestGetSignatureAlgorithm tests the GetSignatureAlgorithm function
 func TestGetSignatureAlgorithm(t *testing.T) {
 	// Test with RSA key
-	rsaKeyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	rsaManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA key pair: %v", err)
+	}
+	rsaKeyPair := rsaManager.KeyPair()
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key pair: %v", err)
 	}
@@ -652,7 +701,11 @@ func TestGetSignatureAlgorithm(t *testing.T) {
 	}
 
 	// Test with ECDSA key
-	ecdsaKeyPair, err := keypair.GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
+	ecdsaManager, err := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
+	if err != nil {
+		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
+	}
+	ecdsaKeyPair := ecdsaManager.KeyPair()
 	if err != nil {
 		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
 	}
@@ -666,7 +719,11 @@ func TestGetSignatureAlgorithm(t *testing.T) {
 	}
 
 	// Test with Ed25519 key
-	ed25519KeyPair, err := keypair.GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
+	ed25519Manager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey]("")
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
+	}
+	ed25519KeyPair := ed25519Manager.KeyPair()
 	if err != nil {
 		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 	}
@@ -878,7 +935,11 @@ func TestGetHashAlgorithm(t *testing.T) {
 // TestSignData tests the convenience SignData function
 func TestSignData(t *testing.T) {
 	// Generate RSA key pair
-	keyPair, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+	manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA key pair: %v", err)
+	}
+	keyPair := manager.KeyPair()
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key pair: %v", err)
 	}
