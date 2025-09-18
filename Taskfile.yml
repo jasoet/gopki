@@ -71,12 +71,14 @@ tasks:
       - go build -tags example -o bin/certificates-example ./examples/certificates/main.go
       - go build -tags example -o bin/signing-example ./examples/signing/main.go
       - go build -tags example -o bin/encryption-example ./examples/encryption/main.go
+      - go build -tags example -o bin/pkcs12-example ./examples/pkcs12/main.go
       - 'echo "✅ Examples built in bin/ directory"'
     generates:
       - bin/keypair-example
       - bin/certificates-example
       - bin/signing-example
       - bin/encryption-example
+      - bin/pkcs12-example
     silent: true
 
   # Testing Tasks
@@ -376,6 +378,11 @@ tasks:
       - 'echo ""'
       - 'echo "🔒 Running encryption examples..."'
       - go run -tags example ./examples/encryption/main.go
+      - 'echo ""'
+      - 'echo "📦 Running PKCS#12 examples..."'
+      - go run -tags example ./examples/pkcs12/main.go
+      - 'echo "✅ All examples completed successfully!"'
+    silent: true
 
   examples:keypair:
     desc: Run keypair examples only
@@ -405,6 +412,13 @@ tasks:
       - go run -tags example ./examples/encryption/main.go
     silent: true
 
+  examples:pkcs12:
+    desc: Run PKCS#12 examples only
+    deps: [build]
+    cmds:
+      - go run -tags example ./examples/pkcs12/main.go
+    silent: true
+
   examples:clean:
     desc: Clean example output directories
     cmds:
@@ -412,6 +426,7 @@ tasks:
       - rm -rf examples/certificates/output/
       - rm -rf examples/signing/output/
       - rm -rf examples/encryption/output/
+      - rm -rf examples/pkcs12/output/
       - 'echo "✅ Example outputs cleaned"'
     silent: true
 

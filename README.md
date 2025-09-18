@@ -267,6 +267,7 @@ task examples:encryption   # Data encryption with various methods
 | **Certificates** | [`examples/certificates/main.go`](examples/certificates/main.go) | [`examples/certificates/doc.md`](examples/certificates/doc.md) | [`cert/cert_test.go`](cert/cert_test.go) |
 | **Digital Signing** | [`examples/signing/main.go`](examples/signing/main.go) | [`examples/signing/doc.md`](examples/signing/doc.md) | [`signing/signing_test.go`](signing/signing_test.go) |
 | **Data Encryption** | [`examples/encryption/main.go`](examples/encryption/main.go) | [`examples/encryption/doc.md`](examples/encryption/doc.md) | [`encryption/*/test.go`](encryption/) |
+| **PKCS#12 Bundles** | [`examples/pkcs12/main.go`](examples/pkcs12/main.go) | [`examples/pkcs12/doc.md`](examples/pkcs12/doc.md) | [`pkcs12/pkcs12_test.go`](pkcs12/pkcs12_test.go) |
 
 ### 🎯 Example Features by Module
 
@@ -300,6 +301,15 @@ task examples:encryption   # Data encryption with various methods
 - Certificate-based encryption with PKI integration
 - CMS format compliance (RFC 5652)
 - Performance analysis and file-based operations
+
+**📦 PKCS#12 Bundle Examples** ([`examples/pkcs12/`](examples/pkcs12/))
+- **Multi-Algorithm P12 Creation**: RSA, ECDSA, Ed25519 certificate bundles
+- **Certificate Chain Bundling**: Complete CA hierarchies in P12 format
+- **Real-World Scenarios**: Web server, client auth, code signing certificates
+- **Security Options**: Password protection, custom iterations, friendly names
+- **Cross-Platform Migration**: Import/export workflows for different systems
+- **Integration Workflows**: Seamless integration with keypair Manager and cert modules
+- **Validation & Security**: Container validation and security best practices
 
 ## 🔧 Core Modules
 
@@ -471,26 +481,68 @@ decrypted, _ := encryption.DecodeFromCMS(cmsData, recipientCert, privateKey)
 
 ### 5. **pkcs12/** - PKCS#12 File Management
 
-**Complete PKI material bundling and storage**
+**Complete PKI material bundling and storage with RFC 7292 compliance**
 
 ```go
-// Create PKCS#12 file with certificate chain
-err := pkcs12.CreateP12File("certificate.p12", privateKey, certificate,
-    []*x509.Certificate{intermediateCert, rootCert}, pkcs12.CreateOptions{
-        Password: "secure123",
-        FriendlyName: "My Certificate",
-        Iterations: 4096,  // Security vs performance
-    })
+// Method 1: Quick P12 creation for simple use cases
+err := pkcs12.QuickCreateP12("basic.p12", "password123", privateKey, certificate)
 
-// Load PKCS#12 file
+// Method 2: Advanced P12 creation with full control
+opts := pkcs12.CreateOptions{
+    Password:     "secure_password_2024",
+    FriendlyName: "Production Web Server Certificate",
+    Iterations:   8192, // High security iterations
+}
+err := pkcs12.CreateP12File("webserver.p12", serverKey, serverCert,
+    []*x509.Certificate{intermediateCert, rootCert}, opts)
+
+// Integration with KeyPair Manager
+manager, _ := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+err := pkcs12.QuickCreateP12("from_manager.p12", "password", manager.PrivateKey(), certificate)
+
+// Loading and validation
 container, _ := pkcs12.LoadFromP12File("certificate.p12", pkcs12.LoadOptions{
     Password: "secure123",
     TrustedCerts: []*x509.Certificate{rootCert},
 })
 
-// Quick operations
+// Container operations
+keyType := container.GetKeyType()                    // "RSA", "ECDSA", "Ed25519"
+chain := container.ExtractCertificateChain()        // Get full certificate chain
+err := container.Validate()                         // Validate container integrity
+
+// Quick loading for simple cases
 container, _ := pkcs12.QuickLoadP12("certificate.p12", "secure123")
+
+// Real-world scenarios
+// Web server certificate bundle
+pkcs12.CreateP12File("webserver.p12", serverKey, serverCert, caChain, webServerOpts)
+
+// Client authentication certificate
+pkcs12.QuickCreateP12("client_auth.p12", "client_password", clientKey, clientCert)
+
+// Code signing certificate with maximum security
+pkcs12.CreateP12File("codesign.p12", codeSignKey, codeSignCert, nil,
+    pkcs12.CreateOptions{
+        Password: "code_sign_password",
+        FriendlyName: "Software Publisher Certificate",
+        Iterations: 16384, // Maximum security for code signing
+    })
 ```
+
+**PKCS#12 Features:**
+- ✅ **Multi-Algorithm Support**: RSA, ECDSA, Ed25519 private keys
+- ✅ **Certificate Chains**: Bundle complete CA hierarchies
+- ✅ **Password Protection**: Configurable iteration counts for security
+- ✅ **Cross-Platform**: Compatible with Windows, macOS, Linux
+- ✅ **Integration**: Seamless with keypair Manager and cert modules
+- ✅ **Validation**: Container integrity and certificate verification
+- ✅ **Real-World Ready**: Web server, client auth, code signing use cases
+
+**Security Levels:**
+- **Development**: 2048 iterations
+- **Production**: 4096-8192 iterations
+- **High Security**: 16384+ iterations for sensitive applications
 
 ## 🔄 Format Support Matrix
 
@@ -723,9 +775,13 @@ gopki/
 │   ├── signing/             # Document signing examples
 │   │   ├── main.go          # Document signing demonstration
 │   │   └── doc.md           # Digital signing documentation
-│   └── encryption/          # Data encryption examples
-│       ├── main.go          # Encryption demonstration
-│       └── doc.md           # Encryption documentation
+│   ├── encryption/          # Data encryption examples
+│   │   ├── main.go          # Encryption demonstration
+│   │   └── doc.md           # Encryption documentation
+│   └── pkcs12/              # PKCS#12 bundle examples
+│       ├── main.go          # PKCS#12 demonstration
+│       ├── doc.md           # PKCS#12 documentation
+│       └── output/          # Generated P12 files (gitignored)
 ├── CLAUDE.md                # Development guide for Claude Code AI
 ├── CHANGELOG.md             # Version history and release notes
 └── README.md               # This comprehensive guide
