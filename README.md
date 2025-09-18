@@ -307,6 +307,32 @@ decrypted, _ := encryption.DecodeFromCMS(cmsData, recipientCert, privateKey)
 - ✅ CMS (RFC 5652) format compliance
 - ✅ Type-safe APIs with generic constraints
 
+## 🔢 Algorithm Feature Matrix
+
+| **Encryption Operation** | **RSA** | **ECDSA** | **Ed25519** | **Notes** |
+|---------------------------|---------|-----------|-------------|-----------|
+| **Direct Data Encryption** | ✅ | ✅ | ✅ | All algorithms supported for key-pair encryption |
+| **Public Key Only Encryption** | ✅ | ✅ | ❌ | Ed25519 requires full key pair due to key derivation limitations |
+| **Certificate-Based Encryption** | ✅ | ✅ | ❌ | Ed25519 limited by public-key-only requirement |
+| **Envelope Large Data** | ✅ | ✅ | ✅* | Ed25519 works with key pairs, not with certificates |
+| **CMS Format Support** | ✅ | ✅ | ✅* | Ed25519 limited to key-pair workflows |
+
+**Legend:**
+- ✅ **Full Support**: Complete implementation with all features
+- ❌ **Not Supported**: Technical limitations prevent implementation
+- ✅* **Partial Support**: Works with restrictions (see notes)
+
+**Ed25519 Limitations:**
+- **Root Cause**: Key derivation incompatibility between Ed25519→X25519 public key conversion (RFC 7748) and Ed25519→X25519 private key conversion (Go standard method)
+- **Impact**: Public-key-only encryption fails, requiring full key pair for encryption operations
+- **Workaround**: Use `EncryptWithEd25519()` with complete key pairs instead of certificate-based encryption
+- **Certificate Encryption**: Not supported - returns clear error with guidance to use RSA or ECDSA for certificate-based workflows
+
+**Algorithm Recommendations:**
+- **RSA**: Best for certificate-based encryption, maximum compatibility
+- **ECDSA**: Modern choice with smaller keys and full feature support
+- **Ed25519**: High performance signing, limited to key-pair encryption workflows
+
 ### 5. **pkcs12/** - PKCS#12 File Management
 
 **Complete PKI material bundling and storage**

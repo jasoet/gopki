@@ -477,7 +477,7 @@ func EncryptForPublicKeyAny(data []byte, publicKey keypair.GenericPublicKey, opt
 	case *ecdsa.PublicKey:
 		return EncryptForPublicKey(data, pk, opts)
 	case ed25519.PublicKey:
-		return EncryptForPublicKey(data, pk, opts)
+		return nil, fmt.Errorf("Ed25519 public-key-only envelope encryption not supported due to key derivation limitations - use EncryptWithEd25519 for full key pair encryption instead")
 	default:
 		return nil, fmt.Errorf("unsupported public key type: %T", publicKey)
 	}

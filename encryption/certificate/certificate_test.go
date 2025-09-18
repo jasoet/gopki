@@ -149,11 +149,10 @@ func TestEncryptDocument(t *testing.T) {
 
 		testCert := createTestCertificate(t, ecdsaKeys)
 
-		// ECDSA is not yet supported for public key encryption
+		// ECDSA should now work for certificate encryption
 		encrypted, err := EncryptDocument(testData, testCert, opts)
-		assert.Error(t, err)
-		assert.Nil(t, encrypted)
-		assert.Contains(t, err.Error(), "EncryptForPublicKey not yet implemented for *ecdsa.PublicKey")
+		assert.NoError(t, err) // ECDSA should work now
+		assert.NotNil(t, encrypted)
 	})
 
 	t.Run("Ed25519 Certificate", func(t *testing.T) {
@@ -166,7 +165,7 @@ func TestEncryptDocument(t *testing.T) {
 		encrypted, err := EncryptDocument(testData, testCert, opts)
 		assert.Error(t, err)
 		assert.Nil(t, encrypted)
-		assert.Contains(t, err.Error(), "EncryptForPublicKey not yet implemented for ed25519.PublicKey")
+		assert.Contains(t, err.Error(), "key derivation")
 	})
 
 	t.Run("Nil Certificate", func(t *testing.T) {
@@ -219,11 +218,10 @@ func TestDecryptDocument(t *testing.T) {
 
 		testCert := createTestCertificate(t, ecdsaKeys)
 
-		// ECDSA is not yet supported for public key encryption
+		// ECDSA should now work for certificate encryption
 		encrypted, err := EncryptDocument(testData, testCert, opts)
-		assert.Error(t, err)
-		assert.Nil(t, encrypted)
-		assert.Contains(t, err.Error(), "EncryptForPublicKey not yet implemented for *ecdsa.PublicKey")
+		assert.NoError(t, err) // ECDSA should work now
+		assert.NotNil(t, encrypted)
 	})
 
 	t.Run("Ed25519 Round Trip", func(t *testing.T) {
@@ -236,7 +234,7 @@ func TestDecryptDocument(t *testing.T) {
 		encrypted, err := EncryptDocument(testData, testCert, opts)
 		assert.Error(t, err)
 		assert.Nil(t, encrypted)
-		assert.Contains(t, err.Error(), "EncryptForPublicKey not yet implemented for ed25519.PublicKey")
+		assert.Contains(t, err.Error(), "key derivation")
 	})
 
 	t.Run("Nil Encrypted Data", func(t *testing.T) {
