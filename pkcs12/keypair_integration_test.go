@@ -1,7 +1,10 @@
 package pkcs12
 
 import (
+	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"math/big"
@@ -65,10 +68,11 @@ func TestToP12KeyPairFunctions(t *testing.T) {
 
 	t.Run("ToP12KeyPair RSA", func(t *testing.T) {
 		// Generate RSA key pair
-		rsaKeys, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+		manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA keys: %v", err)
 		}
+		rsaKeys := manager.KeyPair()
 
 		// Create certificate
 		certificate := createCertificate(rsaKeys)
@@ -96,10 +100,11 @@ func TestToP12KeyPairFunctions(t *testing.T) {
 
 	t.Run("ToP12KeyPair ECDSA", func(t *testing.T) {
 		// Generate ECDSA key pair
-		ecdsaKeys, err := keypair.GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
+		manager, err := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
 		if err != nil {
 			t.Fatalf("Failed to generate ECDSA keys: %v", err)
 		}
+		ecdsaKeys := manager.KeyPair()
 
 		// Create certificate
 		certificate := createCertificate(ecdsaKeys)
@@ -127,10 +132,11 @@ func TestToP12KeyPairFunctions(t *testing.T) {
 
 	t.Run("ToP12KeyPair Ed25519", func(t *testing.T) {
 		// Generate Ed25519 key pair
-		ed25519Keys, err := keypair.GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
+		manager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey]("")
 		if err != nil {
 			t.Fatalf("Failed to generate Ed25519 keys: %v", err)
 		}
+		ed25519Keys := manager.KeyPair()
 
 		// Create certificate
 		certificate := createCertificate(ed25519Keys)
@@ -158,10 +164,11 @@ func TestToP12KeyPairFunctions(t *testing.T) {
 
 	t.Run("ToP12KeyPairFile", func(t *testing.T) {
 		// Generate RSA key pair
-		rsaKeys, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+		manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA keys: %v", err)
 		}
+		rsaKeys := manager.KeyPair()
 
 		// Create certificate
 		certificate := createCertificate(rsaKeys)
@@ -237,10 +244,11 @@ func TestFromP12KeyPairFunctions(t *testing.T) {
 
 	t.Run("FromP12KeyPair RSA Round Trip", func(t *testing.T) {
 		// Generate RSA key pair
-		originalKeys, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+		manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA keys: %v", err)
 		}
+		originalKeys := manager.KeyPair()
 
 		// Create certificate
 		originalCert := createSelfSignedCertificate(originalKeys)
@@ -300,10 +308,11 @@ func TestFromP12KeyPairFunctions(t *testing.T) {
 
 	t.Run("FromP12KeyPair ECDSA Round Trip", func(t *testing.T) {
 		// Generate ECDSA key pair
-		originalKeys, err := keypair.GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](algo.P256)
+		manager, err := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
 		if err != nil {
 			t.Fatalf("Failed to generate ECDSA keys: %v", err)
 		}
+		originalKeys := manager.KeyPair()
 
 		// Create certificate
 		originalCert := createSelfSignedCertificate(originalKeys)
@@ -352,10 +361,11 @@ func TestFromP12KeyPairFunctions(t *testing.T) {
 
 	t.Run("FromP12KeyPair Ed25519 Round Trip", func(t *testing.T) {
 		// Generate Ed25519 key pair
-		originalKeys, err := keypair.GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair]("")
+		manager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey]("")
 		if err != nil {
 			t.Fatalf("Failed to generate Ed25519 keys: %v", err)
 		}
+		originalKeys := manager.KeyPair()
 
 		// Create certificate
 		originalCert := createSelfSignedCertificate(originalKeys)
@@ -401,10 +411,11 @@ func TestFromP12KeyPairFunctions(t *testing.T) {
 
 	t.Run("FromP12KeyPairFile", func(t *testing.T) {
 		// Generate RSA key pair and create P12 file
-		rsaKeys, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+		manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA keys: %v", err)
 		}
+		rsaKeys := manager.KeyPair()
 
 		certificate := createSelfSignedCertificate(rsaKeys)
 
@@ -480,10 +491,11 @@ func TestImportFromP12KeyPairWithValidation(t *testing.T) {
 
 	t.Run("Valid P12 Import", func(t *testing.T) {
 		// Generate RSA key pair
-		rsaKeys, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+		manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA keys: %v", err)
 		}
+		rsaKeys := manager.KeyPair()
 
 		// Create certificate
 		certificate := createValidationCertificate(rsaKeys)
@@ -521,7 +533,8 @@ func TestP12KeyPairErrorCases(t *testing.T) {
 	password := "test123"
 
 	t.Run("ToP12KeyPair Error Cases", func(t *testing.T) {
-		rsaKeys, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+		manager, _ := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+		rsaKeys := manager.KeyPair()
 
 		// Create a test certificate directly
 		template := &x509.Certificate{
@@ -575,7 +588,8 @@ func TestP12KeyPairErrorCases(t *testing.T) {
 
 	t.Run("Type Mismatch Error", func(t *testing.T) {
 		// Create RSA P12 data
-		rsaKeys, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+		manager, _ := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+		rsaKeys := manager.KeyPair()
 
 		// Create certificate directly
 		template := &x509.Certificate{
@@ -629,10 +643,11 @@ func TestExportKeyPairWithChain(t *testing.T) {
 
 	t.Run("Export with Certificate Chain", func(t *testing.T) {
 		// Generate RSA key pair
-		rsaKeys, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+		manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA keys: %v", err)
 		}
+		rsaKeys := manager.KeyPair()
 
 		// Create main certificate
 		template := &x509.Certificate{
@@ -655,7 +670,8 @@ func TestExportKeyPairWithChain(t *testing.T) {
 		}
 
 		// Create a dummy CA certificate for the chain
-		caKeys, _ := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+		caManager, _ := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+		caKeys := caManager.KeyPair()
 		caTemplate := &x509.Certificate{
 			Subject: pkix.Name{
 				CommonName:   "Test CA",
@@ -713,10 +729,11 @@ func TestConvertP12ToPEM(t *testing.T) {
 
 	t.Run("Convert RSA P12 to PEM", func(t *testing.T) {
 		// Generate RSA key pair and create P12
-		rsaKeys, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](2048)
+		manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA keys: %v", err)
 		}
+		rsaKeys := manager.KeyPair()
 
 		// Create certificate directly
 		template := &x509.Certificate{

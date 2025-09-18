@@ -455,15 +455,15 @@ func ConvertP12KeyPairToPEM(p12File, password, privateKeyFile, certFile string) 
 		// Convert keyPair back to the correct type for ToFiles
 		switch kp := keyPair.(type) {
 		case *algo.RSAKeyPair:
-			if err := keypair.ToFiles(kp, privateKeyFile, privateKeyFile+".pub"); err != nil {
+			if err := keypair.ToPEMFiles(kp, privateKeyFile, privateKeyFile+".pub"); err != nil {
 				return fmt.Errorf("failed to save RSA key pair to PEM: %w", err)
 			}
 		case *algo.ECDSAKeyPair:
-			if err := keypair.ToFiles(kp, privateKeyFile, privateKeyFile+".pub"); err != nil {
+			if err := keypair.ToPEMFiles(kp, privateKeyFile, privateKeyFile+".pub"); err != nil {
 				return fmt.Errorf("failed to save ECDSA key pair to PEM: %w", err)
 			}
 		case *algo.Ed25519KeyPair:
-			if err := keypair.ToFiles(kp, privateKeyFile, privateKeyFile+".pub"); err != nil {
+			if err := keypair.ToPEMFiles(kp, privateKeyFile, privateKeyFile+".pub"); err != nil {
 				return fmt.Errorf("failed to save Ed25519 key pair to PEM: %w", err)
 			}
 		default:
@@ -518,7 +518,6 @@ func createKeyPairFromPrivateKey[T keypair.PrivateKey](privateKey T) (any, error
 		return nil, fmt.Errorf("unsupported private key type for keypair creation: %T", privateKey)
 	}
 }
-
 
 // saveCertificateToPEM saves a certificate to a PEM file
 func saveCertificateToPEM(cert *x509.Certificate, filename string) error {
