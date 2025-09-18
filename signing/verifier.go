@@ -534,15 +534,52 @@ func verifyPKCS7SignatureFormat(data []byte, signature *Signature, opts VerifyOp
 		return fmt.Errorf("failed to parse PKCS#7 signature: %w", err)
 	}
 
-	// For detached signatures, set the content
+	// CRITICAL SECURITY FIX: Always set the content to the provided data
+	// This ensures we verify against the actual data being tested, not embedded content
 	if signature.Format == FormatPKCS7Detached {
+		// For detached signatures, set the content
+		p7.Content = data
+	} else {
+		// For attached signatures, we need to verify that the embedded content
+		// matches the provided data to prevent signature substitution attacks
+		if len(p7.Content) != len(data) {
+			return fmt.Errorf("data length mismatch: provided %d bytes, signature contains %d bytes", len(data), len(p7.Content))
+		}
+		for i := range data {
+			if p7.Content[i] != data[i] {
+				return fmt.Errorf("data content mismatch: provided data does not match signed content")
+			}
+		}
+		// Set content to ensure verification uses the provided data
 		p7.Content = data
 	}
 
-	// Standard PKCS#7 verification
-	err = p7.Verify()
-	if err != nil {
-		return fmt.Errorf("PKCS#7 signature verification failed: %w", err)
+	// CRITICAL SECURITY FIX: Verify against the specific certificate
+	// The p7.Verify() call alone doesn't verify the signature was created by the expected certificate
+	if signature.Certificate != nil {
+		// First do standard PKCS#7 verification
+		err = p7.Verify()
+		if err != nil {
+			return fmt.Errorf("PKCS#7 signature verification failed: %w", err)
+		}
+
+		// Then verify the signature was created by the expected certificate
+		// Check if the expected certificate is in the PKCS#7 signers
+		signerCert := p7.GetOnlySigner()
+		if signerCert == nil {
+			return fmt.Errorf("PKCS#7 signature does not contain exactly one signer")
+		}
+
+		// Compare the certificates by their raw bytes (most reliable method)
+		if !signerCert.Equal(signature.Certificate) {
+			return fmt.Errorf("signature was not created by the expected certificate")
+		}
+	} else {
+		// Standard PKCS#7 verification when no specific certificate is required
+		err = p7.Verify()
+		if err != nil {
+			return fmt.Errorf("PKCS#7 signature verification failed: %w", err)
+		}
 	}
 
 	return nil
