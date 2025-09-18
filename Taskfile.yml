@@ -66,14 +66,17 @@ tasks:
     desc: Build example binaries
     deps: [build]
     cmds:
-      - go build -o bin/keypair-example ./examples/keypair/main.go
-      - go build -o bin/certificates-example ./examples/certificates/main.go
-      - go build -o bin/signing-example ./examples/signing/main.go
+      - mkdir -p bin/
+      - go build -tags example -o bin/keypair-example ./examples/keypair/main.go
+      - go build -tags example -o bin/certificates-example ./examples/certificates/main.go
+      - go build -tags example -o bin/signing-example ./examples/signing/main.go
+      - go build -tags example -o bin/encryption-example ./examples/encryption/main.go
       - 'echo "✅ Examples built in bin/ directory"'
     generates:
       - bin/keypair-example
       - bin/certificates-example
       - bin/signing-example
+      - bin/encryption-example
     silent: true
 
   # Testing Tasks
@@ -363,13 +366,44 @@ tasks:
     deps: [build]
     cmds:
       - 'echo "🔐 Running keypair examples..."'
-      - go run ./examples/keypair/main.go
+      - go run -tags example ./examples/keypair/main.go
       - 'echo ""'
       - 'echo "📜 Running certificate examples..."'
-      - go run ./examples/certificates/main.go
+      - go run -tags example ./examples/certificates/main.go
       - 'echo ""'
       - 'echo "✍️ Running document signing examples..."'
-      - go run ./examples/signing/main.go
+      - go run -tags example ./examples/signing/main.go
+      - 'echo ""'
+      - 'echo "🔒 Running encryption examples..."'
+      - go run -tags example ./examples/encryption/main.go
+
+  examples:keypair:
+    desc: Run keypair examples only
+    deps: [build]
+    cmds:
+      - go run -tags example ./examples/keypair/main.go
+    silent: true
+
+  examples:certificates:
+    desc: Run certificate examples only
+    deps: [build]
+    cmds:
+      - go run -tags example ./examples/certificates/main.go
+    silent: true
+
+  examples:signing:
+    desc: Run signing examples only
+    deps: [build]
+    cmds:
+      - go run -tags example ./examples/signing/main.go
+    silent: true
+
+  examples:encryption:
+    desc: Run encryption examples only
+    deps: [build]
+    cmds:
+      - go run -tags example ./examples/encryption/main.go
+    silent: true
 
   examples:clean:
     desc: Clean example output directories
@@ -377,6 +411,7 @@ tasks:
       - rm -rf examples/keypair/output/
       - rm -rf examples/certificates/output/
       - rm -rf examples/signing/output/
+      - rm -rf examples/encryption/output/
       - 'echo "✅ Example outputs cleaned"'
     silent: true
 
