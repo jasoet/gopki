@@ -248,6 +248,27 @@ func TestDecryptDocument(t *testing.T) {
 		assert.Nil(t, decrypted)
 		assert.Contains(t, err.Error(), "encrypted data is required")
 	})
+
+	t.Run("Invalid Decrypt Options", func(t *testing.T) {
+		rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+		assert.NoError(t, err)
+
+		testCert := createTestCertificate(t, rsaKeys)
+		encrypted, err := EncryptDocument(testData, testCert, opts)
+		assert.NoError(t, err)
+
+		invalidDecryptOpts := encryption.DecryptOptions{
+			MaxAge: -time.Hour, // Invalid negative max age
+		}
+
+		decrypted, err := DecryptDocument(encrypted, rsaKeys, invalidDecryptOpts)
+		assert.Error(t, err)
+		assert.Nil(t, decrypted)
+		assert.Contains(t, err.Error(), "invalid encryption parameters")
+	})
+}
+
+func TestEncryptForMultipleCertificates(t *te
 }
 
 func TestEncryptForMultipleCertificates(t *testing.T) {

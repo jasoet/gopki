@@ -88,6 +88,21 @@ func TestEncrypt(t *testing.T) {
 		assert.Equal(t, "testing", encrypted.Metadata["purpose"])
 		assert.Equal(t, "1.0", encrypted.Metadata["version"])
 	})
+
+	t.Run("Invalid Encrypt Options", func(t *testing.T) {
+		rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+		assert.NoError(t, err)
+
+		invalidOpts := encryption.EncryptOptions{
+			Algorithm: "INVALID_ALG", // Invalid algorithm
+			Format:    encryption.FormatCMS,
+		}
+
+		encrypted, err := Encrypt(testData, rsaKeys, invalidOpts)
+		assert.Error(t, err)
+		assert.Nil(t, encrypted)
+		assert.Contains(t, err.Error(), "unsupported encryption algorithm")
+	})
 }
 
 func TestDecrypt(t *testing.T) {
@@ -184,6 +199,23 @@ func TestDecrypt(t *testing.T) {
 		decrypted, err := Decrypt(legacyEncrypted, rsaKeys, decryptOpts)
 		assert.NoError(t, err)
 		assert.Equal(t, testData, decrypted)
+	})
+
+	t.Run("Invalid Decrypt Options", func(t *testing.T) {
+		rsaKeys, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+		assert.NoError(t, err)
+
+		encrypted, err := Encrypt(testData, rsaKeys, opts)
+		assert.NoError(t, err)
+
+		invalidDecryptOpts := encryption.DecryptOptions{
+			MaxAge: -time.Hour, // Invalid negative max age
+		}
+
+		decrypted, err := Decrypt(encrypted, rsaKeys, invalidDecryptOpts)
+		assert.Error(t, err)
+		assert.Nil(t, decrypted)
+		assert.Contains(t, err.Error(), "invalid encryption parameters")
 	})
 }
 

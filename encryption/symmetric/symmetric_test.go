@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/jasoet/gopki/encryption"
 	"github.com/stretchr/testify/assert"
@@ -113,6 +114,30 @@ func TestEncryptAESGCM(t *testing.T) {
 		assert.NotEqual(t, encrypted1.IV, encrypted2.IV)
 		assert.NotEqual(t, encrypted1.Data, encrypted2.Data)
 		assert.NotEqual(t, encrypted1.Tag, encrypted2.Tag)
+	})
+
+	t.Run("Invalid Encrypt Options", func(t *testing.T) {
+		key, err := GenerateAESKey(32)
+		assert.NoError(t, err)
+
+		invalidOpts := encryption.EncryptOptions{
+			Algorithm: "INVALID_ALG", // Invalid algorithm
+			Format:    encryption.FormatCMS,
+		}
+
+		encrypted, err := EncryptAESGCM(testData, key, invalidOpts)
+		assert.Error(t, err)
+		assert.Nil(t, encrypted)
+		assert.Contains(t, err.Error(), "unsupported encryption algorithm")
+	})
+
+	t.Run("Zero Length Key", func(t *testing.T) {
+		zeroKey := []byte{} // Zero-length key
+
+		encrypted, err := EncryptAESGCM(testData, zeroKey, opts)
+		assert.Error(t, err)
+		assert.Nil(t, encrypted)
+		assert.Contains(t, err.Error(), "invalid AES key size")
 	})
 }
 
@@ -277,6 +302,23 @@ func TestDecryptAESGCM(t *testing.T) {
 		decrypted, err := DecryptAESGCM(encrypted, key, decryptOpts)
 		assert.NoError(t, err)
 		assert.Empty(t, decrypted)
+	})
+
+	t.Run("Invalid Decrypt Options", func(t *testing.T) {
+		key, err := GenerateAESKey(32)
+		assert.NoError(t, err)
+
+		encrypted, err := EncryptAESGCM(testData, key, opts)
+		assert.NoError(t, err)
+
+		invalidDecryptOpts := encryption.DecryptOptions{
+			MaxAge: -1 * time.Hour, // Invalid negative max age
+		}
+
+		decrypted, err := DecryptAESGCM(encrypted, key, invalidDecryptOpts)
+		assert.Error(t, err)
+		assert.Nil(t, decrypted)
+		assert.Contains(t, err.Error(), "invalid encryption parameters")
 	})
 }
 
