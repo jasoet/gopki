@@ -21,7 +21,6 @@ import (
 	"github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
-	"github.com/jasoet/gopki/keypair/format"
 	"github.com/jasoet/gopki/signing"
 )
 
@@ -140,7 +139,7 @@ func demonstrateRSASigning() {
 
 	// Save the certificate and keys
 	certificate.SaveToFile("output/rsa_signer.crt")
-	format.ToPEMFiles(keyPair, "output/rsa_private.pem", "output/rsa_public.pem")
+	keypair.ToPEMFiles(keyPair, "output/rsa_private.pem", "output/rsa_public.pem")
 
 	fmt.Println()
 }
@@ -210,7 +209,7 @@ func demonstrateECDSASigning() {
 
 func demonstrateEd25519Signing() {
 	// Generate Ed25519 key pair using generic API
-	keyManager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Config{})
+	keyManager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Default)
 	if err != nil {
 		log.Fatal("Failed to generate Ed25519 key pair:", err)
 	}
@@ -478,7 +477,7 @@ func demonstrateMultipleSignatures() {
 	}{"Bob", "ECDSA", ecdsaKeyPair, ecdsaCert})
 
 	// Signer 3: Ed25519
-	ed25519KeyManager, _ := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Config{})
+	ed25519KeyManager, _ := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Default)
 	ed25519KeyPair := ed25519KeyManager.KeyPair()
 	ed25519Cert, _ := cert.CreateSelfSignedCertificate(ed25519KeyPair, cert.CertificateRequest{
 		Subject:  pkix.Name{CommonName: "Charlie (Ed25519)"},
@@ -669,7 +668,7 @@ func demonstratePerformanceComparison() {
 	}{"ECDSA-P256", ecdsaKeyPair, ecdsaCert})
 
 	// Ed25519
-	ed25519KeyManager, _ := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Config{})
+	ed25519KeyManager, _ := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Default)
 	ed25519KeyPair := ed25519KeyManager.KeyPair()
 	ed25519Cert, _ := cert.CreateSelfSignedCertificate(ed25519KeyPair, cert.CertificateRequest{
 		Subject:  pkix.Name{CommonName: "Ed25519 Perf Test"},
@@ -755,7 +754,7 @@ digital signature protection for integrity and authenticity.`)
 	fmt.Println("✓ Created test document file")
 
 	// Sign the file
-	signature, err := signing.SignFile("output/test_document.txt", keyPair, certificate)
+	signature, err := signing.SignFile("output/test_document.txt", keyPair, certificate, signing.DefaultSignOptions())
 	if err != nil {
 		log.Fatal("Failed to sign file:", err)
 	}
