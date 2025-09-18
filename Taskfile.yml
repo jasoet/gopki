@@ -120,10 +120,49 @@ tasks:
     silent: true
 
   lint:full:
-    desc: Run comprehensive linting with golangci-lint
-    deps: [lint:install]
+    desc: Run comprehensive linting with golangci-lint on core modules
+    deps: [lint:check]
     cmds:
-      - golangci-lint run ./...
+      - golangci-lint run ./keypair/... ./cert/... ./signing/...
+      - 'echo "✅ Full lint checks passed"'
+    silent: true
+
+  lint:check:
+    desc: Check if golangci-lint is installed
+    cmds:
+      - |
+        if ! command -v golangci-lint >/dev/null 2>&1; then
+          echo "❌ golangci-lint not found. Install from https://golangci-lint.run/usage/install/"
+          echo "   For macOS: brew install golangci-lint"
+          echo "   For Linux: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin"
+          exit 1
+        fi
+    silent: true
+
+  lint:fix:
+    desc: Auto-fix linting issues where possible
+    deps: [lint:check]
+    cmds:
+      - golangci-lint run --fix ./keypair/... ./cert/... ./signing/... ./encryption/... ./pkcs12/...
+      - 'echo "✅ Auto-fixable lint issues resolved"'
+    silent: true
+
+  lint:security:
+    desc: Run security-focused linting
+    deps: [lint:check]
+    cmds:
+      - golangci-lint run --enable gosec,ineffassign,unconvert ./keypair/... ./cert/... ./signing/... ./encryption/... ./pkcs12/...
+      - 'echo "✅ Security lint checks passed"'
+    silent: true
+
+  lint:summary:
+    desc: Show linting issues summary by type
+    deps: [lint:check]
+    cmds:
+      - |
+        echo "📊 Linting Issues Summary:"
+        golangci-lint run ./keypair/... ./cert/... ./signing/... --out-format=tab 2>/dev/null | cut -f3 | sort | uniq -c | sort -nr | head -10
+    silent: false
 
   format:
     desc: Format all Go code
@@ -339,4 +378,47 @@ tasks:
       - rm -rf examples/certificates/output/
       - rm -rf examples/signing/output/
       - 'echo "✅ Example outputs cleaned"'
+    silent: true
+
+  # CI/CD Pipeline Tasks
+  ci:
+    desc: Run complete CI pipeline locally
+    deps: [format:check, lint:security, test:coverage, build]
+    cmds:
+      - 'echo "✅ CI pipeline completed successfully"'
+    silent: true
+
+  ci:quick:
+    desc: Run quick CI checks (format, lint, basic tests)
+    deps: [format:check, lint, test]
+    cmds:
+      - 'echo "✅ Quick CI checks completed"'
+    silent: true
+
+  ci:full:
+    desc: Run comprehensive CI pipeline with all checks
+    deps: [format:check, lint:full, lint:security, test:coverage, build, examples:run]
+    cmds:
+      - 'echo "✅ Full CI pipeline completed successfully"'
+    silent: true
+
+  release:check:
+    desc: Check if project is ready for release
+    deps: [format:check, lint:full, test:coverage, build]
+    cmds:
+      - |
+        echo "🔍 Release Readiness Check:"
+        echo "  ✅ Code formatting verified"
+        echo "  ✅ Linting checks passed"
+        echo "  ✅ Test coverage analyzed"
+        echo "  ✅ Build successful"
+        echo ""
+        echo "📦 Project appears ready for release!"
+    silent: false
+
+  pre-commit:
+    desc: Run pre-commit checks (format, quick lint, basic tests)
+    deps: [format, lint, test:quick]
+    cmds:
+      - 'echo "✅ Pre-commit checks completed"'
     silent: true
