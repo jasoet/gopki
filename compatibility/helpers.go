@@ -353,3 +353,200 @@ func CreateTestData() []byte {
 	hash := sha256.Sum256([]byte(testString))
 	return hash[:]
 }
+
+// Certificate-specific OpenSSL helper functions
+
+// GenerateSelfSignedCertWithOpenSSL generates a self-signed certificate using OpenSSL
+func (h *OpenSSLHelper) GenerateSelfSignedCertWithOpenSSL(privateKeyPEM []byte, subject, san string) ([]byte, error) {
+	keyFile := h.TempFile("cert_private.pem", privateKeyPEM)
+	certFile := filepath.Join(h.tempDir, "cert.pem")
+	confFile := h.TempFile("cert.conf", h.createOpenSSLConfig(subject, san))
+
+	h.t.Logf("    → Generating self-signed certificate with OpenSSL...")
+
+	_, err := h.RunOpenSSL("req", "-new", "-x509", "-key", keyFile, "-out", certFile,
+		"-days", "365", "-config", confFile, "-batch")
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate self-signed certificate: %v", err)
+	}
+
+	return os.ReadFile(certFile)
+}
+
+// GenerateCACertWithOpenSSL generates a CA certificate using OpenSSL
+func (h *OpenSSLHelper) GenerateCACertWithOpenSSL(privateKeyPEM []byte, subject string) ([]byte, error) {
+	keyFile := h.TempFile("ca_private.pem", privateKeyPEM)
+	certFile := filepath.Join(h.tempDir, "ca_cert.pem")
+	confFile := h.TempFile("ca.conf", h.createCAConfig(subject))
+
+	h.t.Logf("    → Generating CA certificate with OpenSSL...")
+
+	_, err := h.RunOpenSSL("req", "-new", "-x509", "-key", keyFile, "-out", certFile,
+		"-days", "3650", "-config", confFile, "-batch", "-extensions", "v3_ca")
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate CA certificate: %v", err)
+	}
+
+	return os.ReadFile(certFile)
+}
+
+// SignCertificateWithOpenSSL signs a certificate using OpenSSL CA
+func (h *OpenSSLHelper) SignCertificateWithOpenSSL(csrPEM, caCertPEM, caKeyPEM []byte, subject, san string) ([]byte, error) {
+	csrFile := h.TempFile("cert.csr", csrPEM)
+	caCertFile := h.TempFile("ca_cert.pem", caCertPEM)
+	caKeyFile := h.TempFile("ca_key.pem", caKeyPEM)
+	certFile := filepath.Join(h.tempDir, "signed_cert.pem")
+	confFile := h.TempFile("signing.conf", h.createSigningConfig(subject, san))
+
+	h.t.Logf("    → Signing certificate with OpenSSL CA...")
+
+	_, err := h.RunOpenSSL("x509", "-req", "-in", csrFile, "-CA", caCertFile, "-CAkey", caKeyFile,
+		"-CAcreateserial", "-out", certFile, "-days", "365", "-extensions", "v3_req", "-extfile", confFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign certificate: %v", err)
+	}
+
+	return os.ReadFile(certFile)
+}
+
+// GenerateCSRWithOpenSSL generates a certificate signing request using OpenSSL
+func (h *OpenSSLHelper) GenerateCSRWithOpenSSL(privateKeyPEM []byte, subject, san string) ([]byte, error) {
+	keyFile := h.TempFile("csr_private.pem", privateKeyPEM)
+	csrFile := filepath.Join(h.tempDir, "cert.csr")
+	confFile := h.TempFile("csr.conf", h.createCSRConfig(subject, san))
+
+	h.t.Logf("    → Generating CSR with OpenSSL...")
+
+	_, err := h.RunOpenSSL("req", "-new", "-key", keyFile, "-out", csrFile, "-config", confFile, "-batch")
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate CSR: %v", err)
+	}
+
+	return os.ReadFile(csrFile)
+}
+
+// ValidateCertificateWithOpenSSL validates a certificate using OpenSSL
+func (h *OpenSSLHelper) ValidateCertificateWithOpenSSL(certPEM []byte) error {
+	certFile := h.TempFile("validate_cert.pem", certPEM)
+
+	h.t.Logf("    → Validating certificate with OpenSSL...")
+	_, err := h.RunOpenSSL("x509", "-in", certFile, "-text", "-noout")
+	if err == nil {
+		h.t.Logf("    ✓ Certificate validation passed")
+	}
+	return err
+}
+
+// VerifyCertificateChainWithOpenSSL verifies certificate chain using OpenSSL
+func (h *OpenSSLHelper) VerifyCertificateChainWithOpenSSL(certPEM, caCertPEM []byte) error {
+	certFile := h.TempFile("verify_cert.pem", certPEM)
+	caCertFile := h.TempFile("verify_ca.pem", caCertPEM)
+
+	h.t.Logf("    → Verifying certificate chain with OpenSSL...")
+	_, err := h.RunOpenSSL("verify", "-CAfile", caCertFile, certFile)
+	if err == nil {
+		h.t.Logf("    ✓ Certificate chain verification passed")
+	}
+	return err
+}
+
+// ConvertCertPEMToDERWithOpenSSL converts certificate from PEM to DER using OpenSSL
+func (h *OpenSSLHelper) ConvertCertPEMToDERWithOpenSSL(certPEM []byte) ([]byte, error) {
+	pemFile := h.TempFile("cert.pem", certPEM)
+	derFile := filepath.Join(h.tempDir, "cert.der")
+
+	h.t.Logf("    → Converting certificate PEM to DER with OpenSSL...")
+	_, err := h.RunOpenSSL("x509", "-in", pemFile, "-outform", "DER", "-out", derFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert PEM to DER: %v", err)
+	}
+
+	return os.ReadFile(derFile)
+}
+
+// ConvertCertDERToPEMWithOpenSSL converts certificate from DER to PEM using OpenSSL
+func (h *OpenSSLHelper) ConvertCertDERToPEMWithOpenSSL(certDER []byte) ([]byte, error) {
+	derFile := h.TempFile("cert.der", certDER)
+	pemFile := filepath.Join(h.tempDir, "cert.pem")
+
+	h.t.Logf("    → Converting certificate DER to PEM with OpenSSL...")
+	_, err := h.RunOpenSSL("x509", "-in", derFile, "-inform", "DER", "-outform", "PEM", "-out", pemFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert DER to PEM: %v", err)
+	}
+
+	return os.ReadFile(pemFile)
+}
+
+// Helper functions for OpenSSL configuration files
+
+func (h *OpenSSLHelper) createOpenSSLConfig(subject, san string) []byte {
+	config := `[req]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+` + subject + `
+
+[v3_req]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment`
+
+	if san != "" {
+		config += "\nsubjectAltName = " + san
+	}
+
+	return []byte(config)
+}
+
+func (h *OpenSSLHelper) createCAConfig(subject string) []byte {
+	config := `[req]
+distinguished_name = req_distinguished_name
+x509_extensions = v3_ca
+prompt = no
+
+[req_distinguished_name]
+` + subject + `
+
+[v3_ca]
+basicConstraints = critical,CA:true
+keyUsage = critical, digitalSignature, cRLSign, keyCertSign
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer`
+
+	return []byte(config)
+}
+
+func (h *OpenSSLHelper) createCSRConfig(subject, san string) []byte {
+	config := `[req]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+` + subject + `
+
+[v3_req]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment`
+
+	if san != "" {
+		config += "\nsubjectAltName = " + san
+	}
+
+	return []byte(config)
+}
+
+func (h *OpenSSLHelper) createSigningConfig(subject, san string) []byte {
+	config := `[v3_req]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth, clientAuth`
+
+	if san != "" {
+		config += "\nsubjectAltName = " + san
+	}
+
+	return []byte(config)
+}

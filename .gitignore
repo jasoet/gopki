@@ -233,6 +233,8 @@ examples/certificates/certificates
 examples/encryption/encryption
 
 compatibility/testdata/
+compatibility/cert/testdata
+compatibility/keypair/testdata
 
 # Node.js / Semantic Release
 node_modules/
