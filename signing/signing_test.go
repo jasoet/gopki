@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
+	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
 	"os"
@@ -979,5 +980,583 @@ func TestSignData(t *testing.T) {
 	// Should include certificate by default
 	if signature.Certificate == nil {
 		t.Error("Expected certificate to be included by default")
+	}
+}
+
+// TestVerifyECDSASignature tests the verifyECDSASignature function (0% coverage)
+func TestVerifyECDSASignature(t *testing.T) {
+	// Generate ECDSA key pair
+	ecdsaManager, err := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
+	if err != nil {
+		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
+	}
+	ecdsaKeyPair := ecdsaManager.KeyPair()
+
+	// Create certificate
+	ecdsaCert, err := cert.CreateSelfSignedCertificate(ecdsaKeyPair, cert.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "Test ECDSA Verifier",
+		},
+		ValidFor: 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create ECDSA certificate: %v", err)
+	}
+
+	testData := []byte("Test data for ECDSA verification")
+
+	// Create signature
+	signature, err := SignDocument(testData, ecdsaKeyPair, ecdsaCert, SignOptions{
+		HashAlgorithm:      crypto.SHA256,
+		Format:             FormatRaw,
+		IncludeCertificate: true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create ECDSA signature: %v", err)
+	}
+
+	// Test successful verification
+	err = VerifySignature(testData, signature, DefaultVerifyOptions())
+	if err != nil {
+		t.Errorf("ECDSA signature verification should succeed: %v", err)
+	}
+
+	// Test with wrong data
+	wrongData := []byte("Wrong data")
+	err = VerifySignature(wrongData, signature, DefaultVerifyOptions())
+	if err == nil {
+		t.Error("ECDSA verification should fail with wrong data")
+	}
+
+	// Test with corrupted signature
+	corruptedSig := &Signature{
+		Algorithm:     signature.Algorithm,
+		HashAlgorithm: signature.HashAlgorithm,
+		Data:          append([]byte{0xFF}, signature.Data...),
+		Certificate:   signature.Certificate,
+	}
+	err = VerifySignature(testData, corruptedSig, DefaultVerifyOptions())
+	if err == nil {
+		t.Error("ECDSA verification should fail with corrupted signature")
+	}
+}
+
+// TestVerifyEd25519Signature tests the verifyEd25519Signature function (0% coverage)
+func TestVerifyEd25519Signature(t *testing.T) {
+	// Generate Ed25519 key pair
+	ed25519Manager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey]("")
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
+	}
+	ed25519KeyPair := ed25519Manager.KeyPair()
+
+	// Create certificate
+	ed25519Cert, err := cert.CreateSelfSignedCertificate(ed25519KeyPair, cert.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "Test Ed25519 Verifier",
+		},
+		ValidFor: 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Ed25519 certificate: %v", err)
+	}
+
+	testData := []byte("Test data for Ed25519 verification")
+
+	// Create signature
+	signature, err := SignDocument(testData, ed25519KeyPair, ed25519Cert, SignOptions{
+		HashAlgorithm:      crypto.SHA256,
+		Format:             FormatRaw,
+		IncludeCertificate: true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Ed25519 signature: %v", err)
+	}
+
+	// Test successful verification
+	err = VerifySignature(testData, signature, DefaultVerifyOptions())
+	if err != nil {
+		t.Errorf("Ed25519 signature verification should succeed: %v", err)
+	}
+
+	// Test with wrong data
+	wrongData := []byte("Wrong data for Ed25519")
+	err = VerifySignature(wrongData, signature, DefaultVerifyOptions())
+	if err == nil {
+		t.Error("Ed25519 verification should fail with wrong data")
+	}
+
+	// Test with corrupted signature
+	corruptedSig := &Signature{
+		Algorithm:     signature.Algorithm,
+		HashAlgorithm: signature.HashAlgorithm,
+		Data:          append([]byte{0xFF}, signature.Data...),
+		Certificate:   signature.Certificate,
+	}
+	err = VerifySignature(testData, corruptedSig, DefaultVerifyOptions())
+	if err == nil {
+		t.Error("Ed25519 verification should fail with corrupted signature")
+	}
+}
+
+// TestVerifyDetachedSignature tests the VerifyDetachedSignature function (0% coverage)
+func TestVerifyDetachedSignature(t *testing.T) {
+	// Generate RSA key pair for testing
+	rsaManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA key pair: %v", err)
+	}
+	rsaKeyPair := rsaManager.KeyPair()
+
+	// Create certificate
+	rsaCert, err := cert.CreateSelfSignedCertificate(rsaKeyPair, cert.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "Test Detached Signer",
+		},
+		ValidFor: 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create RSA certificate: %v", err)
+	}
+
+	testData := []byte("Test data for detached signature verification")
+
+	// Create a regular signature first to extract raw signature bytes
+	signature, err := SignDocument(testData, rsaKeyPair, rsaCert, SignOptions{
+		HashAlgorithm: crypto.SHA256,
+		Format:        FormatRaw,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create signature: %v", err)
+	}
+
+	// Test successful detached verification
+	err = VerifyDetachedSignature(testData, signature.Data, rsaCert.Certificate, crypto.SHA256)
+	if err != nil {
+		t.Errorf("Detached signature verification should succeed: %v", err)
+	}
+
+	// Test with wrong data
+	wrongData := []byte("Wrong data for detached")
+	err = VerifyDetachedSignature(wrongData, signature.Data, rsaCert.Certificate, crypto.SHA256)
+	if err == nil {
+		t.Error("Detached verification should fail with wrong data")
+	}
+
+	// Test with nil certificate
+	err = VerifyDetachedSignature(testData, signature.Data, nil, crypto.SHA256)
+	if err == nil {
+		t.Error("Detached verification should fail with nil certificate")
+	}
+
+	// Test with wrong hash algorithm
+	err = VerifyDetachedSignature(testData, signature.Data, rsaCert.Certificate, crypto.SHA512)
+	if err == nil {
+		t.Error("Detached verification should fail with wrong hash algorithm")
+	}
+
+	// Test with ECDSA
+	ecdsaManager, err := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
+	if err != nil {
+		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
+	}
+	ecdsaKeyPair := ecdsaManager.KeyPair()
+
+	ecdsaCert, err := cert.CreateSelfSignedCertificate(ecdsaKeyPair, cert.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "Test ECDSA Detached Signer",
+		},
+		ValidFor: 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create ECDSA certificate: %v", err)
+	}
+
+	ecdsaSignature, err := SignDocument(testData, ecdsaKeyPair, ecdsaCert, SignOptions{
+		HashAlgorithm: crypto.SHA256,
+		Format:        FormatRaw,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create ECDSA signature: %v", err)
+	}
+
+	err = VerifyDetachedSignature(testData, ecdsaSignature.Data, ecdsaCert.Certificate, crypto.SHA256)
+	if err != nil {
+		t.Errorf("ECDSA detached signature verification should succeed: %v", err)
+	}
+}
+
+// TestVerifyCertificateChain tests the verifyCertificateChain function (0% coverage)
+func TestVerifyCertificateChain(t *testing.T) {
+	// Create root CA
+	rootCAManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate root CA key pair: %v", err)
+	}
+	rootCAKeyPair := rootCAManager.KeyPair()
+
+	rootCACert, err := cert.CreateCACertificate(rootCAKeyPair, cert.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName:   "Test Root CA",
+			Organization: []string{"Test Org"},
+			Country:      []string{"US"},
+		},
+		ValidFor: 365 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create root CA certificate: %v", err)
+	}
+
+	// Create end-entity certificate signed by root CA
+	endEntityManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate end-entity key pair: %v", err)
+	}
+	endEntityKeyPair := endEntityManager.KeyPair()
+
+	endEntityCert, err := cert.SignCertificate(rootCACert, rootCAKeyPair, cert.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "Test End Entity",
+		},
+		ValidFor: 30 * 24 * time.Hour,
+	}, endEntityKeyPair.PublicKey)
+	if err != nil {
+		t.Fatalf("Failed to create end-entity certificate: %v", err)
+	}
+
+	// Test certificate chain verification through signature verification
+	testData := []byte("Test data for certificate chain verification")
+
+	signature, err := SignDocument(testData, endEntityKeyPair, endEntityCert, SignOptions{
+		HashAlgorithm:      crypto.SHA256,
+		Format:             FormatRaw,
+		IncludeCertificate: true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create signature: %v", err)
+	}
+
+	// No intermediate certificates needed for direct root CA signing
+
+	// Create root certificate pool
+	rootPool := x509.NewCertPool()
+	rootPool.AddCert(rootCACert.Certificate)
+
+	// Test successful chain verification
+	verifyOpts := VerifyOptions{
+		VerifyChain: true,
+		Roots:       rootPool,
+	}
+
+	err = VerifySignature(testData, signature, verifyOpts)
+	if err != nil {
+		t.Errorf("Certificate chain verification should succeed: %v", err)
+	}
+
+	// Test chain verification failure with wrong root
+	wrongRootManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate wrong root key pair: %v", err)
+	}
+	wrongRootKeyPair := wrongRootManager.KeyPair()
+
+	wrongRootCert, err := cert.CreateCACertificate(wrongRootKeyPair, cert.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "Wrong Root CA",
+		},
+		ValidFor: 365 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wrong root CA certificate: %v", err)
+	}
+
+	wrongRootPool := x509.NewCertPool()
+	wrongRootPool.AddCert(wrongRootCert.Certificate)
+
+	wrongVerifyOpts := VerifyOptions{
+		VerifyChain: true,
+		Roots:       wrongRootPool,
+	}
+
+	err = VerifySignature(testData, signature, wrongVerifyOpts)
+	if err == nil {
+		t.Error("Certificate chain verification should fail with wrong root")
+	}
+
+	// Test without chain verification (should succeed)
+	noChainOpts := DefaultVerifyOptions()
+	noChainOpts.VerifyChain = false
+
+	err = VerifySignature(testData, signature, noChainOpts)
+	if err != nil {
+		t.Errorf("Signature verification without chain check should succeed: %v", err)
+	}
+}
+
+// TestVerifyTimestamp tests the VerifyTimestamp function (0% coverage)
+func TestVerifyTimestamp(t *testing.T) {
+	// Generate key pair for signature
+	manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate key pair: %v", err)
+	}
+	keyPair := manager.KeyPair()
+
+	// Create certificate
+	certificate, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "Test Timestamp Signer",
+		},
+		ValidFor: 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create certificate: %v", err)
+	}
+
+	testData := []byte("Test data for timestamp verification")
+
+	// Create signature
+	signature, err := SignDocument(testData, keyPair, certificate, SignOptions{
+		HashAlgorithm: crypto.SHA256,
+		Format:        FormatRaw,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create signature: %v", err)
+	}
+
+	// Test signature without timestamp
+	err = VerifyTimestamp(signature, DefaultVerifyOptions())
+	if err == nil {
+		t.Error("Timestamp verification should fail when signature has no timestamp")
+	}
+
+	// Create timestamp authority certificate
+	tsaManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate TSA key pair: %v", err)
+	}
+	tsaKeyPair := tsaManager.KeyPair()
+
+	tsaCert, err := cert.CreateSelfSignedCertificate(tsaKeyPair, cert.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "Test TSA",
+		},
+		ValidFor: 365 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create TSA certificate: %v", err)
+	}
+
+	// Add timestamp to signature
+	signature.Timestamp = &Timestamp{
+		Time:        time.Now(),
+		Certificate: tsaCert.Certificate,
+		Token:       []byte("mock_timestamp_token"),
+	}
+
+	// Test successful timestamp verification
+	err = VerifyTimestamp(signature, DefaultVerifyOptions())
+	if err != nil {
+		t.Errorf("Timestamp verification should succeed: %v", err)
+	}
+
+	// Test with expired timestamp certificate
+	expiredTSACert, err := cert.CreateSelfSignedCertificate(tsaKeyPair, cert.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "Expired TSA",
+		},
+		ValidFor: -24 * time.Hour, // Already expired
+	})
+	if err != nil {
+		t.Fatalf("Failed to create expired TSA certificate: %v", err)
+	}
+
+	signature.Timestamp.Certificate = expiredTSACert.Certificate
+
+	err = VerifyTimestamp(signature, DefaultVerifyOptions())
+	if err == nil {
+		t.Error("Timestamp verification should fail with expired TSA certificate")
+	}
+
+	// Test with empty timestamp token
+	signature.Timestamp.Certificate = tsaCert.Certificate
+	signature.Timestamp.Token = []byte{}
+
+	err = VerifyTimestamp(signature, DefaultVerifyOptions())
+	if err == nil {
+		t.Error("Timestamp verification should fail with empty token")
+	}
+
+	// Test with nil timestamp certificate
+	signature.Timestamp.Certificate = nil
+	signature.Timestamp.Token = []byte("mock_token")
+
+	err = VerifyTimestamp(signature, DefaultVerifyOptions())
+	if err != nil {
+		t.Errorf("Timestamp verification should succeed with nil certificate: %v", err)
+	}
+}
+
+// TestExtractCertificateFromSignature tests the ExtractCertificateFromSignature function (0% coverage)
+func TestExtractCertificateFromSignature(t *testing.T) {
+	// Generate key pair and certificate
+	manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate key pair: %v", err)
+	}
+	keyPair := manager.KeyPair()
+
+	certificate, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "Test Certificate Extractor",
+		},
+		ValidFor: 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create certificate: %v", err)
+	}
+
+	testData := []byte("Test data for certificate extraction")
+
+	// Create signature
+	signature, err := SignDocument(testData, keyPair, certificate, SignOptions{
+		HashAlgorithm:      crypto.SHA256,
+		Format:             FormatRaw,
+		IncludeCertificate: true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create signature: %v", err)
+	}
+
+	// Test successful certificate extraction
+	extractedCert, err := ExtractCertificateFromSignature(signature)
+	if err != nil {
+		t.Errorf("Certificate extraction should succeed: %v", err)
+	}
+
+	if extractedCert == nil {
+		t.Error("Extracted certificate should not be nil")
+	}
+
+	if extractedCert.Subject.CommonName != "Test Certificate Extractor" {
+		t.Errorf("Expected common name 'Test Certificate Extractor', got '%s'", extractedCert.Subject.CommonName)
+	}
+
+	// Test with nil signature
+	_, err = ExtractCertificateFromSignature(nil)
+	if err == nil {
+		t.Error("Certificate extraction should fail with nil signature")
+	}
+
+	// Test with signature that has no certificate
+	sigWithoutCert := &Signature{
+		Algorithm:     signature.Algorithm,
+		HashAlgorithm: signature.HashAlgorithm,
+		Data:          signature.Data,
+		Certificate:   nil,
+	}
+
+	_, err = ExtractCertificateFromSignature(sigWithoutCert)
+	if err == nil {
+		t.Error("Certificate extraction should fail when signature has no certificate")
+	}
+}
+
+// TestExtractCertificateChainFromSignature tests the ExtractCertificateChainFromSignature function (0% coverage)
+func TestExtractCertificateChainFromSignature(t *testing.T) {
+	// Generate key pairs for CA and end entity
+	caManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate CA key pair: %v", err)
+	}
+	caKeyPair := caManager.KeyPair()
+
+	caCert, err := cert.CreateCACertificate(caKeyPair, cert.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "Test CA for Chain",
+		},
+		ValidFor: 365 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create CA certificate: %v", err)
+	}
+
+	endEntityManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate end entity key pair: %v", err)
+	}
+	endEntityKeyPair := endEntityManager.KeyPair()
+
+	endEntityCert, err := cert.SignCertificate(caCert, caKeyPair, cert.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "Test End Entity for Chain",
+		},
+		ValidFor: 30 * 24 * time.Hour,
+	}, endEntityKeyPair.PublicKey)
+	if err != nil {
+		t.Fatalf("Failed to create end entity certificate: %v", err)
+	}
+
+	testData := []byte("Test data for certificate chain extraction")
+
+	// Create signature
+	signature, err := SignDocument(testData, endEntityKeyPair, endEntityCert, SignOptions{
+		HashAlgorithm:      crypto.SHA256,
+		Format:             FormatRaw,
+		IncludeCertificate: true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create signature: %v", err)
+	}
+
+	// Add certificate chain to signature
+	signature.CertificateChain = []*x509.Certificate{caCert.Certificate}
+
+	// Test successful certificate chain extraction
+	extractedChain, err := ExtractCertificateChainFromSignature(signature)
+	if err != nil {
+		t.Errorf("Certificate chain extraction should succeed: %v", err)
+	}
+
+	if len(extractedChain) != 1 {
+		t.Errorf("Expected 1 certificate in chain, got %d", len(extractedChain))
+	}
+
+	if extractedChain[0].Subject.CommonName != "Test CA for Chain" {
+		t.Errorf("Expected CA common name 'Test CA for Chain', got '%s'", extractedChain[0].Subject.CommonName)
+	}
+
+	// Test with nil signature
+	_, err = ExtractCertificateChainFromSignature(nil)
+	if err == nil {
+		t.Error("Certificate chain extraction should fail with nil signature")
+	}
+
+	// Test with signature that has no certificate chain
+	sigWithoutChain := &Signature{
+		Algorithm:        signature.Algorithm,
+		HashAlgorithm:    signature.HashAlgorithm,
+		Data:             signature.Data,
+		Certificate:      signature.Certificate,
+		CertificateChain: nil,
+	}
+
+	_, err = ExtractCertificateChainFromSignature(sigWithoutChain)
+	if err == nil {
+		t.Error("Certificate chain extraction should fail when signature has no certificate chain")
+	}
+
+	// Test with empty certificate chain
+	sigWithEmptyChain := &Signature{
+		Algorithm:        signature.Algorithm,
+		HashAlgorithm:    signature.HashAlgorithm,
+		Data:             signature.Data,
+		Certificate:      signature.Certificate,
+		CertificateChain: []*x509.Certificate{},
+	}
+
+	_, err = ExtractCertificateChainFromSignature(sigWithEmptyChain)
+	if err == nil {
+		t.Error("Certificate chain extraction should fail when signature has empty certificate chain")
 	}
 }

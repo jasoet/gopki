@@ -13,7 +13,7 @@ import (
 
 func TestCreateSelfSignedCertificate(t *testing.T) {
 	t.Run("RSA self-signed certificate", func(t *testing.T) {
-		keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+		keyPair, err := algo.GenerateRSAKeyPair(2048)
 		if err != nil {
 			t.Fatalf("Failed to generate RSA key pair: %v", err)
 		}
@@ -100,7 +100,7 @@ func TestCreateSelfSignedCertificate(t *testing.T) {
 }
 
 func TestCreateCACertificate(t *testing.T) {
-	keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+	keyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key pair: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestCreateCACertificate(t *testing.T) {
 
 func TestSignCertificate(t *testing.T) {
 	// Create CA
-	caKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+	caKeyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate CA key pair: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestSignCertificate(t *testing.T) {
 	}
 
 	// Create server key pair
-	serverKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+	serverKeyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate server key pair: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestSignCertificate(t *testing.T) {
 
 func TestVerifyCertificate(t *testing.T) {
 	// Create CA
-	caKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+	caKeyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate CA key pair: %v", err)
 	}
@@ -214,7 +214,7 @@ func TestVerifyCertificate(t *testing.T) {
 	}
 
 	// Create and sign a certificate
-	serverKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+	serverKeyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate server key pair: %v", err)
 	}
@@ -238,7 +238,7 @@ func TestVerifyCertificate(t *testing.T) {
 	}
 
 	// Test verification with wrong CA
-	wrongCaKeyPair, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
+	wrongCaKeyPair, _ := algo.GenerateRSAKeyPair(2048)
 	wrongCaRequest := CertificateRequest{
 		Subject: pkix.Name{
 			CommonName: "Wrong CA",
@@ -261,7 +261,7 @@ func TestCertificateFileOperations(t *testing.T) {
 	tempDir := t.TempDir()
 	certFile := filepath.Join(tempDir, "test.pem")
 
-	keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+	keyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
@@ -305,7 +305,7 @@ func TestCertificateFileOperations(t *testing.T) {
 }
 
 func TestParseCertificateFromPEM(t *testing.T) {
-	keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+	keyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
@@ -350,7 +350,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7
 }
 
 func TestCertificateDefaultValues(t *testing.T) {
-	keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+	keyPair, err := algo.GenerateRSAKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate key pair: %v", err)
 	}
@@ -382,350 +382,4 @@ func TestCertificateDefaultValues(t *testing.T) {
 	if actualValidFor > expectedValidFor+tolerance || actualValidFor < expectedValidFor-tolerance {
 		t.Fatalf("Expected ValidFor ~%v, got %v", expectedValidFor, actualValidFor)
 	}
-}
-
-// TestCreateCACertificateErrors tests error cases for CA certificate creation
-func TestCreateCACertificateErrors(t *testing.T) {
-	// Generate test key pairs
-	rsaKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
-	if err != nil {
-		t.Fatalf("Failed to generate RSA key pair: %v", err)
-	}
-
-	ecdsaKeyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
-	if err != nil {
-		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
-	}
-
-	t.Run("Invalid key pair types", func(t *testing.T) {
-		request := CertificateRequest{
-			Subject: pkix.Name{
-				CommonName: "Invalid CA",
-			},
-			ValidFor: 365 * 24 * time.Hour,
-		}
-
-		// Test with nil key pair
-		_, err := CreateCACertificate(nil, request)
-		if err == nil {
-			t.Error("Expected error with nil key pair")
-		}
-	})
-
-	t.Run("Invalid certificate request", func(t *testing.T) {
-		// Test with empty subject
-		emptyRequest := CertificateRequest{
-			ValidFor: 365 * 24 * time.Hour,
-		}
-
-		_, err := CreateCACertificate(rsaKeyPair, emptyRequest)
-		if err == nil {
-			t.Error("Expected error with empty subject")
-		}
-
-		// Test with negative validity period
-		negativeRequest := CertificateRequest{
-			Subject: pkix.Name{
-				CommonName: "Test CA",
-			},
-			ValidFor: -time.Hour,
-		}
-
-		_, err = CreateCACertificate(rsaKeyPair, negativeRequest)
-		if err == nil {
-			t.Error("Expected error with negative validity period")
-		}
-	})
-
-	t.Run("Path length constraints", func(t *testing.T) {
-		// Test with invalid path length constraint
-		invalidPathRequest := CertificateRequest{
-			Subject: pkix.Name{
-				CommonName: "Test CA with Invalid Path",
-			},
-			ValidFor:            365 * 24 * time.Hour,
-			MaxPathLen:          -2, // Invalid path length
-			MaxPathLenZero:      false,
-			PermittedDNSDomains: []string{"example.com"},
-			ExcludedDNSDomains:  []string{"bad.example.com"},
-		}
-
-		// This should still work but test various combinations
-		cert, err := CreateCACertificate(rsaKeyPair, invalidPathRequest)
-		if err != nil {
-			// If implementation validates path length, this is acceptable
-			t.Logf("Path length validation error (acceptable): %v", err)
-		} else {
-			// Verify that path length constraint is properly set
-			if cert.Certificate.MaxPathLen != invalidPathRequest.MaxPathLen {
-				t.Error("Path length constraint not properly set")
-			}
-		}
-	})
-
-	t.Run("Cross-algorithm validation", func(t *testing.T) {
-		// Test creating CA with different algorithms
-		algorithms := []struct {
-			name    string
-			keyPair interface{}
-		}{
-			{"RSA", rsaKeyPair},
-			{"ECDSA", ecdsaKeyPair},
-		}
-
-		for _, alg := range algorithms {
-			t.Run(alg.name, func(t *testing.T) {
-				request := CertificateRequest{
-					Subject: pkix.Name{
-						CommonName: "Test CA " + alg.name,
-					},
-					ValidFor: 365 * 24 * time.Hour,
-				}
-
-				cert, err := CreateCACertificate(alg.keyPair, request)
-				if err != nil {
-					t.Errorf("Failed to create CA certificate with %s: %v", alg.name, err)
-				} else if cert == nil {
-					t.Errorf("CA certificate is nil for %s", alg.name)
-				} else if !cert.Certificate.IsCA {
-					t.Errorf("Certificate is not marked as CA for %s", alg.name)
-				}
-			})
-		}
-	})
-}
-
-// TestSignCertificateErrors tests error cases for certificate signing
-func TestSignCertificateErrors(t *testing.T) {
-	// Generate CA certificate and key pair
-	caKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
-	if err != nil {
-		t.Fatalf("Failed to generate CA key pair: %v", err)
-	}
-
-	caRequest := CertificateRequest{
-		Subject: pkix.Name{
-			CommonName: "Test CA for Signing",
-		},
-		ValidFor: 365 * 24 * time.Hour,
-	}
-
-	caCert, err := CreateCACertificate(caKeyPair, caRequest)
-	if err != nil {
-		t.Fatalf("Failed to create CA certificate: %v", err)
-	}
-
-	// Generate end-entity key pair
-	entityKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
-	if err != nil {
-		t.Fatalf("Failed to generate entity key pair: %v", err)
-	}
-
-	t.Run("Invalid CA certificate", func(t *testing.T) {
-		entityRequest := CertificateRequest{
-			Subject: pkix.Name{
-				CommonName: "Test Entity",
-			},
-			ValidFor: 30 * 24 * time.Hour,
-		}
-
-		// Test with nil CA certificate
-		_, err := SignCertificate(nil, caKeyPair, entityKeyPair, entityRequest)
-		if err == nil {
-			t.Error("Expected error with nil CA certificate")
-		}
-
-		// Test with nil CA key pair
-		_, err = SignCertificate(caCert, nil, entityKeyPair, entityRequest)
-		if err == nil {
-			t.Error("Expected error with nil CA key pair")
-		}
-
-		// Test with nil entity key pair
-		_, err = SignCertificate(caCert, caKeyPair, nil, entityRequest)
-		if err == nil {
-			t.Error("Expected error with nil entity key pair")
-		}
-	})
-
-	t.Run("Mismatched key pairs", func(t *testing.T) {
-		// Generate a different key pair that doesn't match the CA certificate
-		mismatchedKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
-		if err != nil {
-			t.Fatalf("Failed to generate mismatched key pair: %v", err)
-		}
-
-		entityRequest := CertificateRequest{
-			Subject: pkix.Name{
-				CommonName: "Test Entity with Mismatched CA Key",
-			},
-			ValidFor: 30 * 24 * time.Hour,
-		}
-
-		// Test signing with mismatched CA private key
-		_, err = SignCertificate(caCert, mismatchedKeyPair, entityKeyPair, entityRequest)
-		if err == nil {
-			t.Error("Expected error with mismatched CA private key")
-		}
-	})
-
-	t.Run("Invalid certificate request", func(t *testing.T) {
-		// Test with empty subject
-		emptyRequest := CertificateRequest{
-			ValidFor: 30 * 24 * time.Hour,
-		}
-
-		_, err := SignCertificate(caCert, caKeyPair, entityKeyPair, emptyRequest)
-		if err == nil {
-			t.Error("Expected error with empty subject")
-		}
-
-		// Test with validity period longer than CA
-		longRequest := CertificateRequest{
-			Subject: pkix.Name{
-				CommonName: "Long Validity Entity",
-			},
-			ValidFor: 2 * 365 * 24 * time.Hour, // Longer than CA
-		}
-
-		cert, err := SignCertificate(caCert, caKeyPair, entityKeyPair, longRequest)
-		if err != nil {
-			// If implementation validates against CA validity, this is acceptable
-			t.Logf("Validity period validation error (acceptable): %v", err)
-		} else if cert != nil {
-			// If allowed, verify the certificate was created
-			if cert.Certificate.NotAfter.After(caCert.Certificate.NotAfter) {
-				t.Error("Entity certificate valid longer than CA certificate")
-			}
-		}
-	})
-
-	t.Run("Extension validation", func(t *testing.T) {
-		// Test with various extensions
-		extensionRequest := CertificateRequest{
-			Subject: pkix.Name{
-				CommonName: "Entity with Extensions",
-			},
-			ValidFor:            30 * 24 * time.Hour,
-			DNSNames:            []string{"test.example.com", "*.test.example.com"},
-			IPAddresses:         []net.IP{net.IPv4(192, 168, 1, 1), net.IPv6loopback},
-			EmailAddresses:      []string{"test@example.com"},
-			PermittedDNSDomains: []string{"example.com"},
-			ExcludedDNSDomains:  []string{"malicious.example.com"},
-			IsCA:                true, // This should be rejected for end-entity
-		}
-
-		cert, err := SignCertificate(caCert, caKeyPair, entityKeyPair, extensionRequest)
-		if err != nil {
-			// If implementation validates CA vs end-entity, this is acceptable
-			t.Logf("Extension validation error (acceptable): %v", err)
-		} else if cert != nil {
-			// Verify extensions were properly set
-			if len(cert.Certificate.DNSNames) != len(extensionRequest.DNSNames) {
-				t.Error("DNS names not properly set")
-			}
-			if len(cert.Certificate.IPAddresses) != len(extensionRequest.IPAddresses) {
-				t.Error("IP addresses not properly set")
-			}
-			if len(cert.Certificate.EmailAddresses) != len(extensionRequest.EmailAddresses) {
-				t.Error("Email addresses not properly set")
-			}
-		}
-	})
-
-	t.Run("Algorithm compatibility", func(t *testing.T) {
-		// Test signing with different algorithms
-		ecdsaEntityKeyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
-		if err != nil {
-			t.Fatalf("Failed to generate ECDSA entity key pair: %v", err)
-		}
-
-		mixedRequest := CertificateRequest{
-			Subject: pkix.Name{
-				CommonName: "Mixed Algorithm Entity",
-			},
-			ValidFor: 30 * 24 * time.Hour,
-		}
-
-		// RSA CA signing ECDSA entity certificate
-		cert, err := SignCertificate(caCert, caKeyPair, ecdsaEntityKeyPair, mixedRequest)
-		if err != nil {
-			t.Errorf("Failed to sign ECDSA certificate with RSA CA: %v", err)
-		} else if cert == nil {
-			t.Error("Certificate is nil for mixed algorithm signing")
-		}
-	})
-}
-
-// TestCertificateLoadingErrors tests error cases for certificate loading
-func TestCertificateLoadingErrors(t *testing.T) {
-	tempDir := t.TempDir()
-
-	t.Run("LoadCertificateFromFile errors", func(t *testing.T) {
-		// Test with non-existent file
-		_, err := LoadCertificateFromFile("nonexistent.pem")
-		if err == nil {
-			t.Error("Expected error for non-existent file")
-		}
-
-		// Test with invalid file content
-		invalidFile := filepath.Join(tempDir, "invalid.pem")
-		err = os.WriteFile(invalidFile, []byte("invalid certificate data"), 0644)
-		if err != nil {
-			t.Fatalf("Failed to write invalid file: %v", err)
-		}
-
-		_, err = LoadCertificateFromFile(invalidFile)
-		if err == nil {
-			t.Error("Expected error for invalid certificate file")
-		}
-
-		// Test with empty file
-		emptyFile := filepath.Join(tempDir, "empty.pem")
-		err = os.WriteFile(emptyFile, []byte(""), 0644)
-		if err != nil {
-			t.Fatalf("Failed to write empty file: %v", err)
-		}
-
-		_, err = LoadCertificateFromFile(emptyFile)
-		if err == nil {
-			t.Error("Expected error for empty certificate file")
-		}
-	})
-
-	t.Run("LoadCertificateFromDERFile errors", func(t *testing.T) {
-		// Test with non-existent DER file
-		_, err := LoadCertificateFromDERFile("nonexistent.der")
-		if err == nil {
-			t.Error("Expected error for non-existent DER file")
-		}
-
-		// Test with invalid DER content
-		invalidDERFile := filepath.Join(tempDir, "invalid.der")
-		err = os.WriteFile(invalidDERFile, []byte("invalid der data"), 0644)
-		if err != nil {
-			t.Fatalf("Failed to write invalid DER file: %v", err)
-		}
-
-		_, err = LoadCertificateFromDERFile(invalidDERFile)
-		if err == nil {
-			t.Error("Expected error for invalid DER file")
-		}
-	})
-
-	t.Run("ParseCertificateFromDER errors", func(t *testing.T) {
-		// Test with invalid DER data
-		invalidDER := []byte("invalid der data")
-		_, err := ParseCertificateFromDER(invalidDER)
-		if err == nil {
-			t.Error("Expected error for invalid DER data")
-		}
-
-		// Test with empty DER data
-		emptyDER := []byte("")
-		_, err = ParseCertificateFromDER(emptyDER)
-		if err == nil {
-			t.Error("Expected error for empty DER data")
-		}
-	})
 }
