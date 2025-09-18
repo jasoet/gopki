@@ -114,8 +114,6 @@ type VerifyOptions struct {
 	Intermediates *x509.CertPool
 	// Time to verify certificate validity (default: now)
 	VerifyTime time.Time
-	// Skip expiration check
-	SkipExpirationCheck bool
 }
 
 // Common errors
@@ -168,7 +166,6 @@ func DefaultSignOptions() SignOptions {
 //   - RequiredKeyUsage: x509.KeyUsageDigitalSignature (requires digital signature capability)
 //   - VerifyChain: false (skips certificate chain verification for self-signed certificates)
 //   - VerifyTime: time.Now() (verifies certificate validity at current time)
-//   - SkipExpirationCheck: false (enforces certificate validity period)
 //
 // For production environments with proper PKI infrastructure, consider enabling
 // chain verification and providing root/intermediate certificate pools.

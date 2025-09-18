@@ -93,16 +93,17 @@ func SignDocument[T keypair.KeyPair](data []byte, keyPair T, certificate *cert.C
 
 	var signatureData []byte
 
-	// Ed25519 is not supported by Mozilla PKCS7 library, use raw signature for Ed25519
+	// Hybrid approach: PKCS#7 for RSA/ECDSA, raw signatures for Ed25519
 	if algorithm == AlgorithmEd25519 {
-		// For Ed25519, create a raw signature and wrap it in a simple structure
+		// Ed25519 is not supported by current PKCS#7 libraries (RFC 8419 not implemented)
+		// Use raw signature approach for Ed25519
 		rawSig, err := privateKey.Sign(rand.Reader, data, crypto.Hash(0))
 		if err != nil {
-			return nil, fmt.Errorf("failed to sign data: %w", err)
+			return nil, fmt.Errorf("failed to sign data with Ed25519: %w", err)
 		}
 		signatureData = rawSig
 	} else {
-		// Use Mozilla PKCS#7 library for RSA and ECDSA
+		// Use PKCS#7 for RSA and ECDSA
 		signedData, err := pkcs7.NewSignedData(data)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create signed data: %w", err)

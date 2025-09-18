@@ -5,6 +5,7 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -254,14 +255,6 @@ func TestCertificateValidation(t *testing.T) {
 	err = VerifySignature(testData, signature, DefaultVerifyOptions())
 	if err != ErrCertificateExpired {
 		t.Errorf("Expected ErrCertificateExpired, got %v", err)
-	}
-
-	// Verify with expiration check disabled
-	opts := DefaultVerifyOptions()
-	opts.SkipExpirationCheck = true
-	err = VerifySignature(testData, signature, opts)
-	if err != nil {
-		t.Errorf("Expected verification to succeed with SkipExpirationCheck, got %v", err)
 	}
 }
 
@@ -1023,7 +1016,7 @@ func TestVerifyECDSASignature(t *testing.T) {
 	// Create signature
 	signature, err := SignDocument(testData, ecdsaKeyPair, ecdsaCert, SignOptions{
 		HashAlgorithm:      crypto.SHA256,
-		Format:             FormatPKCS7,
+		Format:             FormatPKCS7Detached,
 		IncludeCertificate: true,
 	})
 	if err != nil {
@@ -1136,36 +1129,39 @@ func TestVerifyDetachedSignature(t *testing.T) {
 
 	testData := []byte("Test data for detached signature verification")
 
-	// Create a regular signature first to extract raw signature bytes
-	signature, err := SignDocument(testData, rsaKeyPair, rsaCert, SignOptions{
-		HashAlgorithm: crypto.SHA256,
-		Format:        FormatPKCS7,
-	})
+	// Create a raw signature for detached verification
+	// First compute the hash
+	hasher := crypto.SHA256.New()
+	hasher.Write(testData)
+	digest := hasher.Sum(nil)
+
+	// Sign the digest directly
+	rawSigBytes, err := rsaKeyPair.PrivateKey.Sign(rand.Reader, digest, crypto.SHA256)
 	if err != nil {
-		t.Fatalf("Failed to create signature: %v", err)
+		t.Fatalf("Failed to create raw signature: %v", err)
 	}
 
 	// Test successful detached verification
-	err = VerifyDetachedSignature(testData, signature.Data, rsaCert.Certificate, crypto.SHA256)
+	err = VerifyDetachedSignature(testData, rawSigBytes, rsaCert.Certificate, crypto.SHA256)
 	if err != nil {
 		t.Errorf("Detached signature verification should succeed: %v", err)
 	}
 
 	// Test with wrong data
 	wrongData := []byte("Wrong data for detached")
-	err = VerifyDetachedSignature(wrongData, signature.Data, rsaCert.Certificate, crypto.SHA256)
+	err = VerifyDetachedSignature(wrongData, rawSigBytes, rsaCert.Certificate, crypto.SHA256)
 	if err == nil {
 		t.Error("Detached verification should fail with wrong data")
 	}
 
 	// Test with nil certificate
-	err = VerifyDetachedSignature(testData, signature.Data, nil, crypto.SHA256)
+	err = VerifyDetachedSignature(testData, rawSigBytes, nil, crypto.SHA256)
 	if err == nil {
 		t.Error("Detached verification should fail with nil certificate")
 	}
 
 	// Test with wrong hash algorithm
-	err = VerifyDetachedSignature(testData, signature.Data, rsaCert.Certificate, crypto.SHA512)
+	err = VerifyDetachedSignature(testData, rawSigBytes, rsaCert.Certificate, crypto.SHA512)
 	if err == nil {
 		t.Error("Detached verification should fail with wrong hash algorithm")
 	}
@@ -1187,15 +1183,17 @@ func TestVerifyDetachedSignature(t *testing.T) {
 		t.Fatalf("Failed to create ECDSA certificate: %v", err)
 	}
 
-	ecdsaSignature, err := SignDocument(testData, ecdsaKeyPair, ecdsaCert, SignOptions{
-		HashAlgorithm: crypto.SHA256,
-		Format:        FormatPKCS7,
-	})
+	// Create ECDSA raw signature for detached verification
+	ecdsaHasher := crypto.SHA256.New()
+	ecdsaHasher.Write(testData)
+	ecdsaDigest := ecdsaHasher.Sum(nil)
+
+	ecdsaRawSigBytes, err := ecdsaKeyPair.PrivateKey.Sign(rand.Reader, ecdsaDigest, crypto.SHA256)
 	if err != nil {
-		t.Fatalf("Failed to create ECDSA signature: %v", err)
+		t.Fatalf("Failed to create ECDSA raw signature: %v", err)
 	}
 
-	err = VerifyDetachedSignature(testData, ecdsaSignature.Data, ecdsaCert.Certificate, crypto.SHA256)
+	err = VerifyDetachedSignature(testData, ecdsaRawSigBytes, ecdsaCert.Certificate, crypto.SHA256)
 	if err != nil {
 		t.Errorf("ECDSA detached signature verification should succeed: %v", err)
 	}

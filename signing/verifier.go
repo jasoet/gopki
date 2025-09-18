@@ -64,20 +64,18 @@ func VerifySignature(data []byte, signature *Signature, opts VerifyOptions) erro
 		return ErrMissingCertificate
 	}
 
-	// Verify certificate validity period unless skipped
-	if !opts.SkipExpirationCheck {
-		now := opts.VerifyTime
-		if now.IsZero() {
-			now = time.Now()
-		}
+	// Verify certificate validity period
+	now := opts.VerifyTime
+	if now.IsZero() {
+		now = time.Now()
+	}
 
-		if now.Before(signature.Certificate.NotBefore) {
-			return ErrCertificateNotYetValid
-		}
+	if now.Before(signature.Certificate.NotBefore) {
+		return ErrCertificateNotYetValid
+	}
 
-		if now.After(signature.Certificate.NotAfter) {
-			return ErrCertificateExpired
-		}
+	if now.After(signature.Certificate.NotAfter) {
+		return ErrCertificateExpired
 	}
 
 	// Check key usage if specified
@@ -113,22 +111,17 @@ func VerifySignature(data []byte, signature *Signature, opts VerifyOptions) erro
 		}
 	}
 
-	// Use format-specific verification for non-raw formats
+	// Use hybrid verification approach
 	switch signature.Format {
 	case FormatPKCS7, FormatPKCS7Detached:
-		// Ed25519 is not supported by Mozilla PKCS7, fall back to raw verification
+		// Ed25519 uses raw signatures stored in PKCS#7 format field for consistency
 		if signature.Algorithm == AlgorithmEd25519 {
-			return verifyRawSignature(data, signature)
+			return verifyEd25519RawSignature(data, signature)
 		}
-		// If SkipExpirationCheck is enabled, use raw verification as Mozilla library
-		// performs its own certificate validation that we cannot override
-		if opts.SkipExpirationCheck {
-			return verifyRawSignature(data, signature)
-		}
+		// Use PKCS#7 verification for RSA and ECDSA
 		return verifyPKCS7SignatureFormat(data, signature, opts)
 	default:
-		// Fallback to raw signature verification for any remaining formats
-		return verifyRawSignature(data, signature)
+		return fmt.Errorf("unsupported signature format: %s", signature.Format)
 	}
 }
 
@@ -244,15 +237,30 @@ func VerifyDetachedSignature(data []byte, signatureData []byte, certificate *x50
 		return err
 	}
 
-	// Create a temporary signature object
-	sig := &Signature{
-		Algorithm:     algo,
-		HashAlgorithm: hashAlgo,
-		Data:          signatureData,
-		Certificate:   certificate,
-	}
+	// For detached signatures, verify directly using algorithm-specific functions
+	// since signatureData contains raw signature bytes, not PKCS#7 data
+	switch algo {
+	case AlgorithmRSA:
+		// Compute digest for RSA verification
+		hasher := hashAlgo.New()
+		hasher.Write(data)
+		digest := hasher.Sum(nil)
+		return verifyRSASignature(certificate.PublicKey, digest, signatureData, hashAlgo)
 
-	return VerifySignature(data, sig, DefaultVerifyOptions())
+	case AlgorithmECDSA:
+		// Compute digest for ECDSA verification
+		hasher := hashAlgo.New()
+		hasher.Write(data)
+		digest := hasher.Sum(nil)
+		return verifyECDSASignature(certificate.PublicKey, digest, signatureData, hashAlgo)
+
+	case AlgorithmEd25519:
+		// Ed25519 verifies the message directly, not a hash
+		return verifyEd25519Signature(certificate.PublicKey, data, signatureData)
+
+	default:
+		return fmt.Errorf("unsupported algorithm for detached verification: %s", algo)
+	}
 }
 
 // verifyRSASignature verifies an RSA signature
@@ -518,7 +526,7 @@ func GetSignatureInfo(signature *Signature) string {
 	return info
 }
 
-// verifyPKCS7SignatureFormat verifies a PKCS#7 format signature using Mozilla PKCS#7 library
+// verifyPKCS7SignatureFormat verifies a PKCS#7 format signature using Smallstep PKCS#7 library
 func verifyPKCS7SignatureFormat(data []byte, signature *Signature, opts VerifyOptions) error {
 	// Parse the PKCS#7 signature data
 	p7, err := pkcs7.Parse(signature.Data)
@@ -531,83 +539,26 @@ func verifyPKCS7SignatureFormat(data []byte, signature *Signature, opts VerifyOp
 		p7.Content = data
 	}
 
-	// Create a custom certificate verification function that respects our options
-	if opts.SkipExpirationCheck {
-		// Use VerifyWithChain to have more control over certificate validation
-		var roots *x509.CertPool
-
-		if opts.Roots != nil {
-			roots = opts.Roots
-		} else {
-			// Create a pool with the signing certificate as trusted root for self-signed certs
-			roots = x509.NewCertPool()
-			roots.AddCert(signature.Certificate)
-		}
-
-		err = p7.VerifyWithChain(roots)
-		if err != nil {
-			return fmt.Errorf("PKCS#7 signature verification failed: %w", err)
-		}
-	} else {
-		// Standard verification
-		err = p7.Verify()
-		if err != nil {
-			return fmt.Errorf("PKCS#7 signature verification failed: %w", err)
-		}
+	// Standard PKCS#7 verification
+	err = p7.Verify()
+	if err != nil {
+		return fmt.Errorf("PKCS#7 signature verification failed: %w", err)
 	}
 
 	return nil
 }
 
-// verifyRawSignature verifies a signature using direct cryptographic verification
-// This function can handle both raw signature bytes and PKCS#7 signatures when we need
-// to bypass the PKCS#7 library's certificate validation
-func verifyRawSignature(data []byte, signature *Signature) error {
-	var signatureBytes []byte
-
-	// Ed25519 signatures are always stored as raw bytes, even if the format says PKCS#7
-	if signature.Algorithm == AlgorithmEd25519 {
-		signatureBytes = signature.Data
-	} else if signature.Format == FormatPKCS7 || signature.Format == FormatPKCS7Detached {
-		// For non-Ed25519 algorithms, if this is a PKCS#7 signature but we're doing raw verification
-		// (e.g., for SkipExpirationCheck), we need to extract the actual signature bytes from the PKCS#7 container
-		p7, err := pkcs7.Parse(signature.Data)
-		if err != nil {
-			return fmt.Errorf("failed to parse PKCS#7 signature for raw verification: %w", err)
-		}
-
-		// For detached signatures, set the content
-		if signature.Format == FormatPKCS7Detached {
-			p7.Content = data
-		}
-
-		// Extract the signature bytes from the PKCS#7 structure
-		if len(p7.Signers) == 0 {
-			return fmt.Errorf("no signers found in PKCS#7 signature")
-		}
-		signatureBytes = p7.Signers[0].EncryptedDigest
-	} else {
-		// For true raw signatures, use the data directly
-		signatureBytes = signature.Data
+// verifyEd25519RawSignature verifies an Ed25519 raw signature
+func verifyEd25519RawSignature(data []byte, signature *Signature) error {
+	ed25519Key, ok := signature.Certificate.PublicKey.(ed25519.PublicKey)
+	if !ok {
+		return fmt.Errorf("certificate does not contain an Ed25519 public key")
 	}
 
-	// Compute the hash of the data
-	hasher := signature.HashAlgorithm.New()
-	if _, err := hasher.Write(data); err != nil {
-		return fmt.Errorf("failed to hash data: %w", err)
+	// Ed25519 verifies the message directly, not a hash
+	if !ed25519.Verify(ed25519Key, data, signature.Data) {
+		return ErrVerificationFailed
 	}
-	computedDigest := hasher.Sum(nil)
 
-	// Verify the signature based on the algorithm
-	publicKey := signature.Certificate.PublicKey
-	switch signature.Algorithm {
-	case AlgorithmRSA:
-		return verifyRSASignature(publicKey, computedDigest, signatureBytes, signature.HashAlgorithm)
-	case AlgorithmECDSA:
-		return verifyECDSASignature(publicKey, computedDigest, signatureBytes, signature.HashAlgorithm)
-	case AlgorithmEd25519:
-		return verifyEd25519Signature(publicKey, data, signatureBytes)
-	default:
-		return ErrUnsupportedAlgorithm
-	}
+	return nil
 }
