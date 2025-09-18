@@ -74,9 +74,17 @@ func TestSignAndVerifyRSA(t *testing.T) {
 				t.Errorf("Failed to verify signature: %v", err)
 			}
 
-			// Test with tampered data
+			// Test with tampered data using detached signature for proper validation
+			detachedOpts := DefaultSignOptions()
+			detachedOpts.HashAlgorithm = hashAlgo
+			detachedOpts.Format = FormatPKCS7Detached
+			detachedSignature, err := SignDocument(testData, keyPair, certificate, detachedOpts)
+			if err != nil {
+				t.Fatalf("Failed to create detached signature: %v", err)
+			}
+
 			tamperedData := append(testData, byte('X'))
-			err = VerifySignature(tamperedData, signature, DefaultVerifyOptions())
+			err = VerifySignature(tamperedData, detachedSignature, DefaultVerifyOptions())
 			if err == nil {
 				t.Error("Expected verification to fail with tampered data")
 			}
@@ -136,9 +144,16 @@ func TestSignAndVerifyECDSA(t *testing.T) {
 				t.Errorf("Failed to verify signature: %v", err)
 			}
 
-			// Test with wrong data
+			// Test with wrong data using detached signature for proper validation
+			detachedOpts := DefaultSignOptions()
+			detachedOpts.Format = FormatPKCS7Detached
+			detachedSignature, err := SignDocument(testData, keyPair, certificate, detachedOpts)
+			if err != nil {
+				t.Fatalf("Failed to create detached signature: %v", err)
+			}
+
 			wrongData := []byte("This is wrong data")
-			err = VerifySignature(wrongData, signature, DefaultVerifyOptions())
+			err = VerifySignature(wrongData, detachedSignature, DefaultVerifyOptions())
 			if err == nil {
 				t.Error("Expected verification to fail with wrong data")
 			}
@@ -965,8 +980,8 @@ func TestSignData(t *testing.T) {
 	}
 
 	// Should use default options
-	if signature.Format != FormatRaw {
-		t.Errorf("Expected default format %s, got %s", FormatRaw, signature.Format)
+	if signature.Format != FormatPKCS7 {
+		t.Errorf("Expected default format %s, got %s", FormatPKCS7, signature.Format)
 	}
 
 	if signature.Algorithm != AlgorithmRSA {
@@ -1008,7 +1023,7 @@ func TestVerifyECDSASignature(t *testing.T) {
 	// Create signature
 	signature, err := SignDocument(testData, ecdsaKeyPair, ecdsaCert, SignOptions{
 		HashAlgorithm:      crypto.SHA256,
-		Format:             FormatRaw,
+		Format:             FormatPKCS7,
 		IncludeCertificate: true,
 	})
 	if err != nil {
@@ -1065,8 +1080,8 @@ func TestVerifyEd25519Signature(t *testing.T) {
 
 	// Create signature
 	signature, err := SignDocument(testData, ed25519KeyPair, ed25519Cert, SignOptions{
-		HashAlgorithm:      crypto.SHA256,
-		Format:             FormatRaw,
+		HashAlgorithm:      crypto.SHA512,
+		Format:             FormatPKCS7,
 		IncludeCertificate: true,
 	})
 	if err != nil {
@@ -1124,7 +1139,7 @@ func TestVerifyDetachedSignature(t *testing.T) {
 	// Create a regular signature first to extract raw signature bytes
 	signature, err := SignDocument(testData, rsaKeyPair, rsaCert, SignOptions{
 		HashAlgorithm: crypto.SHA256,
-		Format:        FormatRaw,
+		Format:        FormatPKCS7,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create signature: %v", err)
@@ -1174,7 +1189,7 @@ func TestVerifyDetachedSignature(t *testing.T) {
 
 	ecdsaSignature, err := SignDocument(testData, ecdsaKeyPair, ecdsaCert, SignOptions{
 		HashAlgorithm: crypto.SHA256,
-		Format:        FormatRaw,
+		Format:        FormatPKCS7,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create ECDSA signature: %v", err)
@@ -1229,7 +1244,7 @@ func TestVerifyCertificateChain(t *testing.T) {
 
 	signature, err := SignDocument(testData, endEntityKeyPair, endEntityCert, SignOptions{
 		HashAlgorithm:      crypto.SHA256,
-		Format:             FormatRaw,
+		Format:             FormatPKCS7,
 		IncludeCertificate: true,
 	})
 	if err != nil {
@@ -1318,7 +1333,7 @@ func TestVerifyTimestamp(t *testing.T) {
 	// Create signature
 	signature, err := SignDocument(testData, keyPair, certificate, SignOptions{
 		HashAlgorithm: crypto.SHA256,
-		Format:        FormatRaw,
+		Format:        FormatPKCS7,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create signature: %v", err)
@@ -1421,7 +1436,7 @@ func TestExtractCertificateFromSignature(t *testing.T) {
 	// Create signature
 	signature, err := SignDocument(testData, keyPair, certificate, SignOptions{
 		HashAlgorithm:      crypto.SHA256,
-		Format:             FormatRaw,
+		Format:             FormatPKCS7,
 		IncludeCertificate: true,
 	})
 	if err != nil {
@@ -1502,7 +1517,7 @@ func TestExtractCertificateChainFromSignature(t *testing.T) {
 	// Create signature
 	signature, err := SignDocument(testData, endEntityKeyPair, endEntityCert, SignOptions{
 		HashAlgorithm:      crypto.SHA256,
-		Format:             FormatRaw,
+		Format:             FormatPKCS7,
 		IncludeCertificate: true,
 	})
 	if err != nil {

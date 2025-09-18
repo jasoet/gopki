@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/asn1"
 	"fmt"
 	"io"
 	"os"
@@ -14,7 +15,7 @@ import (
 	"github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
-	"github.com/jasoet/gopki/signing/formats"
+	"go.mozilla.org/pkcs7"
 )
 
 // SignDocument signs a document using the provided key pair and certificate.
@@ -42,8 +43,7 @@ import (
 // in the options, based on the key type and size for optimal security.
 //
 // Supported formats:
-//   - FormatRaw: Simple signature bytes (default)
-//   - FormatPKCS7: PKCS#7/CMS signature container
+//   - FormatPKCS7: PKCS#7/CMS signature container (default)
 //   - FormatPKCS7Detached: Detached PKCS#7/CMS signature
 //
 // Example:
@@ -91,39 +91,59 @@ func SignDocument[T keypair.KeyPair](data []byte, keyPair T, certificate *cert.C
 		opts.HashAlgorithm = getDefaultHashAlgorithm(algorithm, privateKey)
 	}
 
-	// Get the appropriate format implementation
-	var formatImpl formats.SignatureFormat
-	var formatExists bool
+	var signatureData []byte
 
-	switch opts.Format {
-	case FormatRaw:
-		formatImpl, formatExists = formats.GetFormat(string(FormatRaw))
-	case FormatPKCS7:
-		formatImpl, formatExists = formats.GetFormat(string(FormatPKCS7))
-	case FormatPKCS7Detached:
-		formatImpl, formatExists = formats.GetFormat(string(FormatPKCS7Detached))
-	default:
-		return nil, ErrUnsupportedFormat
-	}
+	// Ed25519 is not supported by Mozilla PKCS7 library, use raw signature for Ed25519
+	if algorithm == AlgorithmEd25519 {
+		// For Ed25519, create a raw signature and wrap it in a simple structure
+		rawSig, err := privateKey.Sign(rand.Reader, data, crypto.Hash(0))
+		if err != nil {
+			return nil, fmt.Errorf("failed to sign data: %w", err)
+		}
+		signatureData = rawSig
+	} else {
+		// Use Mozilla PKCS#7 library for RSA and ECDSA
+		signedData, err := pkcs7.NewSignedData(data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create signed data: %w", err)
+		}
 
-	if !formatExists {
-		return nil, fmt.Errorf("format implementation not found: %s", opts.Format)
-	}
+		// Set digest algorithm if specified
+		if opts.HashAlgorithm != 0 {
+			digestOID, err := getDigestAlgorithmOID(opts.HashAlgorithm)
+			if err != nil {
+				return nil, fmt.Errorf("unsupported hash algorithm: %w", err)
+			}
+			signedData.SetDigestAlgorithm(digestOID)
+		}
 
-	// Convert signing options to format options
-	formatOpts := formats.SignOptions{
-		HashAlgorithm:      opts.HashAlgorithm,
-		IncludeCertificate: opts.IncludeCertificate,
-		IncludeChain:       opts.IncludeChain,
-		Detached:           opts.Detached,
-		TimestampURL:       opts.TimestampURL,
-		Attributes:         opts.Attributes,
-	}
+		// Add signer
+		signerConfig := pkcs7.SignerInfoConfig{}
+		err = signedData.AddSigner(certificate.Certificate, privateKey, signerConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to add signer: %w", err)
+		}
 
-	// Use the format implementation to create the signature
-	signatureData, err := formatImpl.Sign(data, privateKey, certificate.Certificate, formatOpts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create signature in format %s: %w", opts.Format, err)
+		// Add certificates if requested
+		if opts.IncludeCertificate {
+			signedData.AddCertificate(certificate.Certificate)
+		}
+
+		// Add extra certificates
+		for _, extraCert := range opts.ExtraCertificates {
+			signedData.AddCertificate(extraCert)
+		}
+
+		// Create detached signature if requested
+		if opts.Format == FormatPKCS7Detached {
+			signedData.Detach()
+		}
+
+		// Finalize and get signature data
+		signatureData, err = signedData.Finish()
+		if err != nil {
+			return nil, fmt.Errorf("failed to finalize signature: %w", err)
+		}
 	}
 
 	// Compute digest for metadata (some formats may need this separately)
@@ -174,7 +194,7 @@ func SignDocument[T keypair.KeyPair](data []byte, keyPair T, certificate *cert.C
 // default settings are sufficient.
 //
 // The function uses DefaultSignOptions() which provides:
-//   - Raw signature format
+//   - PKCS#7/CMS signature format
 //   - Auto-selected hash algorithm
 //   - Certificate inclusion enabled
 //   - Non-detached signature
@@ -553,5 +573,22 @@ func HashAlgorithmToString(hash crypto.Hash) string {
 		return "SHA224"
 	default:
 		return "Unknown"
+	}
+}
+
+// getDigestAlgorithmOID returns the ASN.1 OID for the given hash algorithm
+// to be used with the Mozilla PKCS#7 library.
+func getDigestAlgorithmOID(hash crypto.Hash) (asn1.ObjectIdentifier, error) {
+	switch hash {
+	case crypto.SHA256:
+		return asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}, nil // sha256
+	case crypto.SHA384:
+		return asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 2}, nil // sha384
+	case crypto.SHA512:
+		return asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 3}, nil // sha512
+	case crypto.SHA224:
+		return asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 4}, nil // sha224
+	default:
+		return nil, fmt.Errorf("unsupported hash algorithm: %v", hash)
 	}
 }

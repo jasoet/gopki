@@ -13,9 +13,7 @@ import (
 type SignatureFormat string
 
 const (
-	// FormatRaw represents a raw signature (just the signature bytes)
-	FormatRaw SignatureFormat = "raw"
-	// FormatPKCS7 represents a PKCS#7/CMS signature format
+	// FormatPKCS7 represents a PKCS#7/CMS signature format (attached)
 	FormatPKCS7 SignatureFormat = "pkcs7"
 	// FormatPKCS7Detached represents a detached PKCS#7/CMS signature
 	FormatPKCS7Detached SignatureFormat = "pkcs7-detached"
@@ -32,7 +30,7 @@ const (
 
 // Signature represents a digital signature with its metadata
 type Signature struct {
-	// Format of the signature (raw, PKCS#7, etc.)
+	// Format of the signature (PKCS#7, CMS, etc.)
 	Format SignatureFormat
 	// Algorithm used for signing
 	Algorithm SignatureAlgorithm
@@ -64,11 +62,29 @@ type Timestamp struct {
 	HashAlgorithm crypto.Hash
 }
 
+// SignatureInfo contains parsed signature information from PKCS#7 signatures
+type SignatureInfo struct {
+	// Signature algorithm used (e.g., "PKCS#7")
+	Algorithm string
+	// Hash algorithm used
+	HashAlgorithm crypto.Hash
+	// Signer's certificate
+	Certificate *x509.Certificate
+	// Certificate chain
+	CertificateChain []*x509.Certificate
+	// Timestamp information
+	Timestamp *Timestamp
+	// Additional attributes
+	Attributes map[string]interface{}
+	// Whether this is a detached signature
+	Detached bool
+}
+
 // SignOptions configures the signing operation
 type SignOptions struct {
 	// Hash algorithm to use (default: SHA256)
 	HashAlgorithm crypto.Hash
-	// Signature format (default: FormatRaw)
+	// Signature format (default: FormatPKCS7)
 	Format SignatureFormat
 	// Include signer's certificate in signature
 	IncludeCertificate bool
@@ -80,6 +96,8 @@ type SignOptions struct {
 	TimestampURL string
 	// Additional attributes to include
 	Attributes map[string]interface{}
+	// Additional certificates to include
+	ExtraCertificates []*x509.Certificate
 }
 
 // VerifyOptions configures the verification operation
@@ -120,7 +138,7 @@ var (
 //
 // Default values:
 //   - HashAlgorithm: 0 (auto-selected based on key algorithm and size)
-//   - Format: FormatRaw (simple signature bytes)
+//   - Format: FormatPKCS7 (industry-standard PKCS#7/CMS format)
 //   - IncludeCertificate: true (includes signer's certificate)
 //   - IncludeChain: false (certificate chain not included)
 //   - Detached: false (signature includes the data)
@@ -135,7 +153,7 @@ var (
 func DefaultSignOptions() SignOptions {
 	return SignOptions{
 		HashAlgorithm:      0, // Let the algorithm determine the default
-		Format:             FormatRaw,
+		Format:             FormatPKCS7,
 		IncludeCertificate: true,
 		IncludeChain:       false,
 		Detached:           false,
