@@ -6,7 +6,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
-	"cry
 	"crypto/x509/pkix"
 	"net"
 	"testing"
@@ -288,10 +287,11 @@ func testCACertificateRSA(t *testing.T, algName string, keySize algo.KeySize) {
 				CommonName:   "Test CA",
 				Organization: []string{"GoPKI"},
 				Country:      []string{"US"},
+			},
+
 			ValidFor:   10 * 365 * 24 * time.Hour, // 10 years
 			IsCA:       true,
 			MaxPathLen: 2,
-			MaxPathLen:  2,
 		}
 
 		caCert, err := cert.CreateCACertificate(manager.KeyPair(), caRequest)
@@ -347,10 +347,10 @@ func testCACertificateECDSA(t *testing.T, algName string, curve algo.ECDSACurve)
 				CommonName:   "Test CA",
 				Organization: []string{"GoPKI"},
 				Country:      []string{"US"},
+			},
 			ValidFor:   10 * 365 * 24 * time.Hour, // 10 years
 			IsCA:       true,
 			MaxPathLen: 2,
-			MaxPathLen:  2,
 		}
 
 		caCert, err := cert.CreateCACertificate(manager.KeyPair(), caRequest)
@@ -413,10 +413,10 @@ func testCertificateSigningRSA(t *testing.T, algName string, keySize algo.KeySiz
 				CommonName:   "Test Server",
 				Organization: []string{"GoPKI"},
 				Country:      []string{"US"},
+			},
 			DNSNames:    []string{"server.example.com"},
 			IPAddresses: []net.IP{net.IPv4(192, 168, 1, 100)},
 			ValidFor:    365 * 24 * time.Hour,
-			ValidFor:     365 * 24 * time.Hour,
 		}
 
 		entityCert, err := cert.SignCertificate(caCert, caManager.KeyPair(), entityRequest, entityManager.PublicKey())
@@ -462,10 +462,10 @@ func testCertificateSigningECDSA(t *testing.T, algName string, curve algo.ECDSAC
 				CommonName:   "Test Server",
 				Organization: []string{"GoPKI"},
 				Country:      []string{"US"},
+			},
 			DNSNames:    []string{"server.example.com"},
 			IPAddresses: []net.IP{net.IPv4(192, 168, 1, 100)},
 			ValidFor:    365 * 24 * time.Hour,
-			ValidFor:     365 * 24 * time.Hour,
 		}
 
 		entityCert, err := cert.SignCertificate(caCert, caManager.KeyPair(), entityRequest, entityManager.PublicKey())
