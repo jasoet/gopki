@@ -120,13 +120,13 @@ func GetCertificateInfo(cert *x509.Certificate) map[string]interface{} {
 	}
 
 	info := map[string]interface{}{
-		"subject":     cert.Subject.String(),
-		"issuer":      cert.Issuer.String(),
-		"serial":      cert.SerialNumber.String(),
-		"not_before":  cert.NotBefore.Format(time.RFC3339),
-		"not_after":   cert.NotAfter.Format(time.RFC3339),
-		"is_ca":       cert.IsCA,
-		"key_usage":   getKeyUsageStrings(cert.KeyUsage),
+		"subject":       cert.Subject.String(),
+		"issuer":        cert.Issuer.String(),
+		"serial":        cert.SerialNumber.String(),
+		"not_before":    cert.NotBefore.Format(time.RFC3339),
+		"not_after":     cert.NotAfter.Format(time.RFC3339),
+		"is_ca":         cert.IsCA,
+		"key_usage":     getKeyUsageStrings(cert.KeyUsage),
 		"ext_key_usage": getExtKeyUsageStrings(cert.ExtKeyUsage),
 	}
 

@@ -1100,4 +1100,3 @@ func createTestCertificate(t *testing.T, keyPair keypair.GenericKeyPair) *x509.C
 
 	return certificate
 }
-

@@ -18,10 +18,11 @@ import (
 // attacks that affect older RSA padding schemes.
 //
 // Data size limitations:
-//   For a k-bit RSA key, the maximum plaintext size is approximately:
-//   - 2048-bit key: ~190 bytes
-//   - 3072-bit key: ~318 bytes
-//   - 4096-bit key: ~446 bytes
+//
+//	For a k-bit RSA key, the maximum plaintext size is approximately:
+//	- 2048-bit key: ~190 bytes
+//	- 3072-bit key: ~318 bytes
+//	- 4096-bit key: ~446 bytes
 //
 // Parameters:
 //   - data: The plaintext data to encrypt (must fit within RSA size limits)

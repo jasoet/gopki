@@ -243,7 +243,6 @@ func CreateP12[T keypair.PrivateKey](privateKey T, certificate *x509.Certificate
 	}
 }
 
-
 // ParseP12 parses PKCS#12 data and returns the private key, certificate, and CA certificates
 func ParseP12(p12Data []byte, opts LoadOptions) (*P12Container, error) {
 	if len(p12Data) == 0 {

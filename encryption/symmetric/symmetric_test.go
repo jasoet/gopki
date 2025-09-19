@@ -89,7 +89,7 @@ func TestEncryptAESGCM(t *testing.T) {
 
 		opts := encryption.DefaultEncryptOptions()
 		opts.Metadata = map[string]interface{}{
-			"purpose": "testing",
+			"purpose":   "testing",
 			"algorithm": "AES-GCM",
 		}
 
@@ -701,8 +701,8 @@ func TestSymmetricPerformance(t *testing.T) {
 
 	// Test with different data sizes
 	dataSizes := []int{
-		1024,         // 1KB
-		1024 * 1024,  // 1MB
+		1024,             // 1KB
+		1024 * 1024,      // 1MB
 		10 * 1024 * 1024, // 10MB
 	}
 

@@ -20,12 +20,12 @@ import (
 // (though this is generally not recommended for security reasons).
 //
 // Process:
-//   1. Extract seed from Ed25519 private key
-//   2. Derive X25519 private key from the seed
-//   3. Generate ephemeral X25519 key pair for forward secrecy
-//   4. Perform X25519 key agreement to get shared secret
-//   5. Derive AES-256 key from shared secret
-//   6. Encrypt data with AES-GCM using derived key
+//  1. Extract seed from Ed25519 private key
+//  2. Derive X25519 private key from the seed
+//  3. Generate ephemeral X25519 key pair for forward secrecy
+//  4. Perform X25519 key agreement to get shared secret
+//  5. Derive AES-256 key from shared secret
+//  6. Encrypt data with AES-GCM using derived key
 //
 // Parameters:
 //   - data: The plaintext data to encrypt (no size limitations)
@@ -105,12 +105,12 @@ func EncryptWithEd25519(data []byte, keyPair *algo.Ed25519KeyPair, opts encrypti
 // DecryptWithEd25519 decrypts X25519 + AES-GCM encrypted data.
 //
 // This function reverses the Ed25519 encryption process by:
-//   1. Extracting seed from Ed25519 private key
-//   2. Deriving the same X25519 private key used for encryption
-//   3. Extracting sender's ephemeral X25519 public key from encrypted data
-//   4. Performing X25519 key agreement to recover shared secret
-//   5. Deriving the same AES key used for encryption
-//   6. Decrypting data using AES-GCM
+//  1. Extracting seed from Ed25519 private key
+//  2. Deriving the same X25519 private key used for encryption
+//  3. Extracting sender's ephemeral X25519 public key from encrypted data
+//  4. Performing X25519 key agreement to recover shared secret
+//  5. Deriving the same AES key used for encryption
+//  6. Decrypting data using AES-GCM
 //
 // Parameters:
 //   - encrypted: The encrypted data to decrypt (must contain ephemeral key)

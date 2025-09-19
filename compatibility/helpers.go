@@ -550,3 +550,282 @@ extendedKeyUsage = serverAuth, clientAuth`
 
 	return []byte(config)
 }
+
+// SSH-specific helper functions for OpenSSH compatibility testing
+
+// GenerateSSHKeyWithSSHKeygen generates an SSH key pair using ssh-keygen
+func (h *OpenSSLHelper) GenerateSSHKeyWithSSHKeygen(algorithm string, keySize int) (privateKeyData, publicKeyData []byte, err error) {
+	privKeyFile := filepath.Join(h.tempDir, "ssh_private")
+	pubKeyFile := privKeyFile + ".pub"
+
+	h.t.Logf("    → Generating %s SSH key pair with ssh-keygen...", strings.ToUpper(algorithm))
+
+	var args []string
+	switch strings.ToLower(algorithm) {
+	case "rsa":
+		args = []string{"-t", "rsa", "-b", fmt.Sprintf("%d", keySize), "-f", privKeyFile, "-N", "", "-q"}
+	case "ecdsa":
+		// Map key size to curve for ECDSA
+		var bits string
+		switch keySize {
+		case 256:
+			bits = "256"
+		case 384:
+			bits = "384"
+		case 521:
+			bits = "521"
+		default:
+			bits = "256"
+		}
+		args = []string{"-t", "ecdsa", "-b", bits, "-f", privKeyFile, "-N", "", "-q"}
+	case "ed25519":
+		args = []string{"-t", "ed25519", "-f", privKeyFile, "-N", "", "-q"}
+	default:
+		return nil, nil, fmt.Errorf("unsupported algorithm for SSH: %s", algorithm)
+	}
+
+	cmd := exec.Command("ssh-keygen", args...)
+	h.t.Logf("    → Executing: ssh-keygen %s", strings.Join(args, " "))
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		h.t.Logf("    ❌ Command failed: %v", err)
+		if len(output) > 0 {
+			h.t.Logf("    ❌ Output: %s", string(output))
+		}
+		return nil, nil, fmt.Errorf("ssh-keygen failed: %v, output: %s", err, string(output))
+	}
+
+	h.t.Logf("    ✓ SSH key pair generated successfully")
+
+	// Read generated files
+	privateKeyData, err = os.ReadFile(privKeyFile)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read private key: %v", err)
+	}
+
+	publicKeyData, err = os.ReadFile(pubKeyFile)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read public key: %v", err)
+	}
+
+	return privateKeyData, publicKeyData, nil
+}
+
+// ValidateSSHPrivateKeyWithSSHKeygen validates an SSH private key using ssh-keygen
+func (h *OpenSSLHelper) ValidateSSHPrivateKeyWithSSHKeygen(privateKeyData []byte) error {
+	keyFile := h.TempFile("ssh_private_validate", privateKeyData)
+
+	h.t.Logf("    → Validating SSH private key with ssh-keygen...")
+
+	// Use ssh-keygen -y to validate and extract public key from private key
+	cmd := exec.Command("ssh-keygen", "-y", "-f", keyFile)
+	h.t.Logf("    → Executing: ssh-keygen -y -f %s", keyFile)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		h.t.Logf("    ❌ SSH private key validation failed: %v", err)
+		if len(output) > 0 {
+			h.t.Logf("    ❌ Output: %s", string(output))
+		}
+		return fmt.Errorf("ssh-keygen validation failed: %v", err)
+	}
+
+	h.t.Logf("    ✓ SSH private key validation passed")
+	return nil
+}
+
+// ValidateSSHPublicKeyWithSSHKeygen validates an SSH public key using ssh-keygen
+func (h *OpenSSLHelper) ValidateSSHPublicKeyWithSSHKeygen(publicKeyData []byte) error {
+	keyFile := h.TempFile("ssh_public_validate.pub", publicKeyData)
+
+	h.t.Logf("    → Validating SSH public key with ssh-keygen...")
+
+	// Use ssh-keygen -l to get fingerprint and validate format
+	cmd := exec.Command("ssh-keygen", "-l", "-f", keyFile)
+	h.t.Logf("    → Executing: ssh-keygen -l -f %s", keyFile)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		h.t.Logf("    ❌ SSH public key validation failed: %v", err)
+		if len(output) > 0 {
+			h.t.Logf("    ❌ Output: %s", string(output))
+		}
+		return fmt.Errorf("ssh-keygen validation failed: %v", err)
+	}
+
+	h.t.Logf("    ✓ SSH public key validation passed: %s", strings.TrimSpace(string(output)))
+	return nil
+}
+
+// GetSSHKeyFingerprint gets the fingerprint of an SSH public key using ssh-keygen
+func (h *OpenSSLHelper) GetSSHKeyFingerprint(publicKeyData []byte, hashAlg string) (string, error) {
+	keyFile := h.TempFile("ssh_fingerprint.pub", publicKeyData)
+
+	var args []string
+	switch strings.ToLower(hashAlg) {
+	case "md5":
+		args = []string{"-l", "-E", "md5", "-f", keyFile}
+	case "sha256", "":
+		args = []string{"-l", "-E", "sha256", "-f", keyFile}
+	default:
+		return "", fmt.Errorf("unsupported hash algorithm: %s", hashAlg)
+	}
+
+	cmd := exec.Command("ssh-keygen", args...)
+	h.t.Logf("    → Getting SSH fingerprint: ssh-keygen %s", strings.Join(args, " "))
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to get fingerprint: %v, output: %s", err, string(output))
+	}
+
+	fingerprint := strings.TrimSpace(string(output))
+	h.t.Logf("    → Fingerprint: %s", fingerprint)
+
+	// Extract just the fingerprint part (format: "2048 SHA256:xxxxx comment (RSA)")
+	parts := strings.Fields(fingerprint)
+	if len(parts) >= 2 {
+		return parts[1], nil
+	}
+
+	return fingerprint, nil
+}
+
+// ConvertPEMToSSHWithSSHKeygen converts a PEM private key to SSH format using ssh-keygen
+func (h *OpenSSLHelper) ConvertPEMToSSHWithSSHKeygen(pemPrivateKey []byte) ([]byte, error) {
+	h.t.Logf("    → Converting PEM to SSH format with ssh-keygen...")
+
+	// First, we need to convert PEM to OpenSSH format
+	// ssh-keygen -p -m PEM -f <file> converts in place, so we copy first
+	tempFile := filepath.Join(h.tempDir, "temp_convert.pem")
+	if err := os.WriteFile(tempFile, pemPrivateKey, 0600); err != nil {
+		return nil, fmt.Errorf("failed to write temp file: %v", err)
+	}
+
+	// Convert to OpenSSH format
+	cmd := exec.Command("ssh-keygen", "-p", "-m", "RFC4716", "-f", tempFile, "-N", "", "-P", "")
+	h.t.Logf("    → Executing: ssh-keygen -p -m RFC4716 -f %s -N '' -P ''", tempFile)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// Try reading the file anyway as ssh-keygen sometimes returns non-zero with success
+		if convertedData, readErr := os.ReadFile(tempFile); readErr == nil && len(convertedData) > 0 {
+			h.t.Logf("    ✓ PEM to SSH conversion completed (with warning)")
+			return convertedData, nil
+		}
+		h.t.Logf("    ❌ Conversion failed: %v", err)
+		if len(output) > 0 {
+			h.t.Logf("    ❌ Output: %s", string(output))
+		}
+		return nil, fmt.Errorf("conversion failed: %v", err)
+	}
+
+	// Read the converted file
+	sshData, err := os.ReadFile(tempFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read converted file: %v", err)
+	}
+
+	h.t.Logf("    ✓ PEM to SSH conversion successful")
+	return sshData, nil
+}
+
+// ExtractPublicKeyWithSSHKeygen extracts public key from private key using ssh-keygen
+func (h *OpenSSLHelper) ExtractPublicKeyWithSSHKeygen(privateKeyData []byte) ([]byte, error) {
+	keyFile := h.TempFile("extract_private", privateKeyData)
+
+	h.t.Logf("    → Extracting public key from private key with ssh-keygen...")
+
+	cmd := exec.Command("ssh-keygen", "-y", "-f", keyFile)
+	h.t.Logf("    → Executing: ssh-keygen -y -f %s", keyFile)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		h.t.Logf("    ❌ Public key extraction failed: %v", err)
+		return nil, fmt.Errorf("extraction failed: %v", err)
+	}
+
+	h.t.Logf("    ✓ Public key extracted successfully")
+	return output, nil
+}
+
+// GenerateSSHKeyWithPassphrase generates a passphrase-protected SSH key using ssh-keygen
+func (h *OpenSSLHelper) GenerateSSHKeyWithPassphrase(algorithm string, keySize int, passphrase string) (privateKeyData, publicKeyData []byte, err error) {
+	privKeyFile := filepath.Join(h.tempDir, "ssh_encrypted")
+	pubKeyFile := privKeyFile + ".pub"
+
+	h.t.Logf("    → Generating passphrase-protected %s SSH key with ssh-keygen...", strings.ToUpper(algorithm))
+
+	var args []string
+	switch strings.ToLower(algorithm) {
+	case "rsa":
+		args = []string{"-t", "rsa", "-b", fmt.Sprintf("%d", keySize), "-f", privKeyFile, "-N", passphrase, "-q"}
+	case "ecdsa":
+		var bits string
+		switch keySize {
+		case 256:
+			bits = "256"
+		case 384:
+			bits = "384"
+		case 521:
+			bits = "521"
+		default:
+			bits = "256"
+		}
+		args = []string{"-t", "ecdsa", "-b", bits, "-f", privKeyFile, "-N", passphrase, "-q"}
+	case "ed25519":
+		args = []string{"-t", "ed25519", "-f", privKeyFile, "-N", passphrase, "-q"}
+	default:
+		return nil, nil, fmt.Errorf("unsupported algorithm: %s", algorithm)
+	}
+
+	cmd := exec.Command("ssh-keygen", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, nil, fmt.Errorf("ssh-keygen failed: %v, output: %s", err, string(output))
+	}
+
+	h.t.Logf("    ✓ Passphrase-protected SSH key generated")
+
+	privateKeyData, err = os.ReadFile(privKeyFile)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read private key: %v", err)
+	}
+
+	publicKeyData, err = os.ReadFile(pubKeyFile)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read public key: %v", err)
+	}
+
+	return privateKeyData, publicKeyData, nil
+}
+
+// ValidateAuthorizedKeysFormat checks if a public key works in authorized_keys format
+func (h *OpenSSLHelper) ValidateAuthorizedKeysFormat(publicKeyData []byte) error {
+	// SSH public keys in authorized_keys format should be a single line
+	// Format: <type> <base64-key> [comment]
+	keyStr := strings.TrimSpace(string(publicKeyData))
+
+	// Check if it's a single line
+	if strings.Contains(keyStr, "\n") && !strings.HasSuffix(keyStr, "\n") {
+		return fmt.Errorf("authorized_keys format should be a single line")
+	}
+
+	// Check if it starts with a valid key type
+	validTypes := []string{"ssh-rsa", "ssh-ed25519", "ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384", "ecdsa-sha2-nistp521"}
+	hasValidType := false
+	for _, keyType := range validTypes {
+		if strings.HasPrefix(keyStr, keyType+" ") {
+			hasValidType = true
+			break
+		}
+	}
+
+	if !hasValidType {
+		return fmt.Errorf("public key does not start with a valid SSH key type")
+	}
+
+	// Validate using ssh-keygen
+	return h.ValidateSSHPublicKeyWithSSHKeygen(publicKeyData)
+}

@@ -16,12 +16,12 @@ import (
 // An ephemeral key pair is generated for each encryption operation to ensure forward secrecy.
 //
 // Process:
-//   1. Convert ECDSA keys to ECDH format
-//   2. Generate ephemeral sender key pair
-//   3. Perform ECDH key agreement to get shared secret
-//   4. Derive AES-256 key from shared secret
-//   5. Encrypt data with AES-GCM using derived key
-//   6. Include ephemeral public key in result for recipient
+//  1. Convert ECDSA keys to ECDH format
+//  2. Generate ephemeral sender key pair
+//  3. Perform ECDH key agreement to get shared secret
+//  4. Derive AES-256 key from shared secret
+//  5. Encrypt data with AES-GCM using derived key
+//  6. Include ephemeral public key in result for recipient
 //
 // Parameters:
 //   - data: The plaintext data to encrypt (no size limitations)
@@ -101,11 +101,11 @@ func EncryptWithECDSA(data []byte, keyPair *algo.ECDSAKeyPair, opts encryption.E
 // DecryptWithECDSA decrypts ECDH + AES-GCM encrypted data.
 //
 // This function reverses the ECDSA encryption process by:
-//   1. Converting the recipient's ECDSA private key to ECDH format
-//   2. Extracting the sender's ephemeral public key from encrypted data
-//   3. Performing ECDH key agreement to recover the shared secret
-//   4. Deriving the same AES key used for encryption
-//   5. Decrypting the data using AES-GCM
+//  1. Converting the recipient's ECDSA private key to ECDH format
+//  2. Extracting the sender's ephemeral public key from encrypted data
+//  3. Performing ECDH key agreement to recover the shared secret
+//  4. Deriving the same AES key used for encryption
+//  5. Decrypting the data using AES-GCM
 //
 // Parameters:
 //   - encrypted: The encrypted data to decrypt (must contain ephemeral key)
