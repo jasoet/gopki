@@ -1,3 +1,22 @@
+## [1.13.0](https://github.com/jasoet/gopki/compare/v1.12.0...v1.13.0) (2025-09-19)
+
+
+### ✨ Features
+
+* **compatibility:** add comprehensive SSH compatibility testing framework ([c80494e](https://github.com/jasoet/gopki/commit/c80494edacada7040c44b57397c90945e3b27a0e))
+
+
+### 📚 Documentation
+
+* **compatibility:** add OpenSSL compatibility framework documentation ([2834925](https://github.com/jasoet/gopki/commit/2834925c1ee6864a82681b8412ca4ccde44ac02b))
+
+
+### ✅ Tests
+
+* **compatibility:** add build tag and update OpenSSL compatibility test command ([e35f1a8](https://github.com/jasoet/gopki/commit/e35f1a8f5221d7e4085ab7b4d8af669e1d18855b))
+* **compatibility:** add OpenSSL certificate compatibility testing framework ([8fbb926](https://github.com/jasoet/gopki/commit/8fbb9269abe122e48aff264599da88e99c7644a1))
+* **compatibility:** clean up cert_test.go by removing duplicate struct fields and unused imports ([b0e1e12](https://github.com/jasoet/gopki/commit/b0e1e126af1f48ec89773508e7b1582550d786d5))
+
 ## [1.12.0](https://github.com/jasoet/gopki/compare/v1.11.0...v1.12.0) (2025-09-18)
 
 
