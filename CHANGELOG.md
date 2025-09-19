@@ -1,3 +1,10 @@
+## [1.14.0](https://github.com/jasoet/gopki/compare/v1.13.0...v1.14.0) (2025-09-19)
+
+
+### ✨ Features
+
+* **compatibility:** add comprehensive OpenSSL signing compatibility tests ([8384feb](https://github.com/jasoet/gopki/commit/8384febeac073ca076cd00a0e87261bca01bc731)), closes [PKCS#7](https://github.com/jasoet/PKCS/issues/7) [PKCS#7](https://github.com/jasoet/PKCS/issues/7)
+
 ## [1.13.0](https://github.com/jasoet/gopki/compare/v1.12.0...v1.13.0) (2025-09-19)
 
 
