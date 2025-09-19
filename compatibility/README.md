@@ -12,11 +12,17 @@ The OpenSSL compatibility framework validates that cryptographic operations, cer
 compatibility/
 ├── keypair/            # Keypair compatibility tests
 │   ├── keypair_test.go # RSA, ECDSA, Ed25519 key compatibility tests
-│   └── doc.md         # Detailed keypair compatibility documentation
+│   ├── ssh_test.go     # SSH/OpenSSH compatibility tests
+│   ├── doc.md         # Detailed keypair compatibility documentation
+│   └── ssh_doc.md     # SSH compatibility documentation
 ├── cert/               # Certificate compatibility tests
 │   ├── cert_test.go    # X.509 certificate compatibility tests
 │   ├── doc.md         # Certificate compatibility documentation
 │   └── testdata/       # Test certificates and reference data
+├── signing/            # Digital signature compatibility tests
+│   ├── signing_test.go # PKCS#7/CMS signature compatibility tests
+│   ├── doc.md         # Comprehensive signing compatibility documentation
+│   └── README.md      # Quick signing compatibility reference
 ├── helpers.go          # OpenSSL integration utilities
 └── README.md          # This overview
 ```
@@ -41,6 +47,9 @@ go test -tags=compatibility ./compatibility/keypair -v
 
 # Certificate-specific tests only
 go test -tags=compatibility ./compatibility/cert -v
+
+# Signing-specific tests only
+go test -tags=compatibility ./compatibility/signing -v
 ```
 
 ## Test Coverage
@@ -62,9 +71,17 @@ go test -tags=compatibility ./compatibility/cert -v
 - **Certificate Chain Validation**: Multi-level certificate hierarchies
 - **Edge Cases**: Invalid certificates, expired certificates
 
+### ✅ **Signing Compatibility** (`./signing/`)
+- **Raw Signatures**: RSA, ECDSA, Ed25519 signature generation and verification
+- **PKCS#7/CMS Formats**: Attached and detached signature containers
+- **Certificate Chain Integration**: Multi-level certificate inclusion
+- **Bidirectional Testing**: GoPKI ↔ OpenSSL signature validation
+- **Hash Algorithms**: SHA256, SHA384, SHA512 support
+- **Format Standards**: RFC 5652 CMS compliance validation
+- **Advanced Features**: Signature metadata extraction and validation
+
 ### 🔮 **Future Compatibility Tests**
 As GoPKI grows, additional compatibility tests will be organized here:
-- `./signing/` - PKCS#7/CMS signature compatibility
 - `./encryption/` - Encryption/decryption compatibility
 - `./pkcs12/` - PKCS#12 container compatibility
 
@@ -153,7 +170,9 @@ task test:compatibility
 ## Documentation
 
 - **Keypair Compatibility**: See [`./keypair/doc.md`](./keypair/doc.md) for comprehensive keypair compatibility documentation
+- **SSH Compatibility**: See [`./keypair/ssh_doc.md`](./keypair/ssh_doc.md) for SSH/OpenSSH compatibility documentation
 - **Certificate Compatibility**: See [`./cert/doc.md`](./cert/doc.md) for certificate compatibility documentation
+- **Signing Compatibility**: See [`./signing/doc.md`](./signing/doc.md) for comprehensive digital signature compatibility documentation
 - **Implementation Details**: Architecture, usage examples, and troubleshooting
 - **Standards Compliance**: RFC references and OpenSSL command documentation
 

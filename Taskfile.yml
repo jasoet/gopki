@@ -23,6 +23,9 @@ tasks:
       - 'echo ""'
       - 'echo "Compatibility Testing:"'
       - 'echo "  task test:compatibility        - Run OpenSSL compatibility tests (build tag: compatibility)"'
+      - 'echo "  task test:compatibility:keypair - Run keypair compatibility tests only"'
+      - 'echo "  task test:compatibility:cert    - Run certificate compatibility tests only"'
+      - 'echo "  task test:compatibility:signing - Run signing compatibility tests only"'
       - 'echo ""'
       - 'echo "Code Analysis:"'
       - 'echo "  task lint              - Run go vet static analysis"'
@@ -113,6 +116,44 @@ tasks:
       - 'echo "✅ OpenSSL compatibility tests completed"'
     silent: false
 
+  test:compatibility:keypair:
+    desc: Run keypair compatibility tests only
+    env:
+      CGO_ENABLED: 1
+    cmds:
+      - mkdir -p output/
+      - |
+        echo "🔑 Running Keypair Compatibility Tests..."
+        echo "   Testing RSA, ECDSA, Ed25519 key compatibility with OpenSSL"
+      - go test -mod=mod ./compatibility/keypair -v -tags=compatibility
+      - 'echo "✅ Keypair compatibility tests completed"'
+    silent: false
+
+  test:compatibility:cert:
+    desc: Run certificate compatibility tests only
+    env:
+      CGO_ENABLED: 1
+    cmds:
+      - mkdir -p output/
+      - |
+        echo "📜 Running Certificate Compatibility Tests..."
+        echo "   Testing X.509 certificate compatibility with OpenSSL"
+      - go test -mod=mod ./compatibility/cert -v -tags=compatibility
+      - 'echo "✅ Certificate compatibility tests completed"'
+    silent: false
+
+  test:compatibility:signing:
+    desc: Run signing compatibility tests only
+    env:
+      CGO_ENABLED: 1
+    cmds:
+      - mkdir -p output/
+      - |
+        echo "✍️ Running Signing Compatibility Tests..."
+        echo "   Testing digital signature and PKCS#7/CMS compatibility with OpenSSL"
+      - go test -mod=mod ./compatibility/signing -v -tags=compatibility
+      - 'echo "✅ Signing compatibility tests completed"'
+    silent: false
 
   # Code Quality Tasks
   lint:

@@ -829,3 +829,185 @@ func (h *OpenSSLHelper) ValidateAuthorizedKeysFormat(publicKeyData []byte) error
 	// Validate using ssh-keygen
 	return h.ValidateSSHPublicKeyWithSSHKeygen(publicKeyData)
 }
+
+// Signing-specific OpenSSL helper functions for signature compatibility testing
+
+// CreatePKCS7SignatureWithOpenSSL creates a PKCS#7 signature using OpenSSL
+func (h *OpenSSLHelper) CreatePKCS7SignatureWithOpenSSL(data, privateKeyPEM, certPEM []byte, detached bool) ([]byte, error) {
+	keyFile := h.TempFile("sign_private.pem", privateKeyPEM)
+	certFile := h.TempFile("sign_cert.pem", certPEM)
+	dataFile := h.TempFile("sign_data.bin", data)
+	sigFile := filepath.Join(h.tempDir, "signature.p7s")
+
+	h.t.Logf("    → Creating PKCS#7 signature with OpenSSL (detached: %v)...", detached)
+
+	var args []string
+	if detached {
+		// For detached signatures, don't include -nodetach (default is detached)
+		args = []string{"cms", "-sign", "-in", dataFile, "-signer", certFile, "-inkey", keyFile,
+			"-out", sigFile, "-outform", "DER", "-binary"}
+	} else {
+		// For attached signatures, use -nodetach to include content
+		args = []string{"cms", "-sign", "-in", dataFile, "-signer", certFile, "-inkey", keyFile,
+			"-out", sigFile, "-outform", "DER", "-binary", "-nodetach"}
+	}
+
+	_, err := h.RunOpenSSL(args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create PKCS#7 signature: %v", err)
+	}
+
+	return os.ReadFile(sigFile)
+}
+
+// VerifyPKCS7SignatureWithOpenSSL verifies a PKCS#7 signature using OpenSSL
+func (h *OpenSSLHelper) VerifyPKCS7SignatureWithOpenSSL(data, signatureData []byte) error {
+	dataFile := h.TempFile("verify_data.bin", data)
+	sigFile := h.TempFile("verify_signature.p7s", signatureData)
+
+	h.t.Logf("    → Verifying PKCS#7 signature with OpenSSL...")
+
+	_, err := h.RunOpenSSL("cms", "-verify", "-in", sigFile, "-inform", "DER", "-content", dataFile, "-noverify")
+	if err == nil {
+		h.t.Logf("    ✓ PKCS#7 signature verification passed")
+	}
+	return err
+}
+
+// VerifyDetachedPKCS7SignatureWithOpenSSL verifies a detached PKCS#7 signature using OpenSSL
+func (h *OpenSSLHelper) VerifyDetachedPKCS7SignatureWithOpenSSL(data, signatureData []byte) error {
+	dataFile := h.TempFile("verify_detached_data.bin", data)
+	sigFile := h.TempFile("verify_detached_signature.p7s", signatureData)
+
+	h.t.Logf("    → Verifying detached PKCS#7 signature with OpenSSL...")
+
+	_, err := h.RunOpenSSL("cms", "-verify", "-in", sigFile, "-inform", "DER", "-content", dataFile, "-noverify")
+	if err == nil {
+		h.t.Logf("    ✓ Detached PKCS#7 signature verification passed")
+	}
+	return err
+}
+
+// VerifyPKCS7SignatureWithCertificateChainWithOpenSSL verifies PKCS#7 signature with certificate chain
+func (h *OpenSSLHelper) VerifyPKCS7SignatureWithCertificateChainWithOpenSSL(data, signatureData, caCertPEM []byte) error {
+	dataFile := h.TempFile("verify_chain_data.bin", data)
+	sigFile := h.TempFile("verify_chain_signature.p7s", signatureData)
+	caFile := h.TempFile("verify_chain_ca.pem", caCertPEM)
+
+	h.t.Logf("    → Verifying PKCS#7 signature with certificate chain using OpenSSL...")
+
+	_, err := h.RunOpenSSL("cms", "-verify", "-in", sigFile, "-inform", "DER", "-content", dataFile, "-CAfile", caFile)
+	if err == nil {
+		h.t.Logf("    ✓ PKCS#7 signature with certificate chain verification passed")
+	}
+	return err
+}
+
+// ExtractSignatureInfoWithOpenSSL extracts signature information using OpenSSL
+func (h *OpenSSLHelper) ExtractSignatureInfoWithOpenSSL(signatureData []byte) (string, error) {
+	sigFile := h.TempFile("extract_info_signature.p7s", signatureData)
+
+	h.t.Logf("    → Extracting signature information with OpenSSL...")
+
+	output, err := h.RunOpenSSL("cms", "-verify", "-in", sigFile, "-inform", "DER", "-print", "-noverify")
+	if err != nil {
+		return "", fmt.Errorf("failed to extract signature info: %v", err)
+	}
+
+	h.t.Logf("    ✓ Signature information extracted successfully")
+	return string(output), nil
+}
+
+// SignDataWithOpenSSLCMS creates a CMS signature using OpenSSL cms command
+func (h *OpenSSLHelper) SignDataWithOpenSSLCMS(data, privateKeyPEM, certPEM []byte, hashAlg string) ([]byte, error) {
+	keyFile := h.TempFile("cms_sign_private.pem", privateKeyPEM)
+	certFile := h.TempFile("cms_sign_cert.pem", certPEM)
+	dataFile := h.TempFile("cms_sign_data.bin", data)
+	sigFile := filepath.Join(h.tempDir, "cms_signature.p7s")
+
+	h.t.Logf("    → Creating CMS signature with OpenSSL using %s...", hashAlg)
+
+	args := []string{"cms", "-sign", "-in", dataFile, "-signer", certFile, "-inkey", keyFile,
+		"-out", sigFile, "-outform", "DER", "-binary"}
+
+	if hashAlg != "" {
+		args = append(args, "-md", hashAlg)
+	}
+
+	_, err := h.RunOpenSSL(args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create CMS signature: %v", err)
+	}
+
+	return os.ReadFile(sigFile)
+}
+
+// VerifyRawSignatureWithOpenSSL verifies a raw signature using OpenSSL dgst command
+func (h *OpenSSLHelper) VerifyRawSignatureWithOpenSSL(data, signature, publicKeyPEM []byte, algorithm, hashAlg string) error {
+	pubKeyFile := h.TempFile("raw_verify_key.pem", publicKeyPEM)
+	dataFile := h.TempFile("raw_verify_data.bin", data)
+	sigFile := h.TempFile("raw_verify_signature.bin", signature)
+
+	h.t.Logf("    → Verifying raw %s signature with OpenSSL...", algorithm)
+
+	switch strings.ToLower(algorithm) {
+	case "rsa", "ecdsa", "ec":
+		_, err := h.RunOpenSSL("dgst", "-"+hashAlg, "-verify", pubKeyFile, "-signature", sigFile, dataFile)
+		return err
+	case "ed25519":
+		_, err := h.RunOpenSSL("pkeyutl", "-verify", "-pubin", "-inkey", pubKeyFile, "-in", dataFile, "-sigfile", sigFile)
+		return err
+	default:
+		return fmt.Errorf("unsupported algorithm for raw signature verification: %s", algorithm)
+	}
+}
+
+// CreateRawSignatureWithOpenSSL creates a raw signature using OpenSSL
+func (h *OpenSSLHelper) CreateRawSignatureWithOpenSSL(data, privateKeyPEM []byte, algorithm, hashAlg string) ([]byte, error) {
+	keyFile := h.TempFile("raw_sign_private.pem", privateKeyPEM)
+	dataFile := h.TempFile("raw_sign_data.bin", data)
+	sigFile := filepath.Join(h.tempDir, "raw_signature.bin")
+
+	h.t.Logf("    → Creating raw %s signature with OpenSSL...", algorithm)
+
+	switch strings.ToLower(algorithm) {
+	case "rsa", "ecdsa", "ec":
+		_, err := h.RunOpenSSL("dgst", "-"+hashAlg, "-sign", keyFile, "-out", sigFile, dataFile)
+		if err != nil {
+			return nil, err
+		}
+	case "ed25519":
+		_, err := h.RunOpenSSL("pkeyutl", "-sign", "-inkey", keyFile, "-in", dataFile, "-out", sigFile)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unsupported algorithm for raw signature creation: %s", algorithm)
+	}
+
+	return os.ReadFile(sigFile)
+}
+
+// ValidateSignatureFormatWithOpenSSL validates signature format using OpenSSL
+func (h *OpenSSLHelper) ValidateSignatureFormatWithOpenSSL(signatureData []byte, format string) error {
+	sigFile := h.TempFile("validate_format_signature", signatureData)
+
+	h.t.Logf("    → Validating %s signature format with OpenSSL...", format)
+
+	switch strings.ToLower(format) {
+	case "pkcs7", "cms":
+		_, err := h.RunOpenSSL("cms", "-in", sigFile, "-inform", "DER", "-print", "-noout")
+		if err == nil {
+			h.t.Logf("    ✓ %s signature format validation passed", format)
+		}
+		return err
+	case "asn1", "der":
+		_, err := h.RunOpenSSL("asn1parse", "-in", sigFile, "-inform", "DER")
+		if err == nil {
+			h.t.Logf("    ✓ %s signature format validation passed", format)
+		}
+		return err
+	default:
+		return fmt.Errorf("unsupported signature format for validation: %s", format)
+	}
+}
