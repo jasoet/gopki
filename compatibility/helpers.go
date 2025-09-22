@@ -3,6 +3,7 @@ package compatibility
 import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -1153,4 +1154,248 @@ func (h *OpenSSLHelper) ValidateSignatureFormatWithOpenSSL(signatureData []byte,
 	default:
 		return fmt.Errorf("unsupported signature format for validation: %s", format)
 	}
+}
+
+// ===============================================
+// ENCRYPTION COMPATIBILITY HELPER FUNCTIONS
+// ===============================================
+
+// EncryptRSAOAEPWithOpenSSL encrypts data using RSA-OAEP with OpenSSL
+func (h *OpenSSLHelper) EncryptRSAOAEPWithOpenSSL(data []byte, publicKeyPEM []byte) ([]byte, error) {
+	publicKeyFile := h.TempFile("encrypt_public.pem", publicKeyPEM)
+	dataFile := h.TempFile("encrypt_data.bin", data)
+	encryptedFile := filepath.Join(h.tempDir, "encrypted.bin")
+
+	h.t.Logf("    → Encrypting with RSA-OAEP using OpenSSL...")
+
+	_, err := h.RunOpenSSL("pkeyutl", "-encrypt", "-pubin", "-inkey", publicKeyFile,
+		"-in", dataFile, "-out", encryptedFile, "-pkeyopt", "rsa_padding_mode:oaep")
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt with RSA-OAEP: %v", err)
+	}
+
+	h.t.Logf("    ✓ RSA-OAEP encryption successful")
+	return os.ReadFile(encryptedFile)
+}
+
+// DecryptRSAOAEPWithOpenSSL decrypts data using RSA-OAEP with OpenSSL
+func (h *OpenSSLHelper) DecryptRSAOAEPWithOpenSSL(encryptedData []byte, privateKeyPEM []byte) ([]byte, error) {
+	privateKeyFile := h.TempFile("decrypt_private.pem", privateKeyPEM)
+	encryptedFile := h.TempFile("encrypted_data.bin", encryptedData)
+	decryptedFile := filepath.Join(h.tempDir, "decrypted.bin")
+
+	h.t.Logf("    → Decrypting with RSA-OAEP using OpenSSL...")
+
+	_, err := h.RunOpenSSL("pkeyutl", "-decrypt", "-inkey", privateKeyFile,
+		"-in", encryptedFile, "-out", decryptedFile, "-pkeyopt", "rsa_padding_mode:oaep")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt with RSA-OAEP: %v", err)
+	}
+
+	h.t.Logf("    ✓ RSA-OAEP decryption successful")
+	return os.ReadFile(decryptedFile)
+}
+
+// PerformECDHWithOpenSSL performs ECDH key agreement using OpenSSL
+func (h *OpenSSLHelper) PerformECDHWithOpenSSL(privateKeyPEM []byte, peerPublicKeyPEM []byte) ([]byte, error) {
+	privateKeyFile := h.TempFile("ecdh_private.pem", privateKeyPEM)
+	publicKeyFile := h.TempFile("ecdh_public.pem", peerPublicKeyPEM)
+	secretFile := filepath.Join(h.tempDir, "shared_secret.bin")
+
+	h.t.Logf("    → Performing ECDH key agreement with OpenSSL...")
+
+	_, err := h.RunOpenSSL("pkeyutl", "-derive", "-inkey", privateKeyFile,
+		"-peerkey", publicKeyFile, "-out", secretFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to perform ECDH: %v", err)
+	}
+
+	h.t.Logf("    ✓ ECDH key agreement successful")
+	return os.ReadFile(secretFile)
+}
+
+// GenerateX25519KeyPairWithOpenSSL generates X25519 key pair using OpenSSL
+func (h *OpenSSLHelper) GenerateX25519KeyPairWithOpenSSL() ([]byte, []byte, error) {
+	privateKeyFile := filepath.Join(h.tempDir, "x25519_private.pem")
+	publicKeyFile := filepath.Join(h.tempDir, "x25519_public.pem")
+
+	h.t.Logf("    → Generating X25519 key pair with OpenSSL...")
+
+	// Generate X25519 private key
+	_, err := h.RunOpenSSL("genpkey", "-algorithm", "X25519", "-out", privateKeyFile)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate X25519 private key: %v", err)
+	}
+
+	// Extract public key
+	_, err = h.RunOpenSSL("pkey", "-in", privateKeyFile, "-pubout", "-out", publicKeyFile)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to extract X25519 public key: %v", err)
+	}
+
+	privateKeyPEM, err := os.ReadFile(privateKeyFile)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read private key: %v", err)
+	}
+
+	publicKeyPEM, err := os.ReadFile(publicKeyFile)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read public key: %v", err)
+	}
+
+	h.t.Logf("    ✓ X25519 key pair generation successful")
+	return privateKeyPEM, publicKeyPEM, nil
+}
+
+// PerformX25519WithOpenSSL performs X25519 key agreement using OpenSSL
+func (h *OpenSSLHelper) PerformX25519WithOpenSSL(privateKeyPEM []byte, peerPublicKeyPEM []byte) ([]byte, error) {
+	privateKeyFile := h.TempFile("x25519_private.pem", privateKeyPEM)
+	publicKeyFile := h.TempFile("x25519_public.pem", peerPublicKeyPEM)
+	secretFile := filepath.Join(h.tempDir, "x25519_secret.bin")
+
+	h.t.Logf("    → Performing X25519 key agreement with OpenSSL...")
+
+	_, err := h.RunOpenSSL("pkeyutl", "-derive", "-inkey", privateKeyFile,
+		"-peerkey", publicKeyFile, "-out", secretFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to perform X25519: %v", err)
+	}
+
+	h.t.Logf("    ✓ X25519 key agreement successful")
+	return os.ReadFile(secretFile)
+}
+
+// EncryptAESGCMWithOpenSSL encrypts data using AES-GCM with OpenSSL
+func (h *OpenSSLHelper) EncryptAESGCMWithOpenSSL(data []byte, key []byte, keySize int) ([]byte, []byte, []byte, error) {
+	dataFile := h.TempFile("aes_data.bin", data)
+	encryptedFile := filepath.Join(h.tempDir, "aes_encrypted.bin")
+	ivFile := filepath.Join(h.tempDir, "aes_iv.bin")
+
+	h.t.Logf("    → Encrypting with AES-%d-GCM using OpenSSL...", keySize)
+
+	algorithm := fmt.Sprintf("aes-%d-gcm", keySize)
+
+	// Generate random IV
+	iv := make([]byte, 12) // 96-bit IV for GCM
+	_, err := rand.Read(iv)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to generate IV: %v", err)
+	}
+
+	err = os.WriteFile(ivFile, iv, 0644)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to write IV: %v", err)
+	}
+
+	_, err = h.RunOpenSSL("enc", "-"+algorithm, "-in", dataFile, "-out", encryptedFile,
+		"-K", fmt.Sprintf("%x", key), "-iv", fmt.Sprintf("%x", iv))
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to encrypt with AES-GCM: %v", err)
+	}
+
+	encrypted, err := os.ReadFile(encryptedFile)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to read encrypted data: %v", err)
+	}
+
+	// Extract authentication tag (last 16 bytes of encrypted data for GCM)
+	if len(encrypted) < 16 {
+		return nil, nil, nil, fmt.Errorf("encrypted data too short for GCM tag")
+	}
+
+	ciphertext := encrypted[:len(encrypted)-16]
+	tag := encrypted[len(encrypted)-16:]
+
+	h.t.Logf("    ✓ AES-%d-GCM encryption successful", keySize)
+	return ciphertext, iv, tag, nil
+}
+
+// DecryptAESGCMWithOpenSSL decrypts data using AES-GCM with OpenSSL
+func (h *OpenSSLHelper) DecryptAESGCMWithOpenSSL(encryptedData []byte, key []byte, iv []byte, tag []byte, keySize int) ([]byte, error) {
+	// Combine encrypted data and tag for OpenSSL
+	combined := append(encryptedData, tag...)
+
+	encryptedFile := h.TempFile("aes_encrypted.bin", combined)
+	decryptedFile := filepath.Join(h.tempDir, "aes_decrypted.bin")
+
+	h.t.Logf("    → Decrypting with AES-%d-GCM using OpenSSL...", keySize)
+
+	algorithm := fmt.Sprintf("aes-%d-gcm", keySize)
+
+	_, err := h.RunOpenSSL("enc", "-d", "-"+algorithm, "-in", encryptedFile, "-out", decryptedFile,
+		"-K", fmt.Sprintf("%x", key), "-iv", fmt.Sprintf("%x", iv))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt with AES-GCM: %v", err)
+	}
+
+	h.t.Logf("    ✓ AES-%d-GCM decryption successful", keySize)
+	return os.ReadFile(decryptedFile)
+}
+
+// CreateTestCertificate creates a test certificate for encryption testing
+func (h *OpenSSLHelper) CreateTestCertificate(publicKey interface{}, privateKey interface{}, subject string) (*x509.Certificate, error) {
+	h.t.Logf("    → Creating test certificate for %s...", subject)
+
+	// Convert keys to PEM format
+	var privateKeyPEM []byte
+	var err error
+
+	switch priv := privateKey.(type) {
+	case *rsa.PrivateKey:
+		privateKeyPEM, err = x509.MarshalPKCS8PrivateKey(priv)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal RSA private key: %v", err)
+		}
+		privateKeyPEM = pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privateKeyPEM})
+
+	case *ecdsa.PrivateKey:
+		privateKeyPEM, err = x509.MarshalPKCS8PrivateKey(priv)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal ECDSA private key: %v", err)
+		}
+		privateKeyPEM = pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privateKeyPEM})
+
+	case ed25519.PrivateKey:
+		privateKeyPEM, err = x509.MarshalPKCS8PrivateKey(priv)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal Ed25519 private key: %v", err)
+		}
+		privateKeyPEM = pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privateKeyPEM})
+
+	default:
+		return nil, fmt.Errorf("unsupported private key type: %T", privateKey)
+	}
+
+	// Create certificate using existing helper
+	certPEM, err := h.GenerateSelfSignedCertWithOpenSSL(privateKeyPEM, subject, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create test certificate: %v", err)
+	}
+
+	// Parse certificate from PEM
+	block, _ := pem.Decode(certPEM)
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode certificate PEM")
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse certificate: %v", err)
+	}
+
+	h.t.Logf("    ✓ Test certificate created for %s", subject)
+	return cert, nil
+}
+
+// ValidateCMSWithOpenSSL validates CMS format using OpenSSL
+func (h *OpenSSLHelper) ValidateCMSWithOpenSSL(cmsData []byte) error {
+	cmsFile := h.TempFile("validate_cms.p7s", cmsData)
+
+	h.t.Logf("    → Validating CMS format with OpenSSL...")
+
+	_, err := h.RunOpenSSL("cms", "-in", cmsFile, "-inform", "DER", "-print", "-noout")
+	if err == nil {
+		h.t.Logf("    ✓ CMS format validation passed")
+	}
+	return err
 }
