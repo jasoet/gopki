@@ -37,6 +37,10 @@ type CertificateRequest struct {
 	IsCA           bool // Set to true to create a CA certificate
 	MaxPathLen     int  // Maximum depth of intermediate CAs (0 = can only sign end-entity certs, -1 = no limit)
 	MaxPathLenZero bool // Set to true to explicitly set MaxPathLen to 0
+
+	// Advanced certificate usage fields (optional)
+	KeyUsage    x509.KeyUsage      // Custom key usage flags (if not set, defaults based on IsCA)
+	ExtKeyUsage []x509.ExtKeyUsage // Custom extended key usage (if not set, defaults based on IsCA)
 }
 
 // CreateSelfSignedCertificate creates a new self-signed X.509 certificate using the provided key pair.
@@ -86,17 +90,55 @@ func CreateSelfSignedCertificate[T keypair.KeyPair](keyPair T, request Certifica
 		request.ValidFor = 365 * 24 * time.Hour // Default 1 year
 	}
 
+	// Determine key usage
+	var keyUsage x509.KeyUsage
+	var extKeyUsage []x509.ExtKeyUsage
+
+	// Check if custom key usage is provided
+	if request.KeyUsage != 0 {
+		keyUsage = request.KeyUsage
+	} else if request.IsCA {
+		// CA certificate
+		keyUsage = x509.KeyUsageCertSign | x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature
+	} else {
+		// End-entity certificate
+		keyUsage = x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature
+	}
+
+	// Check if custom extended key usage is provided
+	if request.ExtKeyUsage != nil {
+		extKeyUsage = request.ExtKeyUsage
+	} else if request.IsCA {
+		// CAs typically don't need extended key usage
+		extKeyUsage = nil
+	} else {
+		// End-entity certificate - for TLS/authentication
+		extKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}
+	}
+
 	template := x509.Certificate{
 		SerialNumber:          serialNumber,
 		Subject:               request.Subject,
 		NotBefore:             request.ValidFrom,
 		NotAfter:              request.ValidFrom.Add(request.ValidFor),
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		KeyUsage:              keyUsage,
+		ExtKeyUsage:           extKeyUsage,
 		BasicConstraintsValid: true,
+		IsCA:                  request.IsCA,
 		DNSNames:              request.DNSNames,
 		IPAddresses:           request.IPAddresses,
 		EmailAddresses:        request.EmailAddress,
+	}
+
+	// Set MaxPathLen for CA certificates
+	if request.IsCA {
+		if request.MaxPathLenZero {
+			template.MaxPathLen = 0
+			template.MaxPathLenZero = true
+		} else if request.MaxPathLen >= 0 {
+			template.MaxPathLen = request.MaxPathLen
+		}
+		// If MaxPathLen is -1, we don't set it (no limit)
 	}
 
 	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, publicKey, privateKey)
@@ -276,14 +318,25 @@ func SignCertificate[T keypair.KeyPair](caCert *Certificate, caKeyPair T, reques
 	var keyUsage x509.KeyUsage
 	var extKeyUsage []x509.ExtKeyUsage
 
-	if request.IsCA {
+	// Check if custom key usage is provided
+	if request.KeyUsage != 0 {
+		keyUsage = request.KeyUsage
+	} else if request.IsCA {
 		// CA certificate - can sign other certificates
 		keyUsage = x509.KeyUsageCertSign | x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature
+	} else {
+		// End-entity certificate - for TLS/authentication
+		keyUsage = x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature
+	}
+
+	// Check if custom extended key usage is provided
+	if request.ExtKeyUsage != nil {
+		extKeyUsage = request.ExtKeyUsage
+	} else if request.IsCA {
 		// CAs typically don't need extended key usage
 		extKeyUsage = nil
 	} else {
 		// End-entity certificate - for TLS/authentication
-		keyUsage = x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature
 		extKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}
 	}
 

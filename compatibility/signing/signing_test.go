@@ -311,8 +311,21 @@ func TestCertificateChainSigningCompatibility(t *testing.T) {
 	endManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
 	require.NoError(t, err, "Failed to generate end-entity key pair")
 
-	// Create end-entity certificate signed by CA
-	endCert, err := cert.SignCertificate(caCert, caManager.KeyPair(), testCertRequest, endManager.KeyPair().PublicKey)
+	// Create end-entity certificate signed by CA with proper signing extensions
+	endCertRequest := cert.CertificateRequest{
+		Subject:      testCertRequest.Subject,
+		DNSNames:     testCertRequest.DNSNames,
+		IPAddresses:  testCertRequest.IPAddresses,
+		EmailAddress: testCertRequest.EmailAddress,
+		ValidFrom:    testCertRequest.ValidFrom,
+		ValidFor:     testCertRequest.ValidFor,
+		// Add email protection and code signing for CMS/PKCS#7 compatibility
+		ExtKeyUsage: []x509.ExtKeyUsage{
+			x509.ExtKeyUsageEmailProtection,
+			x509.ExtKeyUsageCodeSigning,
+		},
+	}
+	endCert, err := cert.SignCertificate(caCert, caManager.KeyPair(), endCertRequest, endManager.KeyPair().PublicKey)
 	require.NoError(t, err, "Failed to create end-entity certificate")
 
 	t.Run("Certificate_Chain_Inclusion", func(t *testing.T) {
@@ -365,8 +378,8 @@ func TestSigningMetadataCompatibility(t *testing.T) {
 		require.NoError(t, err, "Failed to extract signature info with OpenSSL")
 
 		// Validate extracted information
-		assert.Contains(t, sigInfo, "Certificate", "Certificate info should be present")
-		assert.Contains(t, sigInfo, "Signature Algorithm", "Signature algorithm should be present")
+		assert.Contains(t, sigInfo, "cert_info", "Certificate info should be present")
+		assert.Contains(t, sigInfo, "signatureAlgorithm", "Signature algorithm should be present")
 
 		t.Logf("✓ Signature metadata extraction compatibility verified")
 	})

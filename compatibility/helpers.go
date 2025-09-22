@@ -909,7 +909,8 @@ func (h *OpenSSLHelper) ExtractSignatureInfoWithOpenSSL(signatureData []byte) (s
 
 	h.t.Logf("    → Extracting signature information with OpenSSL...")
 
-	output, err := h.RunOpenSSL("cms", "-verify", "-in", sigFile, "-inform", "DER", "-print", "-noverify")
+	// Use -cmsout -print to extract signature structure and certificate info
+	output, err := h.RunOpenSSL("cms", "-cmsout", "-print", "-in", sigFile, "-inform", "DER", "-noout")
 	if err != nil {
 		return "", fmt.Errorf("failed to extract signature info: %v", err)
 	}
