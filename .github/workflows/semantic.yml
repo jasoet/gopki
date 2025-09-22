@@ -29,6 +29,15 @@ jobs:
         with:
           go-version: '1.21'
 
+      # Install system dependencies for compatibility tests
+      - name: Install OpenSSL and OpenSSH
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openssl openssh-client
+          echo "Installed dependencies:"
+          openssl version
+          ssh -V
+
       # Install dependencies
       - name: Download dependencies
         run: go mod download
