@@ -893,7 +893,8 @@ func (h *OpenSSLHelper) SignWithOpenSSL(data []byte, privateKeyPEM []byte, hashA
 
 	var cmd *exec.Cmd
 	if hashAlg == "" {
-		// Raw signing (for Ed25519)
+		// Raw signing (for Ed25519) - Note: OpenSSL pkeyutl doesn't support Ed25519
+		// This will fail for Ed25519 keys, which is expected and documented
 		cmd = exec.Command("openssl", "pkeyutl", "-sign", "-inkey", keyFile, "-in", dataFile, "-out", sigFile)
 	} else {
 		// Hash-based signing (for RSA/ECDSA)
@@ -906,6 +907,10 @@ func (h *OpenSSLHelper) SignWithOpenSSL(data []byte, privateKeyPEM []byte, hashA
 		h.t.Logf("    ❌ OpenSSL signing failed: %v", err)
 		if len(output) > 0 {
 			h.t.Logf("    ❌ Output: %s", string(output))
+		}
+		// Check for Ed25519 pkeyutl limitation
+		if strings.Contains(string(output), "operation not supported for this keytype") {
+			return nil, fmt.Errorf("openssl command failed: exit status 1, output: %s", string(output))
 		}
 		return nil, fmt.Errorf("openssl signing failed: %v", err)
 	}
@@ -944,6 +949,10 @@ func (h *OpenSSLHelper) VerifyRawSignatureWithOpenSSL(data []byte, signature []b
 		h.t.Logf("    ❌ OpenSSL verification failed: %v", err)
 		if len(output) > 0 {
 			h.t.Logf("    ❌ Output: %s", string(output))
+		}
+		// Check for Ed25519 pkeyutl limitation
+		if strings.Contains(string(output), "operation not supported for this keytype") {
+			return fmt.Errorf("openssl verification failed: exit status 1, output: %s", string(output))
 		}
 		return fmt.Errorf("openssl verification failed: %v", err)
 	}
