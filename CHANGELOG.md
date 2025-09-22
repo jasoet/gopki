@@ -1,3 +1,29 @@
+## [1.15.0](https://github.com/jasoet/gopki/compare/v1.14.0...v1.15.0) (2025-09-22)
+
+
+### ✨ Features
+
+* **cert:** support custom key usage and extended key usage in certificate creation ([bf5a37c](https://github.com/jasoet/gopki/commit/bf5a37c59e3dd5ed1dbb945e15d94079002bc993))
+* **crypto:** add debug utilities for Ed25519 PKCS[#7](https://github.com/jasoet/gopki/issues/7) signature handling ([cce095b](https://github.com/jasoet/gopki/commit/cce095ba76af12ad68535ee12439d6c9889da394))
+* **crypto:** add Ed25519 PKCS[#7](https://github.com/jasoet/gopki/issues/7) signature creation and verification functions ([c1aaf55](https://github.com/jasoet/gopki/commit/c1aaf554e8a129121d9048ff656dfe79e2b3a5d5))
+* **crypto:** add Ed25519 to X25519 conversion and modular arithmetic utilities ([59cfbfc](https://github.com/jasoet/gopki/commit/59cfbfc96fd4b83dca6ee7893a4faa96fe7a17c9))
+* **signing:** replace VerifyDetachedSignature with VerifySignature for PKCS[#7](https://github.com/jasoet/gopki/issues/7) verification ([3b301b1](https://github.com/jasoet/gopki/commit/3b301b14131287355f6f7590ebb138cfc17c1b0b))
+
+
+### 🐛 Bug Fixes
+
+* **encryption:** update error messaging to reference RFC 7748 and improve Ed25519 compatibility ([2256547](https://github.com/jasoet/gopki/commit/2256547ec7ebca6a7c17402cf81a625a06ced3bd))
+
+
+### ✅ Tests
+
+* **compatibility:** add advanced SSH compatibility and edge case tests ([25ce698](https://github.com/jasoet/gopki/commit/25ce698063ca895347d910dd9eb2e17617429a3e))
+
+
+### 🔧 Miscellaneous
+
+* **crypto:** remove example Ed25519 RFC 8419 validation code and update tests ([fdc29ea](https://github.com/jasoet/gopki/commit/fdc29ea0fa3c05a84081c6df70641ac9910d6275)), closes [PKCS#7](https://github.com/jasoet/PKCS/issues/7)
+
 ## [1.14.0](https://github.com/jasoet/gopki/compare/v1.13.0...v1.14.0) (2025-09-19)
 
 
