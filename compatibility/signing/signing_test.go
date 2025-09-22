@@ -3,7 +3,6 @@
 package signing
 
 import (
-	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
@@ -177,8 +176,14 @@ func testRawSignatureCompatibility[T keypair.KeyPair, P keypair.PrivateKey, B ke
 			pkcs7Data, err := helper.CreatePKCS7SignatureWithOpenSSL(testData, privatePEM, certificate.PEMData, true)
 			require.NoError(t, err, "Failed to create detached PKCS#7 signature with OpenSSL")
 
-			// Use GoPKI's detached signature verification which is more flexible
-			err = signing.VerifyDetachedSignature(testData, pkcs7Data, certificate.Certificate, crypto.SHA256)
+			// Parse and verify PKCS#7 signature from OpenSSL
+			// OpenSSL creates PKCS#7 format even for detached signatures, not raw bytes
+			signature := &signing.Signature{
+				Format:      signing.FormatPKCS7Detached,
+				Data:        pkcs7Data,
+				Certificate: certificate.Certificate,
+			}
+			err = signing.VerifySignature(testData, signature, signing.DefaultVerifyOptions())
 			assert.NoError(t, err, "GoPKI failed to verify OpenSSL-generated detached PKCS#7 signature")
 
 			t.Logf("✓ OpenSSL %s detached PKCS#7 signature verified by GoPKI", algorithm)
@@ -217,8 +222,14 @@ func testPKCS7SignatureCompatibility[T keypair.KeyPair, P keypair.PrivateKey, B 
 			pkcs7Data, err := helper.CreatePKCS7SignatureWithOpenSSL(testData, privatePEM, certificate.PEMData, true)
 			require.NoError(t, err, "Failed to create detached PKCS#7 signature with OpenSSL")
 
-			// Use detached signature verification
-			err = signing.VerifyDetachedSignature(testData, pkcs7Data, certificate.Certificate, crypto.SHA256)
+			// Parse and verify PKCS#7 signature from OpenSSL
+			// OpenSSL creates PKCS#7 format even for detached signatures, not raw bytes
+			signature := &signing.Signature{
+				Format:      signing.FormatPKCS7Detached,
+				Data:        pkcs7Data,
+				Certificate: certificate.Certificate,
+			}
+			err = signing.VerifySignature(testData, signature, signing.DefaultVerifyOptions())
 			assert.NoError(t, err, "GoPKI failed to verify OpenSSL detached PKCS#7 signature")
 
 			t.Logf("✓ OpenSSL %s detached PKCS#7 signature verified by GoPKI", algorithm)
@@ -257,8 +268,14 @@ func testDetachedSignatureCompatibility[T keypair.KeyPair, P keypair.PrivateKey,
 			detachedSig, err := helper.CreatePKCS7SignatureWithOpenSSL(testData, privatePEM, certificate.PEMData, true)
 			require.NoError(t, err, "Failed to create detached PKCS#7 signature with OpenSSL")
 
-			// Verify with GoPKI detached verification
-			err = signing.VerifyDetachedSignature(testData, detachedSig, certificate.Certificate, crypto.SHA256)
+			// Parse and verify PKCS#7 detached signature from OpenSSL
+			// OpenSSL creates PKCS#7 format even for detached signatures, not raw bytes
+			signature := &signing.Signature{
+				Format:      signing.FormatPKCS7Detached,
+				Data:        detachedSig,
+				Certificate: certificate.Certificate,
+			}
+			err = signing.VerifySignature(testData, signature, signing.DefaultVerifyOptions())
 			assert.NoError(t, err, "GoPKI failed to verify OpenSSL detached signature")
 
 			t.Logf("✓ OpenSSL %s detached signature verified by GoPKI", algorithm)
