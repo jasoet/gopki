@@ -165,7 +165,7 @@ func TestEncryptDocument(t *testing.T) {
 		encrypted, err := EncryptDocument(testData, testCert, opts)
 		assert.Error(t, err)
 		assert.Nil(t, encrypted)
-		assert.Contains(t, err.Error(), "key derivation")
+		assert.Contains(t, err.Error(), "RFC 7748")
 	})
 
 	t.Run("Nil Certificate", func(t *testing.T) {
@@ -234,7 +234,7 @@ func TestDecryptDocument(t *testing.T) {
 		encrypted, err := EncryptDocument(testData, testCert, opts)
 		assert.Error(t, err)
 		assert.Nil(t, encrypted)
-		assert.Contains(t, err.Error(), "key derivation")
+		assert.Contains(t, err.Error(), "RFC 7748")
 	})
 
 	t.Run("Nil Encrypted Data", func(t *testing.T) {

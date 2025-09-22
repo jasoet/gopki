@@ -465,7 +465,19 @@ func DecryptForRecipient[T keypair.KeyPair](encrypted *encryption.EncryptedData,
 //	encrypted, err := envelope.EncryptWithCertificate(data, recipientCert, opts)
 func EncryptWithCertificate(data []byte, certificate *cert.Certificate, opts encryption.EncryptOptions) (*encryption.EncryptedData, error) {
 	publicKey := certificate.Certificate.PublicKey
-	return EncryptForPublicKeyAny(data, publicKey, opts)
+
+	// Call the underlying encryption but then enhance with certificate info
+	encryptedData, err := EncryptForPublicKeyAny(data, publicKey, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add certificate information to recipient info for CMS compatibility
+	if len(encryptedData.Recipients) > 0 {
+		encryptedData.Recipients[0].Certificate = certificate.Certificate
+	}
+
+	return encryptedData, nil
 }
 
 // EncryptForPublicKeyAny is a non-generic wrapper for EncryptForPublicKey that works with any public key type.
@@ -477,7 +489,7 @@ func EncryptForPublicKeyAny(data []byte, publicKey keypair.GenericPublicKey, opt
 	case *ecdsa.PublicKey:
 		return EncryptForPublicKey(data, pk, opts)
 	case ed25519.PublicKey:
-		return nil, fmt.Errorf("ed25519 public-key-only envelope encryption not supported due to key derivation limitations - use EncryptWithEd25519 for full key pair encryption instead")
+		return asymmetric.EncryptForPublicKey(data, pk, opts)
 	default:
 		return nil, fmt.Errorf("unsupported public key type: %T", publicKey)
 	}

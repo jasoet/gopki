@@ -233,13 +233,13 @@ func TestEncryptForPublicKey(t *testing.T) {
 			t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
 		}
 
-		// Ed25519 public-key-only encryption is not supported
+		// Ed25519 public-key-only encryption is not supported (requires RFC 7748 conversion)
 		_, err = EncryptForPublicKey(data, ed25519Keys.PublicKey, opts)
 		if err == nil {
 			t.Fatal("Expected Ed25519 public-key-only encryption to fail")
 		}
-		if !strings.Contains(err.Error(), "key derivation incompatibility") {
-			t.Errorf("Expected key derivation incompatibility error, got: %v", err)
+		if !strings.Contains(err.Error(), "RFC 7748") {
+			t.Errorf("Expected RFC 7748 error message, got: %v", err)
 		}
 	})
 
@@ -303,13 +303,13 @@ func TestEncryptForPublicKeyAny(t *testing.T) {
 			t.Fatalf("Failed to generate Ed25519 key: %v", err)
 		}
 
-		// Ed25519 public-key-only encryption is not supported
+		// Ed25519 public-key-only encryption is not supported (requires RFC 7748 conversion)
 		_, err = EncryptForPublicKeyAny(data, publicKey, opts)
 		if err == nil {
 			t.Fatal("Expected Ed25519 public-key-only encryption to fail")
 		}
-		if !strings.Contains(err.Error(), "key derivation incompatibility") {
-			t.Errorf("Expected key derivation incompatibility error, got: %v", err)
+		if !strings.Contains(err.Error(), "RFC 7748") {
+			t.Errorf("Expected RFC 7748 error message, got: %v", err)
 		}
 	})
 
@@ -768,14 +768,13 @@ func TestEncryptForPublicKeyRoundTrip(t *testing.T) {
 
 		for i, data := range testData {
 			t.Run(fmt.Sprintf("Data%d", i), func(t *testing.T) {
-				// Ed25519 public-key-only encryption is not supported due to key derivation incompatibility
-				// This is expected to fail with a specific error message
+				// Ed25519 public-key-only encryption is not supported (requires RFC 7748 conversion)
 				_, err := EncryptForPublicKey(data, ed25519Keys.PublicKey, opts)
 				if err == nil {
 					t.Fatal("Expected Ed25519 public-key-only encryption to fail")
 				}
-				if !strings.Contains(err.Error(), "key derivation incompatibility") {
-					t.Errorf("Expected key derivation incompatibility error, got: %v", err)
+				if !strings.Contains(err.Error(), "RFC 7748") {
+					t.Errorf("Expected RFC 7748 error message, got: %v", err)
 				}
 				t.Logf("Ed25519 public-key-only encryption correctly failed: %v", err)
 			})
@@ -809,13 +808,13 @@ func TestEncryptForPublicKeyCrossKeyDecryption(t *testing.T) {
 	})
 
 	t.Run("Ed25519 cross-key", func(t *testing.T) {
-		// Ed25519 public-key-only encryption is not supported
+		// Ed25519 public-key-only encryption is not supported (requires RFC 7748 conversion)
 		_, err := EncryptForPublicKey(data, ed25519Keys1.PublicKey, opts)
 		if err == nil {
 			t.Fatal("Expected Ed25519 public-key-only encryption to fail")
 		}
-		if !strings.Contains(err.Error(), "key derivation incompatibility") {
-			t.Errorf("Expected key derivation incompatibility error, got: %v", err)
+		if !strings.Contains(err.Error(), "RFC 7748") {
+			t.Errorf("Expected RFC 7748 error message, got: %v", err)
 		}
 		t.Log("Ed25519 cross-key test skipped due to public-key-only limitation")
 	})

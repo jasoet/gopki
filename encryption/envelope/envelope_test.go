@@ -253,7 +253,7 @@ func TestEncryptForPublicKey(t *testing.T) {
 		encrypted, err := EncryptForPublicKey(testData, ed25519Keys.PublicKey, opts)
 		assert.Error(t, err)
 		assert.Nil(t, encrypted)
-		assert.Contains(t, err.Error(), "key derivation")
+		assert.Contains(t, err.Error(), "RFC 7748")
 	})
 
 	t.Run("Round Trip with Public Key", func(t *testing.T) {
@@ -516,7 +516,7 @@ func TestEncryptWithCertificate(t *testing.T) {
 		encrypted, err := EncryptWithCertificate(testData, testCert, opts)
 		assert.Error(t, err)
 		assert.Nil(t, encrypted)
-		assert.Contains(t, err.Error(), "key derivation")
+		assert.Contains(t, err.Error(), "RFC 7748")
 	})
 
 	t.Run("Nil Certificate", func(t *testing.T) {

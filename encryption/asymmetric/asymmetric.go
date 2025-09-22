@@ -399,13 +399,15 @@ func encryptForECDSAPublicKey(data []byte, publicKey *ecdsa.PublicKey, opts encr
 // encryptForEd25519PublicKey encrypts data for an Ed25519 public key using ephemeral X25519 key agreement.
 // This function mirrors the logic from EncryptWithEd25519 but works with just the public key.
 //
-// NOTE: This function currently has a limitation - we can only encrypt for Ed25519 public keys
-// if we also have access to the corresponding private key seed, because the Ed25519 public key
-// to X25519 conversion is not compatible with Go's standard Ed25519 private key to X25519 conversion.
+// NOTE: This function has a fundamental limitation - Ed25519 public keys cannot be directly
+// converted to the equivalent X25519 public keys that would be derived from the same Ed25519 seed.
+// The mathematical conversion requires RFC 7748 point conversion (Montgomery ladder), which is
+// complex and not currently implemented.
 //
-// For now, we return an error directing users to use the full key pair encryption method.
+// For now, this returns an error directing users to use the full key pair encryption method.
+// A future implementation could add the proper RFC 7748 conversion.
 func encryptForEd25519PublicKey(data []byte, publicKey ed25519.PublicKey, opts encryption.EncryptOptions) (*encryption.EncryptedData, error) {
-	return nil, fmt.Errorf("Ed25519 public-key-only encryption not yet supported due to key derivation incompatibility - use EncryptWithEd25519 with full key pair instead")
+	return nil, fmt.Errorf("Ed25519 public-key-only encryption requires RFC 7748 point conversion (not yet implemented) - use EncryptWithEd25519 with full key pair instead, or use envelope.Encrypt for multi-recipient scenarios")
 }
 
 // decryptWithECDSAPrivateKey decrypts ECDH encrypted data using an ECDSA private key.
