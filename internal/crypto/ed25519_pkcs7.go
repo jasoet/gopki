@@ -129,7 +129,7 @@ func CreateEd25519PKCS7Signature(data []byte, privateKey ed25519.PrivateKey, cer
 		}
 		ci = contentInfo{
 			ContentType: oidData,
-			Content:     asn1.RawValue{Tag: 0, Class: 2, IsCompound: true, FullBytes: contentData},
+			Content:     asn1.RawValue{Tag: 0, Class: 2, IsCompound: true, Bytes: contentData},
 		}
 	}
 
@@ -152,9 +152,10 @@ func CreateEd25519PKCS7Signature(data []byte, privateKey ed25519.PrivateKey, cer
 	}
 
 	// Create final content info wrapper with proper explicit tag
+	// The Content field needs to be properly wrapped as explicit tag 0
 	finalContentInfo := contentInfo{
 		ContentType: oidSignedData,
-		Content:     asn1.RawValue{Tag: 0, Class: 2, IsCompound: true, FullBytes: signedDataBytes},
+		Content:     asn1.RawValue{Tag: 0, Class: 2, IsCompound: true, Bytes: signedDataBytes},
 	}
 
 	// Marshal final PKCS#7 structure
@@ -183,9 +184,9 @@ func VerifyEd25519PKCS7Signature(data []byte, pkcs7Data []byte) (*Ed25519PKCS7In
 		return nil, fmt.Errorf("not a signed data PKCS#7 structure")
 	}
 
-	// Parse signed data
+	// Parse signed data - the content is wrapped in explicit tag, so use Bytes
 	var sd signedData
-	_, err = asn1.Unmarshal(ci.Content.FullBytes, &sd)
+	_, err = asn1.Unmarshal(ci.Content.Bytes, &sd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse signed data: %w", err)
 	}
@@ -261,7 +262,7 @@ func IsEd25519PKCS7(pkcs7Data []byte) (bool, error) {
 	}
 
 	var sd signedData
-	_, err = asn1.Unmarshal(ci.Content.FullBytes, &sd)
+	_, err = asn1.Unmarshal(ci.Content.Bytes, &sd)
 	if err != nil {
 		return false, fmt.Errorf("failed to parse signed data: %w", err)
 	}
@@ -295,7 +296,7 @@ func ValidateEd25519PKCS7Structure(pkcs7Data []byte) error {
 	}
 
 	var sd signedData
-	_, err = asn1.Unmarshal(ci.Content.FullBytes, &sd)
+	_, err = asn1.Unmarshal(ci.Content.Bytes, &sd)
 	if err != nil {
 		return fmt.Errorf("failed to parse signed data: %w", err)
 	}

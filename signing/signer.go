@@ -102,8 +102,8 @@ func SignDocument[T keypair.KeyPair](data []byte, keyPair T, certificate *cert.C
 			return nil, fmt.Errorf("invalid Ed25519 private key type")
 		}
 
-		// Use simple Ed25519 PKCS#7 format for now (will be replaced with full ASN.1 implementation)
-		pkcs7Data, err := internalcrypto.SimpleEd25519PKCS7(data, ed25519PrivKey, certificate.Certificate)
+		// Use RFC 8419 ASN.1 Ed25519 PKCS#7 format
+		pkcs7Data, err := internalcrypto.CreateEd25519PKCS7Signature(data, ed25519PrivKey, certificate.Certificate, opts.Detached)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Ed25519 PKCS#7 signature: %w", err)
 		}

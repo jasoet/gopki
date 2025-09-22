@@ -115,10 +115,10 @@ func VerifySignature(data []byte, signature *Signature, opts VerifyOptions) erro
 	// Use PKCS#7 verification for all algorithms including Ed25519
 	switch signature.Format {
 	case FormatPKCS7, FormatPKCS7Detached:
-		// Check if this is an Ed25519 PKCS#7 signature (simple format for now)
-		if internalcrypto.IsSimpleEd25519PKCS7(signature.Data) {
-			// Use our simple Ed25519 PKCS#7 verification
-			return verifySimpleEd25519PKCS7Signature(data, signature)
+		// Check if this is an Ed25519 PKCS#7 signature (RFC 8419 ASN.1 format)
+		if isEd25519, err := internalcrypto.IsEd25519PKCS7(signature.Data); err == nil && isEd25519 {
+			// Use RFC 8419 Ed25519 PKCS#7 verification
+			return verifyEd25519PKCS7Signature(data, signature)
 		}
 		// Use standard PKCS#7 verification for RSA and ECDSA
 		return verifyPKCS7SignatureFormat(data, signature, opts)
@@ -587,10 +587,10 @@ func verifyPKCS7SignatureFormat(data []byte, signature *Signature, opts VerifyOp
 	return nil
 }
 
-// verifySimpleEd25519PKCS7Signature verifies an Ed25519 PKCS#7 signature using our simple implementation
-func verifySimpleEd25519PKCS7Signature(data []byte, signature *Signature) error {
-	// Use our simple Ed25519 PKCS#7 verification
-	info, err := internalcrypto.VerifySimpleEd25519PKCS7(data, signature.Data)
+// verifyEd25519PKCS7Signature verifies an Ed25519 PKCS#7 signature using RFC 8419 ASN.1 implementation
+func verifyEd25519PKCS7Signature(data []byte, signature *Signature) error {
+	// Use RFC 8419 Ed25519 PKCS#7 verification
+	info, err := internalcrypto.VerifyEd25519PKCS7Signature(data, signature.Data)
 	if err != nil {
 		return fmt.Errorf("Ed25519 PKCS#7 verification failed: %w", err)
 	}

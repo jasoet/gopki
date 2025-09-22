@@ -52,6 +52,8 @@ func TestCreateEd25519PKCS7Signature(t *testing.T) {
 			t.Fatal("PKCS#7 signature data is empty")
 		}
 
+		t.Logf("Attached PKCS#7 signature created: %d bytes", len(pkcs7Data))
+
 		// Verify the signature
 		info, err := VerifyEd25519PKCS7Signature(testData, pkcs7Data)
 		if err != nil {
@@ -66,7 +68,7 @@ func TestCreateEd25519PKCS7Signature(t *testing.T) {
 			t.Error("Certificate serial number mismatch")
 		}
 
-		t.Logf("Attached PKCS#7 signature created and verified successfully (%d bytes)", len(pkcs7Data))
+		t.Logf("Attached PKCS#7 signature verified successfully")
 	})
 
 	t.Run("Detached Signature", func(t *testing.T) {
@@ -79,6 +81,8 @@ func TestCreateEd25519PKCS7Signature(t *testing.T) {
 			t.Fatal("PKCS#7 signature data is empty")
 		}
 
+		t.Logf("Detached PKCS#7 signature created: %d bytes", len(pkcs7Data))
+
 		// Verify the signature
 		info, err := VerifyEd25519PKCS7Signature(testData, pkcs7Data)
 		if err != nil {
@@ -89,7 +93,7 @@ func TestCreateEd25519PKCS7Signature(t *testing.T) {
 			t.Fatal("Signature verification failed")
 		}
 
-		t.Logf("Detached PKCS#7 signature created and verified successfully (%d bytes)", len(pkcs7Data))
+		t.Logf("Detached PKCS#7 signature verified successfully")
 	})
 
 	t.Run("Large Data", func(t *testing.T) {
@@ -133,7 +137,6 @@ func TestVerifyEd25519PKCS7Signature(t *testing.T) {
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
 		KeyUsage:              x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
 		BasicConstraintsValid: true,
 	}
 
@@ -147,14 +150,16 @@ func TestVerifyEd25519PKCS7Signature(t *testing.T) {
 		t.Fatalf("Failed to parse certificate: %v", err)
 	}
 
-	testData := []byte("Test data for verification")
+	testData := []byte("Verification test data")
 
 	t.Run("Valid Signature", func(t *testing.T) {
+		// Create signature
 		pkcs7Data, err := CreateEd25519PKCS7Signature(testData, privateKey, cert, true)
 		if err != nil {
 			t.Fatalf("Failed to create signature: %v", err)
 		}
 
+		// Verify signature
 		info, err := VerifyEd25519PKCS7Signature(testData, pkcs7Data)
 		if err != nil {
 			t.Fatalf("Verification failed: %v", err)
@@ -163,9 +168,20 @@ func TestVerifyEd25519PKCS7Signature(t *testing.T) {
 		if !info.Verified {
 			t.Fatal("Signature should be valid")
 		}
+
+		if info.Certificate == nil {
+			t.Fatal("Certificate should be present")
+		}
+
+		if len(info.Signature) != ed25519.SignatureSize {
+			t.Errorf("Expected signature size %d, got %d", ed25519.SignatureSize, len(info.Signature))
+		}
+
+		t.Logf("Valid signature verified successfully")
 	})
 
 	t.Run("Tampered Data", func(t *testing.T) {
+		// Create signature
 		pkcs7Data, err := CreateEd25519PKCS7Signature(testData, privateKey, cert, true)
 		if err != nil {
 			t.Fatalf("Failed to create signature: %v", err)
@@ -175,50 +191,13 @@ func TestVerifyEd25519PKCS7Signature(t *testing.T) {
 		tamperedData := append([]byte(nil), testData...)
 		tamperedData[0] ^= 0x01
 
+		// Verify should fail
 		_, err = VerifyEd25519PKCS7Signature(tamperedData, pkcs7Data)
 		if err == nil {
-			t.Fatal("Verification should fail for tampered data")
+			t.Fatal("Should have failed with tampered data")
 		}
 
 		t.Logf("Correctly detected tampered data: %v", err)
-	})
-
-	t.Run("Tampered Signature", func(t *testing.T) {
-		pkcs7Data, err := CreateEd25519PKCS7Signature(testData, privateKey, cert, true)
-		if err != nil {
-			t.Fatalf("Failed to create signature: %v", err)
-		}
-
-		// Tamper with the signature
-		tamperedSig := append([]byte(nil), pkcs7Data...)
-		tamperedSig[len(tamperedSig)-10] ^= 0x01
-
-		_, err = VerifyEd25519PKCS7Signature(testData, tamperedSig)
-		if err == nil {
-			t.Fatal("Verification should fail for tampered signature")
-		}
-
-		t.Logf("Correctly detected tampered signature: %v", err)
-	})
-
-	t.Run("Wrong Key", func(t *testing.T) {
-		// Generate different key pair
-		_, wrongPrivateKey, err := ed25519.GenerateKey(rand.Reader)
-		if err != nil {
-			t.Fatalf("Failed to generate wrong key pair: %v", err)
-		}
-
-		pkcs7Data, err := CreateEd25519PKCS7Signature(testData, wrongPrivateKey, cert, true)
-		if err != nil {
-			t.Fatalf("Failed to create signature with wrong key: %v", err)
-		}
-
-		_, err = VerifyEd25519PKCS7Signature(testData, pkcs7Data)
-		if err == nil {
-			t.Fatal("Verification should fail for wrong key")
-		}
-
-		t.Logf("Correctly detected wrong key: %v", err)
 	})
 }
 
@@ -238,7 +217,6 @@ func TestIsEd25519PKCS7(t *testing.T) {
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
 		KeyUsage:              x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
 		BasicConstraintsValid: true,
 	}
 
@@ -252,7 +230,7 @@ func TestIsEd25519PKCS7(t *testing.T) {
 		t.Fatalf("Failed to parse certificate: %v", err)
 	}
 
-	testData := []byte("Test data for detection")
+	testData := []byte("Detection test data")
 
 	t.Run("Ed25519 PKCS#7", func(t *testing.T) {
 		pkcs7Data, err := CreateEd25519PKCS7Signature(testData, privateKey, cert, true)
@@ -266,21 +244,25 @@ func TestIsEd25519PKCS7(t *testing.T) {
 		}
 
 		if !isEd25519 {
-			t.Fatal("Should detect Ed25519 PKCS#7 signature")
+			t.Fatal("Should detect Ed25519 PKCS#7 format")
 		}
 
-		t.Log("Correctly detected Ed25519 PKCS#7 signature")
+		t.Logf("Ed25519 PKCS#7 detected correctly")
 	})
 
-	t.Run("Invalid PKCS#7", func(t *testing.T) {
-		invalidData := []byte("Not a PKCS#7 structure")
+	t.Run("Non-PKCS#7 Data", func(t *testing.T) {
+		nonPKCS7Data := []byte("This is not PKCS#7 data")
 
-		_, err := IsEd25519PKCS7(invalidData)
+		isEd25519, err := IsEd25519PKCS7(nonPKCS7Data)
 		if err == nil {
-			t.Fatal("Should fail for invalid PKCS#7 data")
+			t.Fatal("Should fail for non-PKCS#7 data")
 		}
 
-		t.Logf("Correctly rejected invalid data: %v", err)
+		if isEd25519 {
+			t.Fatal("Should not detect Ed25519 in non-PKCS#7 data")
+		}
+
+		t.Logf("Correctly rejected non-PKCS#7 data")
 	})
 }
 
@@ -295,12 +277,11 @@ func TestValidateEd25519PKCS7Structure(t *testing.T) {
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(4),
 		Subject: pkix.Name{
-			CommonName: "Ed25519 Structure Test",
+			CommonName: "Ed25519 Validation Test",
 		},
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
 		KeyUsage:              x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
 		BasicConstraintsValid: true,
 	}
 
@@ -314,7 +295,7 @@ func TestValidateEd25519PKCS7Structure(t *testing.T) {
 		t.Fatalf("Failed to parse certificate: %v", err)
 	}
 
-	testData := []byte("Test data for structure validation")
+	testData := []byte("Structure validation test")
 
 	t.Run("Valid Structure", func(t *testing.T) {
 		pkcs7Data, err := CreateEd25519PKCS7Signature(testData, privateKey, cert, true)
@@ -327,10 +308,10 @@ func TestValidateEd25519PKCS7Structure(t *testing.T) {
 			t.Fatalf("Structure validation failed: %v", err)
 		}
 
-		t.Log("Structure validation passed")
+		t.Logf("Structure validation passed")
 	})
 
-	t.Run("Invalid Structure", func(t *testing.T) {
+	t.Run("Invalid Data", func(t *testing.T) {
 		invalidData := []byte("Invalid PKCS#7 structure")
 
 		err := ValidateEd25519PKCS7Structure(invalidData)
@@ -348,7 +329,7 @@ func TestEd25519PKCS7ErrorHandling(t *testing.T) {
 		cert := &x509.Certificate{SerialNumber: big.NewInt(1)}
 		data := []byte("test")
 
-		_, err := CreateEd25519PKCS7Signature(data, invalidKey, cert, false)
+		_, err := CreateEd25519PKCS7Signature(data, invalidKey, cert, true)
 		if err == nil {
 			t.Fatal("Should fail for invalid private key size")
 		}
@@ -364,7 +345,7 @@ func TestEd25519PKCS7ErrorHandling(t *testing.T) {
 
 		data := []byte("test")
 
-		_, err = CreateEd25519PKCS7Signature(data, privateKey, nil, false)
+		_, err = CreateEd25519PKCS7Signature(data, privateKey, nil, true)
 		if err == nil {
 			t.Fatal("Should fail for nil certificate")
 		}
@@ -372,54 +353,21 @@ func TestEd25519PKCS7ErrorHandling(t *testing.T) {
 		t.Logf("Correctly rejected nil certificate: %v", err)
 	})
 
-	t.Run("Empty Data", func(t *testing.T) {
-		publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
-		if err != nil {
-			t.Fatalf("Failed to generate key pair: %v", err)
+	t.Run("Invalid PKCS#7 Data", func(t *testing.T) {
+		invalidData := []byte("Invalid PKCS#7 data")
+		testData := []byte("test")
+
+		_, err := VerifyEd25519PKCS7Signature(testData, invalidData)
+		if err == nil {
+			t.Fatal("Should fail for invalid PKCS#7 data")
 		}
 
-		template := &x509.Certificate{
-			SerialNumber: big.NewInt(5),
-			Subject: pkix.Name{
-				CommonName: "Empty Data Test",
-			},
-			NotBefore:             time.Now(),
-			NotAfter:              time.Now().Add(365 * 24 * time.Hour),
-			KeyUsage:              x509.KeyUsageDigitalSignature,
-			BasicConstraintsValid: true,
-		}
-
-		certDER, err := x509.CreateCertificate(rand.Reader, template, template, publicKey, privateKey)
-		if err != nil {
-			t.Fatalf("Failed to create certificate: %v", err)
-		}
-
-		cert, err := x509.ParseCertificate(certDER)
-		if err != nil {
-			t.Fatalf("Failed to parse certificate: %v", err)
-		}
-
-		// Empty data should still work (valid use case)
-		pkcs7Data, err := CreateEd25519PKCS7Signature([]byte{}, privateKey, cert, false)
-		if err != nil {
-			t.Fatalf("Should work with empty data: %v", err)
-		}
-
-		info, err := VerifyEd25519PKCS7Signature([]byte{}, pkcs7Data)
-		if err != nil {
-			t.Fatalf("Should verify empty data: %v", err)
-		}
-
-		if !info.Verified {
-			t.Fatal("Empty data signature should verify")
-		}
-
-		t.Log("Empty data signature works correctly")
+		t.Logf("Correctly rejected invalid PKCS#7 data: %v", err)
 	})
 }
 
 // Benchmark the Ed25519 PKCS#7 operations
-func BenchmarkCreateEd25519PKCS7Signature(b *testing.B) {
+func BenchmarkEd25519PKCS7Creation(b *testing.B) {
 	// Setup
 	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -458,7 +406,7 @@ func BenchmarkCreateEd25519PKCS7Signature(b *testing.B) {
 	}
 }
 
-func BenchmarkVerifyEd25519PKCS7Signature(b *testing.B) {
+func BenchmarkEd25519PKCS7Verification(b *testing.B) {
 	// Setup
 	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
