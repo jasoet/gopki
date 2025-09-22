@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	internalcrypto "github.com/jasoet/gopki/internal/crypto"
 	"github.com/smallstep/pkcs7"
 )
 
@@ -111,14 +112,15 @@ func VerifySignature(data []byte, signature *Signature, opts VerifyOptions) erro
 		}
 	}
 
-	// Use hybrid verification approach
+	// Use PKCS#7 verification for all algorithms including Ed25519
 	switch signature.Format {
 	case FormatPKCS7, FormatPKCS7Detached:
-		// Ed25519 uses raw signatures stored in PKCS#7 format field for consistency
-		if signature.Algorithm == AlgorithmEd25519 {
-			return verifyEd25519RawSignature(data, signature)
+		// Check if this is an Ed25519 PKCS#7 signature (simple format for now)
+		if internalcrypto.IsSimpleEd25519PKCS7(signature.Data) {
+			// Use our simple Ed25519 PKCS#7 verification
+			return verifySimpleEd25519PKCS7Signature(data, signature)
 		}
-		// Use PKCS#7 verification for RSA and ECDSA
+		// Use standard PKCS#7 verification for RSA and ECDSA
 		return verifyPKCS7SignatureFormat(data, signature, opts)
 	default:
 		return fmt.Errorf("unsupported signature format: %s", signature.Format)
@@ -585,16 +587,26 @@ func verifyPKCS7SignatureFormat(data []byte, signature *Signature, opts VerifyOp
 	return nil
 }
 
-// verifyEd25519RawSignature verifies an Ed25519 raw signature
-func verifyEd25519RawSignature(data []byte, signature *Signature) error {
-	ed25519Key, ok := signature.Certificate.PublicKey.(ed25519.PublicKey)
-	if !ok {
-		return fmt.Errorf("certificate does not contain an Ed25519 public key")
+// verifySimpleEd25519PKCS7Signature verifies an Ed25519 PKCS#7 signature using our simple implementation
+func verifySimpleEd25519PKCS7Signature(data []byte, signature *Signature) error {
+	// Use our simple Ed25519 PKCS#7 verification
+	info, err := internalcrypto.VerifySimpleEd25519PKCS7(data, signature.Data)
+	if err != nil {
+		return fmt.Errorf("Ed25519 PKCS#7 verification failed: %w", err)
 	}
 
-	// Ed25519 verifies the message directly, not a hash
-	if !ed25519.Verify(ed25519Key, data, signature.Data) {
+	if !info.Verified {
 		return ErrVerificationFailed
+	}
+
+	// Verify the certificate matches (if provided in signature)
+	if signature.Certificate != nil {
+		if !signature.Certificate.Equal(info.Certificate) {
+			return fmt.Errorf("certificate mismatch between signature and PKCS#7 data")
+		}
+	} else {
+		// Populate certificate from PKCS#7 data
+		signature.Certificate = info.Certificate
 	}
 
 	return nil

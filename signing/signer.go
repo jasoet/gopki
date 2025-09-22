@@ -13,6 +13,7 @@ import (
 	"os"
 
 	"github.com/jasoet/gopki/cert"
+	internalcrypto "github.com/jasoet/gopki/internal/crypto"
 	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
 	"github.com/smallstep/pkcs7"
@@ -93,15 +94,20 @@ func SignDocument[T keypair.KeyPair](data []byte, keyPair T, certificate *cert.C
 
 	var signatureData []byte
 
-	// Hybrid approach: PKCS#7 for RSA/ECDSA, raw signatures for Ed25519
+	// Use PKCS#7 for all algorithms including Ed25519 (now supported via internal implementation)
 	if algorithm == AlgorithmEd25519 {
-		// Ed25519 is not supported by current PKCS#7 libraries (RFC 8419 not implemented)
-		// Use raw signature approach for Ed25519
-		rawSig, err := privateKey.Sign(rand.Reader, data, crypto.Hash(0))
-		if err != nil {
-			return nil, fmt.Errorf("failed to sign data with Ed25519: %w", err)
+		// Use our custom Ed25519 PKCS#7 implementation (RFC 8419)
+		ed25519PrivKey, ok := privateKey.(ed25519.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("invalid Ed25519 private key type")
 		}
-		signatureData = rawSig
+
+		// Use simple Ed25519 PKCS#7 format for now (will be replaced with full ASN.1 implementation)
+		pkcs7Data, err := internalcrypto.SimpleEd25519PKCS7(data, ed25519PrivKey, certificate.Certificate)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Ed25519 PKCS#7 signature: %w", err)
+		}
+		signatureData = pkcs7Data
 	} else {
 		// Use PKCS#7 for RSA and ECDSA
 		signedData, err := pkcs7.NewSignedData(data)
