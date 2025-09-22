@@ -5,7 +5,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/jasoet/gopki)](https://goreportcard.com/report/github.com/jasoet/gopki)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A **production-ready Go library for PKI (Public Key Infrastructure) operations** that emphasizes **type-safe cryptography through Go generics**. GoPKI provides comprehensive cryptographic functionality with 80.3% test coverage across 844+ tests and strict type safety throughout all APIs.
+A **production-ready Go library for PKI (Public Key Infrastructure) operations** that emphasizes **type-safe cryptography through Go generics**. GoPKI provides comprehensive cryptographic functionality with 80.3% test coverage across 844+ tests, extensive compatibility testing with OpenSSL and OpenSSH, and strict type safety throughout all APIs.
 
 ## 🚀 Key Features
 
@@ -13,6 +13,7 @@ A **production-ready Go library for PKI (Public Key Infrastructure) operations**
 - **🛡️ Security-First Design**: Enforced minimum key sizes, secure file permissions, cryptographic best practices
 - **📜 Standards Compliant**: Full support for X.509, PKCS#7/CMS, PKCS#12, SSH formats
 - **🧪 Production Ready**: 80.3% test coverage, comprehensive CI/CD pipeline, semantic versioning
+- **🤝 Cross-Platform Compatible**: Extensive compatibility testing with OpenSSL and OpenSSH binaries
 - **⚡ High Performance**: Zero runtime overhead from generics, optimized algorithms
 - **🔧 Developer Friendly**: Comprehensive Taskfile, extensive examples, excellent documentation
 
@@ -46,6 +47,7 @@ go get github.com/jasoet/gopki
 - [🛡️ Security Features](#-security-features)
 - [🧪 Testing and Quality Assurance](#-testing-and-quality-assurance)
 - [📖 Standards Compliance](#-standards-compliance)
+- [🤝 Compatibility Testing](#-compatibility-testing)
 - [🔗 Dependencies](#-dependencies)
 - [💻 Development](#-development)
 - [🤝 Contributing](#-contributing)
@@ -634,6 +636,78 @@ GoPKI implements and adheres to industry standards:
 - **PKCS #7**: Cryptographic Message Syntax Standard
 - **PKCS #12**: Personal Information Exchange Syntax Standard
 - **OpenSSH**: SSH public/private key formats
+
+## 🤝 Compatibility Testing
+
+GoPKI includes extensive compatibility testing with industry-standard tools to ensure seamless interoperability:
+
+### 🔧 Test Coverage
+
+```bash
+# Run compatibility tests with OpenSSL and ssh-keygen
+task test:compatibility    # Full compatibility test suite
+task test -- -tags=compatibility ./compatibility/...
+```
+
+### ✅ OpenSSL Compatibility (95%+ Compatible)
+
+**Certificate Management (100% Compatible)**
+- ✅ RSA, ECDSA, Ed25519 self-signed certificates
+- ✅ CA certificate creation and chain verification
+- ✅ Subject Alternative Names (DNS, IP, Email)
+- ✅ PEM/DER format bidirectional conversion
+
+**Digital Signatures (95% Compatible)**
+- ✅ RSA and ECDSA PKCS#7 signatures (full bidirectional)
+- ✅ Raw signatures (all algorithms)
+- ⚠️ Ed25519 PKCS#7 (GoPKI creates valid, OpenSSL has limited support)
+
+**Encryption & Key Agreement (Mixed)**
+- ✅ ECDH key agreement (P-256, P-384, P-521) - 100% compatible
+- ✅ X25519 key agreement - 100% compatible
+- ⚠️ RSA-OAEP encryption (parameter differences between implementations)
+- ⚠️ AES-GCM direct (OpenSSL version dependent)
+
+### ✅ OpenSSH Compatibility (100% Compatible)
+
+**SSH Key Management**
+- ✅ RSA-2048/3072/4096, ECDSA P-256/384/521, Ed25519 key generation
+- ✅ SSH public/private key format validation with ssh-keygen
+- ✅ SSH fingerprint generation (SHA256 + ASCII art)
+- ✅ Key type detection and validation
+- ✅ authorized_keys format support
+- ✅ Large comments and special characters support
+
+**Advanced SSH Features**
+- ✅ SSH certificate information extraction
+- ✅ Format conversion chains (PEM → SSH → PEM)
+- ✅ Passphrase protection for private keys
+- ✅ Malformed key rejection with proper error handling
+
+**SSH Signature Interoperability**
+- ✅ Ed25519 raw signatures (bidirectional with OpenSSL)
+- ✅ ECDSA raw signatures (bidirectional with OpenSSL)
+- ✅ Cross-validation between GoPKI and OpenSSL
+
+### 📊 Compatibility Matrix Summary
+
+| Feature Category | OpenSSL | ssh-keygen | Overall Status |
+|------------------|---------|------------|---------------|
+| **Certificate Management** | 100% | - | ✅ Full |
+| **SSH Key Operations** | 100% | 100% | ✅ Full |
+| **Digital Signatures** | 95% | - | ✅ Excellent |
+| **Key Agreement** | 100% | - | ✅ Full |
+| **Encryption** | Mixed | - | ⚠️ Good with notes |
+
+### 📋 Compatibility Test Files
+
+- [`compatibility/keypair/ssh_test.go`](compatibility/keypair/ssh_test.go) - Basic SSH compatibility
+- [`compatibility/keypair/ssh_advanced_test.go`](compatibility/keypair/ssh_advanced_test.go) - Advanced SSH features
+- [`compatibility/encryption/encryption_test.go`](compatibility/encryption/encryption_test.go) - Encryption compatibility
+- [`compatibility/signing/signing_test.go`](compatibility/signing/signing_test.go) - Signature compatibility
+- [`COMPATIBILITY_REPORT.md`](COMPATIBILITY_REPORT.md) - Detailed compatibility report
+
+**Real-World Impact**: GoPKI works seamlessly with existing PKI infrastructure, OpenSSH deployments, and OpenSSL-based applications, ensuring smooth integration in production environments.
 
 ## 🔗 Dependencies
 

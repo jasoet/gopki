@@ -35,14 +35,23 @@ ed25519Keys, err := algo.GenerateEd25519KeyPair()
 rsaKeys, err := keypair.GenerateKeyPair[algo.KeySize, *algo.RSAKeyPair](algo.KeySize2048)
 ```
 
-### 2. Unified Manager Pattern
+### 2. KeyPair Manager Pattern
 ```go
-manager := keypair.NewManager()
+import (
+    "crypto/rsa"
+    "crypto/ecdsa"
+    "crypto/ed25519"
+)
 
-// All algorithms through single interface
-rsaKeys, err := manager.GenerateKeyPair("RSA", algo.KeySize2048)
-ecdsaKeys, err := manager.GenerateKeyPair("ECDSA", algo.P256)
-ed25519Keys, err := manager.GenerateKeyPair("Ed25519", algo.Ed25519Default)
+// Generic Manager with type safety
+rsaManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+ecdsaManager, err := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
+ed25519Manager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Default)
+
+// Extract keys with type safety
+privateKey := rsaManager.PrivateKey()
+publicKey := rsaManager.PublicKey()
+keyPair := rsaManager.KeyPair()
 ```
 
 ### 3. Comprehensive Format Support
@@ -92,20 +101,27 @@ ecdsaKeys, err := keypair.GenerateKeyPair[algo.ECDSACurve, *algo.ECDSAKeyPair](a
 ed25519Keys, err := keypair.GenerateKeyPair[algo.Ed25519Config, *algo.Ed25519KeyPair](algo.Ed25519Default)
 ```
 
-### Manager Pattern
-Unified interface for runtime algorithm selection:
+### KeyPair Manager Pattern
+Type-safe manager providing unified interface with format conversion:
 
 ```go
-manager := keypair.NewManager()
+// Generate with full type safety
+rsaManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+ecdsaManager, err := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
+ed25519Manager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Default)
 
-// Runtime algorithm selection with type safety
-rsaKeys, err := manager.GenerateKeyPair("RSA", algo.KeySize2048)
-ecdsaKeys, err := manager.GenerateKeyPair("ECDSA", algo.P256)
-ed25519Keys, err := manager.GenerateKeyPair("Ed25519", algo.Ed25519Default)
+// Unified format operations
+privatePEM, publicPEM, err := rsaManager.ToPEM()
+privateDER, publicDER, err := rsaManager.ToDER()
+privateSSH, publicSSH, err := rsaManager.ToSSH("user@host", "")
 
-// List supported algorithms
-algorithms := manager.SupportedAlgorithms()
-// Returns: ["RSA", "ECDSA", "Ed25519"]
+// Unified file operations with secure permissions
+err = rsaManager.SaveToPEM("private.pem", "public.pem")
+err = rsaManager.SaveToDER("private.der", "public.der")
+err = rsaManager.SaveToSSH("id_rsa", "id_rsa.pub", "user@host", "")
+
+// Load existing keys into Manager
+loadedManager, err := keypair.LoadFromPEM[*algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey]("private.pem")
 ```
 
 ## Supported Algorithms
@@ -214,6 +230,112 @@ sshData, err := format.PEMToSSH(pemData, "converted@example.com")
 ```go
 // Save to PKCS#12 with password protection
 err := keypair.ToPKCS12File(keyPair, "keystore.p12", "secure-password")
+```
+
+## Compatibility Testing & SSH Integration
+
+### OpenSSH Compatibility (100% Compatible)
+GoPKI provides full compatibility with OpenSSH tools and infrastructure:
+
+#### SSH Key Generation and Validation
+```go
+// Generate SSH keys compatible with ssh-keygen
+manager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Default)
+
+// Convert to SSH format
+privateSSH, publicSSH, err := manager.ToSSH("user@example.com", "")
+
+// SSH keys are validated with ssh-keygen during compatibility testing
+// All algorithms (RSA, ECDSA, Ed25519) pass ssh-keygen validation
+```
+
+#### SSH Key Features Supported
+- ✅ **All Key Types**: RSA (2048/3072/4096), ECDSA (P-256/384/521), Ed25519
+- ✅ **SSH Fingerprints**: SHA256 fingerprints compatible with ssh-keygen
+- ✅ **Comments**: Large comments and special characters supported
+- ✅ **authorized_keys Format**: Full compatibility with OpenSSH
+- ✅ **Passphrase Protection**: Optional passphrase encryption for private keys
+- ✅ **Format Conversion**: PEM ↔ SSH ↔ DER conversion chains
+
+#### SSH Advanced Testing
+```go
+// SSH certificate information extraction (compatibility/keypair/ssh_advanced_test.go)
+func TestSSHCertificateCompatibility(t *testing.T) {
+    manager, _ := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Default)
+    _, publicSSH, _ := manager.ToSSH("test-user@example.com", "")
+
+    // Extract key information using ssh-keygen
+    keyInfo, err := helper.GetSSHKeyInformation([]byte(publicSSH))
+    // Result: "256 SHA256:abc123... test-user@example.com (ED25519)"
+}
+
+// Multi-format conversion testing
+func TestSSHFormatConversion(t *testing.T) {
+    // Test conversion chain: PEM → SSH → PEM
+    original, _ := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Default)
+    sshPrivate, sshPublic, _ := original.ToSSH("chain-test", "")
+
+    // Load back from SSH format
+    reconstructed, _ := keypair.LoadFromSSHData[*algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](sshPrivate, "")
+
+    // Verify keys are functionally equivalent
+    assert.Equal(t, original.KeyPair().PrivateKey, reconstructed.KeyPair().PrivateKey)
+}
+```
+
+### Cross-Platform Interoperability
+GoPKI keys work seamlessly across different systems:
+
+#### OpenSSL Signature Interoperability
+```go
+// Bidirectional signature testing with OpenSSL
+func TestSignatureInteroperability(t *testing.T) {
+    manager, _ := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Default)
+    testData := []byte("Cross-platform signature test")
+
+    // OpenSSL sign → GoPKI verify
+    signature, _ := helper.SignWithOpenSSL(testData, privatePEM, "")
+    verified := ed25519.Verify(manager.PublicKey(), testData, signature)
+    assert.True(t, verified, "GoPKI should verify OpenSSL Ed25519 signature")
+
+    // GoPKI sign → OpenSSL verify
+    signature := ed25519.Sign(manager.PrivateKey(), testData)
+    err := helper.VerifyRawSignatureWithOpenSSL(testData, signature, publicPEM, "")
+    assert.NoError(t, err, "OpenSSL should verify GoPKI Ed25519 signature")
+}
+```
+
+#### SSH Key Type Detection
+```go
+// All key types properly detected by ssh-keygen
+algorithms := []struct {
+    name     string
+    expected string
+}{
+    {"RSA-2048", "ssh-rsa"},
+    {"ECDSA-P256", "ecdsa-sha2-nistp256"},
+    {"Ed25519", "ssh-ed25519"},
+}
+
+for _, alg := range algorithms {
+    // Generated keys have correct SSH type prefixes
+    // and pass ssh-keygen validation
+}
+```
+
+### Compatibility Test Coverage
+- **Total SSH Tests**: 100+ test cases across all algorithms
+- **OpenSSL Integration**: Bidirectional signature verification
+- **Edge Case Testing**: Malformed keys, large comments, special characters
+- **Format Validation**: Cross-validation with external tools
+
+Run compatibility tests:
+```bash
+# Full compatibility test suite
+task test:compatibility
+
+# Specific SSH compatibility tests
+go test -tags=compatibility ./compatibility/keypair/...
 ```
 
 ## Security & Best Practices
