@@ -254,7 +254,7 @@ func TestEncryptForPublicKey(t *testing.T) {
 		if err == nil {
 			// Success case
 			assert.NotNil(t, encrypted)
-			assert.Equal(t, encryption.AlgorithmX25519, encrypted.Algorithm)
+			assert.Equal(t, encryption.AlgorithmEnvelope, encrypted.Algorithm)
 		} else {
 			// Expected failure case
 			assert.Error(t, err)
