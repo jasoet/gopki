@@ -33,9 +33,30 @@ jobs:
       - name: Install OpenSSL and OpenSSH
         run: |
           sudo apt-get update
-          sudo apt-get install -y openssl openssh-client
+          sudo apt-get install -y openssh-client build-essential
+
+          # Install newer OpenSSL from source for better Ed25519 support
+          echo "Installing OpenSSL 3.3.2 from source..."
+          cd /tmp
+          wget https://www.openssl.org/source/openssl-3.3.2.tar.gz
+          tar -xzf openssl-3.3.2.tar.gz
+          cd openssl-3.3.2
+
+          # Configure and build OpenSSL
+          ./Configure --prefix=/usr/local/openssl --openssldir=/usr/local/openssl/ssl
+          make -j$(nproc)
+          sudo make install
+
+          # Update PATH and library path
+          echo "/usr/local/openssl/bin" | sudo tee -a /etc/environment
+          echo "/usr/local/openssl/lib64" | sudo tee /etc/ld.so.conf.d/openssl.conf
+          sudo ldconfig
+
+          # Create symlink for system-wide access
+          sudo ln -sf /usr/local/openssl/bin/openssl /usr/local/bin/openssl
+
           echo "Installed dependencies:"
-          openssl version
+          /usr/local/openssl/bin/openssl version
           ssh -V
 
       # Install dependencies
@@ -52,7 +73,13 @@ jobs:
 
       # Run compatibility tests
       - name: Run compatibility tests
-        run: go test -tags compatibility ./compatibility/...
+        env:
+          PATH: /usr/local/openssl/bin:$PATH
+          LD_LIBRARY_PATH: /usr/local/openssl/lib64:$LD_LIBRARY_PATH
+        run: |
+          echo "Using OpenSSL version:"
+          openssl version
+          go test -tags compatibility ./compatibility/...
 
       # Run examples to ensure they work
       - name: Test examples
