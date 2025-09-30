@@ -1,3 +1,16 @@
+## [1.17.1](https://github.com/jasoet/gopki/compare/v1.17.0...v1.17.1) (2025-09-30)
+
+
+### 🐛 Bug Fixes
+
+* **test:** add 10-minute timeout to compatibility tests ([c4a27ce](https://github.com/jasoet/gopki/commit/c4a27ce9e4037c42fb4c384deb3c9a856db0a8ed))
+
+
+### 👷 CI/CD
+
+* add parallel compatibility tests and examples jobs ([57a2be9](https://github.com/jasoet/gopki/commit/57a2be973ccabae3c4e1ffe318464f145bae6b87))
+* improve workflow setup and run examples instead of building ([1a943ce](https://github.com/jasoet/gopki/commit/1a943ce19a1bbc6b5ca70d3e5c11952d0b62c2b5))
+
 ## [1.17.0](https://github.com/jasoet/gopki/compare/v1.16.0...v1.17.0) (2025-09-30)
 
 
