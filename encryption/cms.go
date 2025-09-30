@@ -33,6 +33,7 @@ package encryption
 
 import (
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -40,6 +41,28 @@ import (
 )
 
 type CMS []byte
+
+// envelopeContainer is used to serialize the entire EncryptedData structure
+// for CMS encoding, preserving all envelope encryption metadata
+type envelopeContainer struct {
+	Algorithm    Algorithm              `json:"algorithm"`
+	Data         []byte                 `json:"data"`
+	EncryptedKey []byte                 `json:"encrypted_key,omitempty"`
+	IV           []byte                 `json:"iv,omitempty"`
+	Tag          []byte                 `json:"tag,omitempty"`
+	Recipients   []recipientInfoJSON    `json:"recipients,omitempty"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// recipientInfoJSON is a JSON-serializable version of RecipientInfo
+type recipientInfoJSON struct {
+	KeyID                  []byte    `json:"key_id,omitempty"`
+	EncryptedKey           []byte    `json:"encrypted_key"`
+	KeyEncryptionAlgorithm Algorithm `json:"key_encryption_algorithm"`
+	EphemeralKey           []byte    `json:"ephemeral_key,omitempty"`
+	KeyIV                  []byte    `json:"key_iv,omitempty"`
+	KeyTag                 []byte    `json:"key_tag,omitempty"`
+}
 
 // EncodeToCMS converts EncryptedData to CMS format using external library
 func EncodeToCMS(data *EncryptedData) (CMS, error) {
@@ -64,6 +87,43 @@ func EncodeToCMS(data *EncryptedData) (CMS, error) {
 		return nil, fmt.Errorf("no valid certificates found in recipients")
 	}
 
+	// For envelope encryption, we need to preserve all the envelope metadata
+	// (IV, Tag, EncryptedKey, etc.) through the CMS encode/decode cycle.
+	// We serialize the entire EncryptedData structure to JSON and encrypt that.
+	var contentToEncrypt []byte
+	if data.Algorithm == AlgorithmEnvelope {
+		// Serialize envelope metadata
+		container := envelopeContainer{
+			Algorithm:    data.Algorithm,
+			Data:         data.Data,
+			EncryptedKey: data.EncryptedKey,
+			IV:           data.IV,
+			Tag:          data.Tag,
+			Metadata:     data.Metadata,
+		}
+
+		// Serialize recipient info (excluding certificates to avoid circular serialization)
+		for _, recip := range data.Recipients {
+			container.Recipients = append(container.Recipients, recipientInfoJSON{
+				KeyID:                  recip.KeyID,
+				EncryptedKey:           recip.EncryptedKey,
+				KeyEncryptionAlgorithm: recip.KeyEncryptionAlgorithm,
+				EphemeralKey:           recip.EphemeralKey,
+				KeyIV:                  recip.KeyIV,
+				KeyTag:                 recip.KeyTag,
+			})
+		}
+
+		var err error
+		contentToEncrypt, err = json.Marshal(container)
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize envelope metadata: %w", err)
+		}
+	} else {
+		// For non-envelope encryption, just encrypt the data as before
+		contentToEncrypt = data.Data
+	}
+
 	// Set encryption algorithm based on our algorithm
 	switch data.Algorithm {
 	case AlgorithmAESGCM:
@@ -76,7 +136,7 @@ func EncodeToCMS(data *EncryptedData) (CMS, error) {
 	}
 
 	// Encrypt using external library
-	return pkcs7.Encrypt(data.Data, recipients)
+	return pkcs7.Encrypt(contentToEncrypt, recipients)
 }
 
 // DecodeFromCMS parses CMS format into EncryptedData using external library
@@ -108,28 +168,59 @@ func DecodeFromCMS[T any](cmsData CMS, cert *x509.Certificate, privateKey T) (*E
 		return nil, fmt.Errorf("failed to parse PKCS7 structure: %w", err)
 	}
 
-	// Decrypt the content
-	decryptedData, err := p7.Decrypt(cert, privateKey)
+	// Decrypt the content (this decrypts the CMS layer)
+	decryptedContent, err := p7.Decrypt(cert, privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt PKCS7 content: %w", err)
 	}
 
-	// Create EncryptedData structure
+	// Try to deserialize as envelope container (for envelope encryption)
+	var container envelopeContainer
+	if err := json.Unmarshal(decryptedContent, &container); err == nil {
+		// Successfully deserialized envelope structure - reconstruct EncryptedData
+		result := &EncryptedData{
+			Format:       FormatCMS,
+			Algorithm:    container.Algorithm,
+			Data:         container.Data,
+			EncryptedKey: container.EncryptedKey,
+			IV:           container.IV,
+			Tag:          container.Tag,
+			Recipients:   make([]*RecipientInfo, 0),
+			Metadata:     container.Metadata,
+			Timestamp:    time.Now(),
+		}
+
+		// Reconstruct recipient info with certificate
+		for _, recipJSON := range container.Recipients {
+			recip := &RecipientInfo{
+				Certificate:            cert, // Use the cert provided for decryption
+				KeyID:                  recipJSON.KeyID,
+				EncryptedKey:           recipJSON.EncryptedKey,
+				KeyEncryptionAlgorithm: recipJSON.KeyEncryptionAlgorithm,
+				EphemeralKey:           recipJSON.EphemeralKey,
+				KeyIV:                  recipJSON.KeyIV,
+				KeyTag:                 recipJSON.KeyTag,
+			}
+			result.Recipients = append(result.Recipients, recip)
+		}
+
+		return result, nil
+	}
+
+	// Not envelope encryption or failed to deserialize - treat as simple encrypted data
 	result := &EncryptedData{
 		Format:     FormatCMS,
-		Algorithm:  AlgorithmEnvelope, // Default to envelope encryption
-		Data:       decryptedData,
+		Algorithm:  AlgorithmRSAOAEP, // Assume RSA for non-envelope
+		Data:       decryptedContent,
 		Recipients: make([]*RecipientInfo, 0),
 		Metadata:   make(map[string]any),
 		Timestamp:  time.Now(),
 	}
 
-	// Create a recipient info based on the provided certificate
-	// Since the PKCS7 struct doesn't expose internal recipient details,
-	// we create a basic recipient info with the certificate used for decryption
+	// Create a basic recipient info
 	recipInfo := &RecipientInfo{
 		Certificate:            cert,
-		KeyEncryptionAlgorithm: AlgorithmRSAOAEP, // Default assumption
+		KeyEncryptionAlgorithm: AlgorithmRSAOAEP,
 	}
 	result.Recipients = append(result.Recipients, recipInfo)
 
