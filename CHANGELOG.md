@@ -1,3 +1,21 @@
+## [1.17.3](https://github.com/jasoet/gopki/compare/v1.17.2...v1.17.3) (2025-09-30)
+
+
+### 🐛 Bug Fixes
+
+* **lint:** enable goimports linter with local-prefixes ([7e74338](https://github.com/jasoet/gopki/commit/7e74338f86d8abbc598dbb60e24e7e6fdf4a2d05))
+
+
+### ♻️ Refactoring
+
+* **lint:** optimize golangci-lint configuration and fix formatting ([0deb5d4](https://github.com/jasoet/gopki/commit/0deb5d4d6c808b37eebc3b2c32b00c21f09d1b5c))
+* **taskfile:** simplify tasks and use golangci-lint config ([dab522a](https://github.com/jasoet/gopki/commit/dab522a7ea5c24fab7fb3efd2f5cbc292762a343))
+
+
+### 🔧 Miscellaneous
+
+* **taskfile:** add goimports to format task ([985b582](https://github.com/jasoet/gopki/commit/985b5821a0496441b333eeb2cfedbd4c2c4080dc))
+
 ## [1.17.2](https://github.com/jasoet/gopki/compare/v1.17.1...v1.17.2) (2025-09-30)
 
 
