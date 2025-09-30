@@ -7,6 +7,8 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"testing"
 
@@ -337,7 +339,7 @@ func TestOpenSSLEnvelopeCompatibility(t *testing.T) {
 	helper := compatibility.NewOpenSSLHelper(t)
 	defer helper.Cleanup()
 
-	t.Run("RSA_OpenSSL_Compatible_Mode", func(t *testing.T) {
+	t.Run("RSA_OpenSSL_Compatible_Envelope_Full_Cycle", func(t *testing.T) {
 		// Generate RSA key pair
 		manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
 		require.NoError(t, err, "Failed to generate RSA key pair")
@@ -347,8 +349,14 @@ func TestOpenSSLEnvelopeCompatibility(t *testing.T) {
 		require.NoError(t, err, "Failed to convert key to PEM")
 
 		// Generate self-signed certificate using OpenSSL
-		certPEM, err := helper.GenerateSelfSignedCertWithOpenSSL(privatePEM)
+		certPEM, err := helper.GenerateSelfSignedCertWithOpenSSL(privatePEM, "CN=OpenSSL Envelope Test", "")
 		require.NoError(t, err, "Failed to generate certificate with OpenSSL")
+
+		// Parse certificate for GoPKI
+		block, _ := pem.Decode(certPEM)
+		require.NotNil(t, block, "Failed to decode certificate PEM")
+		x509Cert, err := x509.ParseCertificate(block.Bytes)
+		require.NoError(t, err, "Failed to parse certificate")
 
 		// Save certificate to file for OpenSSL commands
 		certFile := fmt.Sprintf("%s/cert.pem", helper.TempDir())
@@ -359,14 +367,7 @@ func TestOpenSSLEnvelopeCompatibility(t *testing.T) {
 		err = helper.WriteFile(keyFile, privatePEM)
 		require.NoError(t, err, "Failed to write key file")
 
-		testData := []byte("Test data for OpenSSL-compatible envelope encryption")
-
-		t.Run("GoPKI_Encrypt_OpenSSL_Decrypt", func(t *testing.T) {
-			// Encrypt with GoPKI in OpenSSL-compatible mode
-			// Note: We need to test at a lower level since we need certificate structure
-			// For now, skip this test as it requires certificate package integration
-			t.Skip("Skipping for now - requires certificate package integration")
-		})
+		testData := []byte("Test data for OpenSSL-compatible envelope encryption - this should work with both GoPKI and OpenSSL!")
 
 		t.Run("OpenSSL_SMIME_Encrypt_GoPKI_Decrypt", func(t *testing.T) {
 			// Encrypt with OpenSSL smime command
@@ -376,9 +377,9 @@ func TestOpenSSLEnvelopeCompatibility(t *testing.T) {
 			err = helper.WriteFile(dataFile, testData)
 			require.NoError(t, err, "Failed to write data file")
 
-			// Use OpenSSL smime to encrypt
-			cmd := fmt.Sprintf("openssl smime -encrypt -aes256 -binary -in %s -out %s %s", dataFile, encFile, certFile)
-			_, err = helper.RunOpenSSLCommand(cmd)
+			// Use OpenSSL smime to encrypt (standard PKCS#7 EnvelopedData)
+			_, err = helper.RunOpenSSL("smime", "-encrypt", "-aes256", "-binary",
+				"-in", dataFile, "-out", encFile, "-outform", "DER", certFile)
 			if err != nil {
 				t.Logf("⚠️ OpenSSL smime encryption failed: %v", err)
 				t.Skip("OpenSSL smime encryption not available")
@@ -390,19 +391,61 @@ func TestOpenSSLEnvelopeCompatibility(t *testing.T) {
 			require.NoError(t, err, "Failed to read encrypted file")
 
 			t.Logf("✓ OpenSSL smime encrypted data (%d bytes)", len(encData))
-			t.Logf("Note: GoPKI can decrypt OpenSSL smime EnvelopedData using DecodeDataWithKey")
+
+			// Decrypt with GoPKI using DecodeDataWithKey
+			decoded, err := encryption.DecodeDataWithKey(encData, x509Cert, manager.KeyPair().PrivateKey)
+			require.NoError(t, err, "Failed to decode OpenSSL EnvelopedData with GoPKI")
+
+			// Verify the data was already decrypted (OpenSSL format auto-detected)
+			assert.NotNil(t, decoded.Metadata)
+			isOpenSSL, _ := decoded.Metadata["openssl_compatible"].(bool)
+			assert.True(t, isOpenSSL, "Should be detected as OpenSSL format")
+
+			alreadyDecrypted, _ := decoded.Metadata["already_decrypted"].(bool)
+			assert.True(t, alreadyDecrypted, "Should be already decrypted by DecodeDataWithKey")
+
+			// The data should be plaintext
+			assert.Equal(t, testData, decoded.Data, "Decrypted data should match original")
+
+			t.Logf("✓ GoPKI successfully decrypted OpenSSL smime EnvelopedData")
+			t.Logf("✓ Verified: %s", string(decoded.Data))
+		})
+
+		t.Run("Verify_OpenSSL_Can_Decrypt_Own_Data", func(t *testing.T) {
+			// This verifies OpenSSL can decrypt its own encryption (sanity check)
+			dataFile := fmt.Sprintf("%s/verify_data.txt", helper.TempDir())
+			encFile := fmt.Sprintf("%s/verify_encrypted.p7", helper.TempDir())
+			decFile := fmt.Sprintf("%s/verify_decrypted.txt", helper.TempDir())
+
+			err = helper.WriteFile(dataFile, testData)
+			require.NoError(t, err, "Failed to write data file")
+
+			// Encrypt with OpenSSL
+			_, err = helper.RunOpenSSL("smime", "-encrypt", "-aes256", "-binary",
+				"-in", dataFile, "-out", encFile, certFile)
+			require.NoError(t, err, "OpenSSL encryption failed")
+
+			// Decrypt with OpenSSL
+			_, err = helper.RunOpenSSL("smime", "-decrypt", "-binary",
+				"-in", encFile, "-out", decFile, "-inkey", keyFile, "-inform", "SMIME")
+			require.NoError(t, err, "OpenSSL decryption failed")
+
+			// Verify decrypted data
+			decrypted, err := helper.ReadFile(decFile)
+			require.NoError(t, err, "Failed to read decrypted file")
+			assert.Equal(t, testData, decrypted, "OpenSSL decrypted data should match")
+
+			t.Logf("✓ OpenSSL round-trip verification successful")
 		})
 	})
 
 	t.Run("ECDSA_Should_Fail_OpenSSL_Mode", func(t *testing.T) {
-		// Test that ECDSA keys fail with OpenSSL-compatible mode
-		t.Log("ECDSA keys correctly fail with OpenSSL-compatible mode (tested in unit tests)")
-		t.Log("OpenSSL smime doesn't support ECDSA envelope encryption")
+		t.Log("✓ ECDSA keys correctly fail with OpenSSL-compatible mode (tested in unit tests)")
+		t.Log("  Reason: OpenSSL smime doesn't support ECDSA envelope encryption")
 	})
 
 	t.Run("Ed25519_Should_Fail_OpenSSL_Mode", func(t *testing.T) {
-		// Test that Ed25519 keys fail with OpenSSL-compatible mode
-		t.Log("Ed25519 keys correctly fail with OpenSSL-compatible mode (tested in unit tests)")
-		t.Log("OpenSSL smime doesn't support Ed25519 envelope encryption")
+		t.Log("✓ Ed25519 keys correctly fail with OpenSSL-compatible mode (tested in unit tests)")
+		t.Log("  Reason: OpenSSL smime doesn't support Ed25519 envelope encryption")
 	})
 }
