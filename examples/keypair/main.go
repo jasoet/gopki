@@ -25,7 +25,7 @@ func main() {
 	fmt.Println()
 
 	// Create outputs directory
-	if err := os.MkdirAll("output", 0755); err != nil {
+	if err := os.MkdirAll("output", 0o755); err != nil {
 		log.Fatal("Failed to create output directory:", err)
 	}
 
@@ -477,7 +477,7 @@ func filePermissionsExample() {
 
 	// Create a secure directory structure
 	secureDir := "output/secure"
-	if err := os.MkdirAll(secureDir, 0700); err != nil {
+	if err := os.MkdirAll(secureDir, 0o700); err != nil {
 		log.Printf("Failed to create secure directory: %v\n", err)
 		return
 	}
@@ -1008,7 +1008,7 @@ func securityBestPracticesExample() {
 	}
 
 	perm := stat.Mode().Perm()
-	if perm == 0600 {
+	if perm == 0o600 {
 		fmt.Printf("        ✓ Private key saved with 0600 permissions (owner only)\n")
 	} else {
 		fmt.Printf("        ⚠️  Private key permissions: %o (should be 0600)\n", perm)

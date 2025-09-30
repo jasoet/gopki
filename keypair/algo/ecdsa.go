@@ -7,8 +7,9 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"github.com/jasoet/gopki/keypair/format"
 	"strings"
+
+	"github.com/jasoet/gopki/keypair/format"
 
 	"golang.org/x/crypto/ssh"
 )

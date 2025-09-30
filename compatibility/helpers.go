@@ -63,7 +63,7 @@ func (h *OpenSSLHelper) Cleanup() {
 // TempFile creates a temporary file with the given content
 func (h *OpenSSLHelper) TempFile(name string, content []byte) string {
 	filepath := filepath.Join(h.tempDir, name)
-	err := os.WriteFile(filepath, content, 0600)
+	err := os.WriteFile(filepath, content, 0o600)
 	if err != nil {
 		h.t.Fatalf("Failed to write temp file %s: %v", filepath, err)
 	}
@@ -700,7 +700,7 @@ func (h *OpenSSLHelper) ConvertPEMToSSHWithSSHKeygen(pemPrivateKey []byte) ([]by
 	// First, we need to convert PEM to OpenSSH format
 	// ssh-keygen -p -m PEM -f <file> converts in place, so we copy first
 	tempFile := filepath.Join(h.tempDir, "temp_convert.pem")
-	if err := os.WriteFile(tempFile, pemPrivateKey, 0600); err != nil {
+	if err := os.WriteFile(tempFile, pemPrivateKey, 0o600); err != nil {
 		return nil, fmt.Errorf("failed to write temp file: %v", err)
 	}
 
@@ -857,7 +857,7 @@ func (h *OpenSSLHelper) ConvertSSHToPEMWithSSHKeygen(sshPrivateKey []byte) ([]by
 
 	// Write SSH key to temp file
 	tempFile := filepath.Join(h.tempDir, "ssh_to_convert")
-	if err := os.WriteFile(tempFile, sshPrivateKey, 0600); err != nil {
+	if err := os.WriteFile(tempFile, sshPrivateKey, 0o600); err != nil {
 		return nil, fmt.Errorf("failed to write SSH key: %v", err)
 	}
 
@@ -996,12 +996,16 @@ func (h *OpenSSLHelper) CreatePKCS7SignatureWithOpenSSL(data, privateKeyPEM, cer
 	var args []string
 	if detached {
 		// For detached signatures, don't include -nodetach (default is detached)
-		args = []string{"cms", "-sign", "-in", dataFile, "-signer", certFile, "-inkey", keyFile,
-			"-out", sigFile, "-outform", "DER", "-binary"}
+		args = []string{
+			"cms", "-sign", "-in", dataFile, "-signer", certFile, "-inkey", keyFile,
+			"-out", sigFile, "-outform", "DER", "-binary",
+		}
 	} else {
 		// For attached signatures, use -nodetach to include content
-		args = []string{"cms", "-sign", "-in", dataFile, "-signer", certFile, "-inkey", keyFile,
-			"-out", sigFile, "-outform", "DER", "-binary", "-nodetach"}
+		args = []string{
+			"cms", "-sign", "-in", dataFile, "-signer", certFile, "-inkey", keyFile,
+			"-out", sigFile, "-outform", "DER", "-binary", "-nodetach",
+		}
 	}
 
 	_, err := h.RunOpenSSL(args...)
@@ -1080,8 +1084,10 @@ func (h *OpenSSLHelper) SignDataWithOpenSSLCMS(data, privateKeyPEM, certPEM []by
 
 	h.t.Logf("    → Creating CMS signature with OpenSSL using %s...", hashAlg)
 
-	args := []string{"cms", "-sign", "-in", dataFile, "-signer", certFile, "-inkey", keyFile,
-		"-out", sigFile, "-outform", "DER", "-binary"}
+	args := []string{
+		"cms", "-sign", "-in", dataFile, "-signer", certFile, "-inkey", keyFile,
+		"-out", sigFile, "-outform", "DER", "-binary",
+	}
 
 	if hashAlg != "" {
 		args = append(args, "-md", hashAlg)
@@ -1291,7 +1297,7 @@ func (h *OpenSSLHelper) EncryptAESGCMWithOpenSSL(data []byte, key []byte, keySiz
 		return nil, nil, nil, fmt.Errorf("failed to generate IV: %v", err)
 	}
 
-	err = os.WriteFile(ivFile, iv, 0644)
+	err = os.WriteFile(ivFile, iv, 0o644)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to write IV: %v", err)
 	}
@@ -1416,7 +1422,7 @@ func (h *OpenSSLHelper) TempDir() string {
 
 // WriteFile writes content to a file
 func (h *OpenSSLHelper) WriteFile(filepath string, content []byte) error {
-	return os.WriteFile(filepath, content, 0600)
+	return os.WriteFile(filepath, content, 0o600)
 }
 
 // ReadFile reads content from a file

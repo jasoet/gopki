@@ -3,12 +3,13 @@ package cert
 import (
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"github.com/jasoet/gopki/keypair/algo"
 	"net"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/jasoet/gopki/keypair/algo"
 )
 
 func TestCreateSelfSignedCertificate(t *testing.T) {

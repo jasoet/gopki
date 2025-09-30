@@ -548,7 +548,7 @@ func TestSignFile(t *testing.T) {
 	testData := []byte("This is test data for file signing")
 	testFile := "/tmp/gopki_test_file.txt"
 
-	err = os.WriteFile(testFile, testData, 0644)
+	err = os.WriteFile(testFile, testData, 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}

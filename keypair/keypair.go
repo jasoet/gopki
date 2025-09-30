@@ -27,11 +27,12 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"github.com/jasoet/gopki/keypair/algo"
-	"github.com/jasoet/gopki/keypair/format"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/jasoet/gopki/keypair/algo"
+	"github.com/jasoet/gopki/keypair/format"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -2018,12 +2019,12 @@ func GetPublicKeyFromKeyPair[K KeyPair, T PublicKey](keyPair K) (T, error) {
 func saveDERToFile(derData format.DER, filename string) error {
 	dir := filepath.Dir(filename)
 
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
 	if _, err := os.Stat(filename); err == nil {
-		file, err := os.OpenFile(filename, os.O_WRONLY, 0600)
+		file, err := os.OpenFile(filename, os.O_WRONLY, 0o600)
 		if err != nil {
 			return fmt.Errorf("no write permission for existing file %s: %w", filename, err)
 		}
@@ -2032,7 +2033,7 @@ func saveDERToFile(derData format.DER, filename string) error {
 		return fmt.Errorf("failed to check file status %s: %w", filename, err)
 	}
 
-	if err := os.WriteFile(filename, derData, 0600); err != nil {
+	if err := os.WriteFile(filename, derData, 0o600); err != nil {
 		return fmt.Errorf("failed to write file %s: %w", filename, err)
 	}
 
@@ -2055,12 +2056,12 @@ func saveDERToFile(derData format.DER, filename string) error {
 func saveSSHToFile(sshData format.SSH, filename string) error {
 	dir := filepath.Dir(filename)
 
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
 	if _, err := os.Stat(filename); err == nil {
-		file, err := os.OpenFile(filename, os.O_WRONLY, 0600)
+		file, err := os.OpenFile(filename, os.O_WRONLY, 0o600)
 		if err != nil {
 			return fmt.Errorf("no write permission for existing file %s: %w", filename, err)
 		}
@@ -2069,7 +2070,7 @@ func saveSSHToFile(sshData format.SSH, filename string) error {
 		return fmt.Errorf("failed to check file status %s: %w", filename, err)
 	}
 
-	if err := os.WriteFile(filename, []byte(sshData), 0600); err != nil {
+	if err := os.WriteFile(filename, []byte(sshData), 0o600); err != nil {
 		return fmt.Errorf("failed to write file %s: %w", filename, err)
 	}
 
@@ -2092,12 +2093,12 @@ func saveSSHToFile(sshData format.SSH, filename string) error {
 func savePEMToFile(pemData format.PEM, filename string) error {
 	dir := filepath.Dir(filename)
 
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
 	if _, err := os.Stat(filename); err == nil {
-		file, err := os.OpenFile(filename, os.O_WRONLY, 0600)
+		file, err := os.OpenFile(filename, os.O_WRONLY, 0o600)
 		if err != nil {
 			return fmt.Errorf("no write permission for existing file %s: %w", filename, err)
 		}
@@ -2106,7 +2107,7 @@ func savePEMToFile(pemData format.PEM, filename string) error {
 		return fmt.Errorf("failed to check file status %s: %w", filename, err)
 	}
 
-	if err := os.WriteFile(filename, pemData, 0600); err != nil {
+	if err := os.WriteFile(filename, pemData, 0o600); err != nil {
 		return fmt.Errorf("failed to write file %s: %w", filename, err)
 	}
 

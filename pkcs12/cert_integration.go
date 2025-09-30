@@ -200,7 +200,7 @@ func ExtractCertificatesFromP12(p12File, password, outputDir string) error {
 	}
 
 	// Create output directory
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
@@ -324,7 +324,7 @@ func CreateP12FromPEM(privateKeyFile, certFile, p12File, password string) error 
 func saveCertificateAsPEM(cert *x509.Certificate, filename string) error {
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(filename)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
@@ -335,7 +335,7 @@ func saveCertificateAsPEM(cert *x509.Certificate, filename string) error {
 	})
 
 	// Write to file
-	if err := os.WriteFile(filename, certPEM, 0644); err != nil {
+	if err := os.WriteFile(filename, certPEM, 0o644); err != nil {
 		return fmt.Errorf("failed to write PEM file: %w", err)
 	}
 

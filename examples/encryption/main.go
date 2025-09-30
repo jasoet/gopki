@@ -37,7 +37,7 @@ func main() {
 	fmt.Println()
 
 	// Create output directory
-	if err := os.MkdirAll("output", 0755); err != nil {
+	if err := os.MkdirAll("output", 0o755); err != nil {
 		log.Fatal("Failed to create output directory:", err)
 	}
 
@@ -358,7 +358,7 @@ func demonstrateEnvelopeEncryption() {
 	})
 
 	// Save raw encrypted data for format demonstration
-	os.WriteFile("output/envelope_large.bin", encrypted.Data, 0644)
+	os.WriteFile("output/envelope_large.bin", encrypted.Data, 0o644)
 	fmt.Println("💾 Saved large data encryption example")
 
 	fmt.Println()
@@ -573,8 +573,8 @@ func demonstrateCMSFormatSupport() {
 	fmt.Printf("✓ Final decryption: %s\n", decrypted)
 
 	// Save CMS format examples
-	os.WriteFile("output/cms_encoded.bin", cmsData, 0644)
-	os.WriteFile("output/cms_certificate.pem", testCert.DERData, 0644)
+	os.WriteFile("output/cms_encoded.bin", cmsData, 0o644)
+	os.WriteFile("output/cms_certificate.pem", testCert.DERData, 0o644)
 
 	saveCMSExample("cms_format", map[string]interface{}{
 		"format":        "CMS (RFC 5652)",
@@ -917,7 +917,7 @@ Distribution outside the organization is strictly prohibited.`),
 
 		// Save original file
 		originalPath := fmt.Sprintf("output/original_%s", file.name)
-		os.WriteFile(originalPath, file.content, 0644)
+		os.WriteFile(originalPath, file.content, 0o644)
 
 		// Encrypt file content
 		opts := encryption.DefaultEncryptOptions()
@@ -940,7 +940,7 @@ Distribution outside the organization is strictly prohibited.`),
 			log.Printf("Failed to serialize %s: %v", file.name, err)
 			continue
 		}
-		os.WriteFile(encryptedPath, encryptedBytes, 0644)
+		os.WriteFile(encryptedPath, encryptedBytes, 0o644)
 
 		// Note: CMS encoding requires specific recipient certificate configuration
 		// For demonstration, we save in JSON format which preserves all encryption metadata
@@ -958,7 +958,7 @@ Distribution outside the organization is strictly prohibited.`),
 
 		// Save decrypted file for verification
 		decryptedPath := fmt.Sprintf("output/decrypted_%s", file.name)
-		os.WriteFile(decryptedPath, decrypted, 0644)
+		os.WriteFile(decryptedPath, decrypted, 0o644)
 
 		fmt.Printf("💾 Files saved:\n")
 		fmt.Printf("  Original: %s\n", originalPath)
@@ -982,7 +982,7 @@ func saveEncryptionResult(prefix string, encrypted *encryption.EncryptedData, me
 	filename := fmt.Sprintf("output/%s.bin", prefix)
 	cmsData, err := encryption.EncodeData(encrypted)
 	if err == nil {
-		os.WriteFile(filename, cmsData, 0644)
+		os.WriteFile(filename, cmsData, 0o644)
 	}
 
 	// Save metadata
@@ -1024,7 +1024,7 @@ func saveJSON(filename string, data interface{}) {
 		return
 	}
 
-	err = os.WriteFile(filename, jsonData, 0644)
+	err = os.WriteFile(filename, jsonData, 0o644)
 	if err != nil {
 		log.Printf("Failed to save file %s: %v", filename, err)
 		return

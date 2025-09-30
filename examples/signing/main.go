@@ -29,7 +29,7 @@ func main() {
 	fmt.Println("Demonstrating hybrid approach: PKCS#7 for RSA/ECDSA, raw signatures for Ed25519 (not PKCS#7)")
 
 	// Create output directory
-	if err := os.MkdirAll("output", 0755); err != nil {
+	if err := os.MkdirAll("output", 0o755); err != nil {
 		log.Fatal("Failed to create output directory:", err)
 	}
 
@@ -617,8 +617,8 @@ func demonstratePKCS7FormatExamples() {
 	fmt.Println("✓ Detached PKCS#7 verified successfully")
 
 	// Save PKCS#7 signatures
-	os.WriteFile("output/pkcs7_attached.p7s", attachedSig.Data, 0644)
-	os.WriteFile("output/pkcs7_detached.p7s", detachedSig.Data, 0644)
+	os.WriteFile("output/pkcs7_attached.p7s", attachedSig.Data, 0o644)
+	os.WriteFile("output/pkcs7_detached.p7s", detachedSig.Data, 0o644)
 	fmt.Println("\n✓ PKCS#7 signatures saved to output/ directory")
 
 	fmt.Println()
@@ -747,7 +747,7 @@ func demonstrateFileOperations() {
 It contains multiple lines and represents a real file that needs
 digital signature protection for integrity and authenticity.`)
 
-	err = os.WriteFile("output/test_document.txt", testFileContent, 0644)
+	err = os.WriteFile("output/test_document.txt", testFileContent, 0o644)
 	if err != nil {
 		log.Fatal("Failed to create test file:", err)
 	}
@@ -789,7 +789,7 @@ digital signature protection for integrity and authenticity.`)
 	}
 
 	// Save raw signature bytes
-	err = os.WriteFile("output/test_document.sig", rawSigBytes, 0644)
+	err = os.WriteFile("output/test_document.sig", rawSigBytes, 0o644)
 	if err != nil {
 		log.Fatal("Failed to save signature file:", err)
 	}
@@ -838,7 +838,7 @@ func saveJSON(data interface{}, filename string) {
 		return
 	}
 
-	err = os.WriteFile(filename, jsonData, 0644)
+	err = os.WriteFile(filename, jsonData, 0o644)
 	if err != nil {
 		log.Printf("Failed to save file %s: %v", filename, err)
 		return

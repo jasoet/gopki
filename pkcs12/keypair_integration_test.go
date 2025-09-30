@@ -954,7 +954,7 @@ func TestConvertP12KeyPairToPEMErrorHandling(t *testing.T) {
 	t.Run("InvalidP12Data", func(t *testing.T) {
 		// Create a file with invalid P12 data
 		invalidP12File := filepath.Join(tempDir, "invalid.p12")
-		err := os.WriteFile(invalidP12File, []byte("this is not valid P12 data"), 0644)
+		err := os.WriteFile(invalidP12File, []byte("this is not valid P12 data"), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to create invalid P12 file: %v", err)
 		}

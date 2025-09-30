@@ -121,7 +121,6 @@ func TestCertificateEnvelopeEncryptionWithCMSCycle(t *testing.T) {
 
 		// Step 4: Decrypt the envelope
 		decrypted, err := Decrypt(decoded, rsaKeys, encryption.DefaultDecryptOptions())
-
 		// This will FAIL with current implementation due to the bug
 		if err != nil {
 			t.Logf("Decryption failed (expected with bug): %v", err)

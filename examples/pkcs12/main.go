@@ -41,7 +41,7 @@ func main() {
 
 	// Setup output directory
 	outputDir := "output"
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		log.Fatalf("Failed to create output directory: %v", err)
 	}
 
@@ -376,7 +376,7 @@ func runGoPKIIntegration(outputDir string) {
 		log.Fatalf("Failed to convert to PEM: %v", err)
 	}
 
-	err = os.WriteFile(tempPEMPath, privatePEM, 0600)
+	err = os.WriteFile(tempPEMPath, privatePEM, 0o600)
 	if err != nil {
 		log.Fatalf("Failed to write PEM file: %v", err)
 	}

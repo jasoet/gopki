@@ -7,12 +7,13 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"github.com/jasoet/gopki/keypair"
-	"github.com/jasoet/gopki/keypair/algo"
 	"math/big"
 	"net"
 	"os"
 	"time"
+
+	"github.com/jasoet/gopki/keypair"
+	"github.com/jasoet/gopki/keypair/algo"
 )
 
 // Certificate represents an X.509 certificate with support for both PEM and DER formats.
@@ -394,7 +395,7 @@ func SignCertificate[T keypair.KeyPair](caCert *Certificate, caKeyPair T, reques
 //
 //	err := certificate.SaveToFile("certificate.pem")
 func (c *Certificate) SaveToFile(filename string) error {
-	return os.WriteFile(filename, c.PEMData, 0600)
+	return os.WriteFile(filename, c.PEMData, 0o600)
 }
 
 // LoadCertificateFromFile loads a certificate from a PEM-formatted file.
@@ -489,7 +490,7 @@ func VerifyCertificate(cert *Certificate, caCert *Certificate) error {
 //
 //	err := certificate.SaveToDERFile("certificate.der")
 func (c *Certificate) SaveToDERFile(filename string) error {
-	return os.WriteFile(filename, c.DERData, 0600)
+	return os.WriteFile(filename, c.DERData, 0o600)
 }
 
 // LoadCertificateFromDERFile loads a certificate from a DER-formatted file.

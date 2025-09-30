@@ -23,7 +23,7 @@ func main() {
 	fmt.Println("Demonstrating all certificate features with type-safe APIs")
 
 	// Create output directory
-	if err := os.MkdirAll("output", 0755); err != nil {
+	if err := os.MkdirAll("output", 0o755); err != nil {
 		log.Fatal("Failed to create output directory:", err)
 	}
 
@@ -831,7 +831,7 @@ func demonstrateFormatOperations() {
 	}
 
 	// Save converted DER
-	err = os.WriteFile("output/converted_to_der.der", derData, 0644)
+	err = os.WriteFile("output/converted_to_der.der", derData, 0o644)
 	if err != nil {
 		log.Printf("Failed to write converted DER: %v\n", err)
 		return
@@ -848,7 +848,7 @@ func demonstrateFormatOperations() {
 	}
 
 	// Save converted PEM
-	err = os.WriteFile("output/converted_to_pem.pem", convertedPEM, 0644)
+	err = os.WriteFile("output/converted_to_pem.pem", convertedPEM, 0o644)
 	if err != nil {
 		log.Printf("Failed to write converted PEM: %v\n", err)
 		return

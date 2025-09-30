@@ -6,9 +6,10 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"github.com/jasoet/gopki/keypair/format"
 	"strings"
 	"testing"
+
+	"github.com/jasoet/gopki/keypair/format"
 
 	"github.com/stretchr/testify/assert"
 )

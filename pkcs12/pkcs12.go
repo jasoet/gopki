@@ -294,12 +294,12 @@ func CreateP12File[T keypair.PrivateKey](filename string, privateKey T, certific
 
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(filename)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
 	// Write to file with secure permissions
-	if err := os.WriteFile(filename, p12Data, 0600); err != nil {
+	if err := os.WriteFile(filename, p12Data, 0o600); err != nil {
 		return fmt.Errorf("failed to write P12 file %s: %w", filename, err)
 	}
 

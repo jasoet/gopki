@@ -1,5 +1,7 @@
 package format
 
-type PEM []byte
-type DER []byte
-type SSH string
+type (
+	PEM []byte
+	DER []byte
+	SSH string
+)

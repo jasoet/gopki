@@ -530,7 +530,7 @@ func saveCertificateToPEM(cert *x509.Certificate, filename string) error {
 
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(filename)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
@@ -541,7 +541,7 @@ func saveCertificateToPEM(cert *x509.Certificate, filename string) error {
 	})
 
 	// Write to file
-	if err := os.WriteFile(filename, certPEM, 0644); err != nil {
+	if err := os.WriteFile(filename, certPEM, 0o644); err != nil {
 		return fmt.Errorf("failed to write PEM file: %w", err)
 	}
 
