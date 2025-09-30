@@ -2,8 +2,6 @@ version: '3'
 
 vars:
   MODULE: github.com/jasoet/gopki
-  GO_FILES:
-    sh: find . -type f -name '*.go' -not -path './vendor/*' -not -path './.git/*' | head -20
 
 tasks:
   default:
@@ -12,58 +10,20 @@ tasks:
       - task --list
     silent: true
 
-  help:quality:
-    desc: Show all code quality and analysis tasks
-    cmds:
-      - 'echo "📋 Code Quality & Analysis Tasks:"'
-      - 'echo ""'
-      - 'echo "Testing:"'
-      - 'echo "  task test              - Run main tests (excludes examples and compatibility)"'
-      - 'echo "  task test:all          - Run all tests including compatibility tests"'
-      - 'echo "  task test:quick        - Run tests without race detection (faster)"'
-      - 'echo ""'
-      - 'echo "Compatibility Testing:"'
-      - 'echo "  task test:compatibility        - Run OpenSSL compatibility tests (build tag: compatibility)"'
-      - 'echo "  task test:compatibility:keypair - Run keypair compatibility tests only"'
-      - 'echo "  task test:compatibility:cert    - Run certificate compatibility tests only"'
-      - 'echo "  task test:compatibility:signing - Run signing compatibility tests only"'
-      - 'echo ""'
-      - 'echo "Code Analysis:"'
-      - 'echo "  task lint              - Run go vet static analysis"'
-      - 'echo "  task lint:full         - Run golangci-lint comprehensive check"'
-      - 'echo "  task deadcode          - Find unused/dead code with deadcode tool"'
-      - 'echo "  task unused            - Find unused code with golangci-lint"'
-      - 'echo "  task unused:all        - Run all unused code detection tools"'
-      - 'echo "  task analyze           - Run lint, vet, and deadcode"'
-      - 'echo "  task analyze:full      - Run full analysis with all tools"'
-      - 'echo ""'
-      - 'echo "Formatting:"'
-      - 'echo "  task format            - Format all Go code"'
-      - 'echo "  task format:check      - Check if code is properly formatted"'
-      - 'echo ""'
-      - 'echo "💡 Tips:"'
-      - 'echo "  • Use task test for comprehensive testing with coverage"'
-      - 'echo "  • Use task deadcode to quickly find unused functions"'
-      - 'echo "  • Use task analyze:full for complete code analysis"'
-    silent: true
-
   # Setup and Dependencies
   setup:
-    desc: Initial project setup - download dependencies and verify module
+    desc: Initial project setup and install development tools
     cmds:
       - go mod download
       - go mod verify
       - go mod tidy
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
       - 'echo "✅ Project setup complete"'
     silent: true
 
   # Build Tasks
   build:
-    desc: Build the module and verify compilation
-    sources:
-      - '**/*.go'
-      - go.mod
-      - go.sum
+    desc: Build the module
     cmds:
       - go build ./...
       - 'echo "✅ Build successful"'
@@ -71,7 +31,6 @@ tasks:
 
   build:examples:
     desc: Build example binaries
-    deps: [build]
     cmds:
       - mkdir -p bin/
       - go build -tags example -o bin/keypair-example ./examples/keypair/main.go
@@ -80,44 +39,20 @@ tasks:
       - go build -tags example -o bin/encryption-example ./examples/encryption/main.go
       - go build -tags example -o bin/pkcs12-example ./examples/pkcs12/main.go
       - 'echo "✅ Examples built in bin/ directory"'
-    generates:
-      - bin/keypair-example
-      - bin/certificates-example
-      - bin/signing-example
-      - bin/encryption-example
-      - bin/pkcs12-example
     silent: true
 
   # Testing Tasks
   test:
-    desc: Run main tests (excludes examples and compatibility tests)
+    desc: Run main tests with verbose output and coverage (excludes compatibility)
     env:
       CGO_ENABLED: 1
     cmds:
       - mkdir -p output/
-      - go test $(go list ./... | grep -v '/compatibility') -race -coverprofile=output/coverage.out
+      - go test $(go list ./... | grep -v '/compatibility') -race -v -coverprofile=output/coverage.out
       - go tool cover -html=output/coverage.out -o output/coverage.html
       - go tool cover -func=output/coverage.out | tail -1
-      - 'echo "✅ Tests completed with coverage report: output/coverage.html"'
-    generates:
-      - output/coverage.out
-      - output/coverage.html
-    silent: true
-
-  test:all:
-    desc: Run all tests including compatibility tests
-    env:
-      CGO_ENABLED: 1
-    cmds:
-      - mkdir -p output/
-      - go test ./... -race -coverprofile=output/coverage.out
-      - go tool cover -html=output/coverage.out -o output/coverage.html
-      - go tool cover -func=output/coverage.out | tail -1
-      - 'echo "✅ All tests completed with coverage report: output/coverage.html"'
-    generates:
-      - output/coverage.out
-      - output/coverage.html
-    silent: true
+      - 'echo "✅ Tests completed with coverage: output/coverage.html"'
+    silent: false
 
   test:compatibility:
     desc: Run OpenSSL compatibility tests
@@ -132,116 +67,7 @@ tasks:
       - 'echo "✅ OpenSSL compatibility tests completed"'
     silent: false
 
-  test:compatibility:keypair:
-    desc: Run keypair compatibility tests only
-    env:
-      CGO_ENABLED: 1
-    cmds:
-      - mkdir -p output/
-      - |
-        echo "🔑 Running Keypair Compatibility Tests..."
-        echo "   Testing RSA, ECDSA, Ed25519 key compatibility with OpenSSL"
-      - go test -mod=mod ./compatibility/keypair -v -tags=compatibility
-      - 'echo "✅ Keypair compatibility tests completed"'
-    silent: false
-
-  test:compatibility:cert:
-    desc: Run certificate compatibility tests only
-    env:
-      CGO_ENABLED: 1
-    cmds:
-      - mkdir -p output/
-      - |
-        echo "📜 Running Certificate Compatibility Tests..."
-        echo "   Testing X.509 certificate compatibility with OpenSSL"
-      - go test -mod=mod ./compatibility/cert -v -tags=compatibility
-      - 'echo "✅ Certificate compatibility tests completed"'
-    silent: false
-
-  test:compatibility:signing:
-    desc: Run signing compatibility tests only
-    env:
-      CGO_ENABLED: 1
-    cmds:
-      - mkdir -p output/
-      - |
-        echo "✍️ Running Signing Compatibility Tests..."
-        echo "   Testing digital signature and PKCS#7/CMS compatibility with OpenSSL"
-      - go test -mod=mod ./compatibility/signing -v -tags=compatibility
-      - 'echo "✅ Signing compatibility tests completed"'
-    silent: false
-
-  # Code Quality Tasks
-  lint:
-    desc: Run static analysis with go vet
-    cmds:
-      - go vet ./...
-      - 'echo "✅ Linting complete"'
-    silent: true
-
-  unused:
-    desc: Check for unused code using golangci-lint
-    cmds:
-      - |
-        if ! command -v golangci-lint &> /dev/null; then
-          echo "⚠️  golangci-lint not found. Installing..."
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-        fi
-      - golangci-lint run --enable=unused --disable-all ./...
-    silent: false
-
-  lint:install:
-    desc: Install golangci-lint for advanced linting
-    cmds:
-      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-      - 'echo "✅ golangci-lint installed"'
-    silent: true
-
-  lint:full:
-    desc: Run comprehensive linting with golangci-lint on core modules
-    deps: [lint:check]
-    cmds:
-      - golangci-lint run ./keypair/... ./cert/... ./signing/...
-      - 'echo "✅ Full lint checks passed"'
-    silent: true
-
-  lint:check:
-    desc: Check if golangci-lint is installed
-    cmds:
-      - |
-        if ! command -v golangci-lint >/dev/null 2>&1; then
-          echo "❌ golangci-lint not found. Install from https://golangci-lint.run/usage/install/"
-          echo "   For macOS: brew install golangci-lint"
-          echo "   For Linux: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin"
-          exit 1
-        fi
-    silent: true
-
-  lint:fix:
-    desc: Auto-fix linting issues where possible
-    deps: [lint:check]
-    cmds:
-      - golangci-lint run --fix ./keypair/... ./cert/... ./signing/... ./encryption/... ./pkcs12/...
-      - 'echo "✅ Auto-fixable lint issues resolved"'
-    silent: true
-
-  lint:security:
-    desc: Run security-focused linting
-    deps: [lint:check]
-    cmds:
-      - golangci-lint run --enable gosec,ineffassign,unconvert ./keypair/... ./cert/... ./signing/... ./encryption/... ./pkcs12/...
-      - 'echo "✅ Security lint checks passed"'
-    silent: true
-
-  lint:summary:
-    desc: Show linting issues summary by type
-    deps: [lint:check]
-    cmds:
-      - |
-        echo "📊 Linting Issues Summary:"
-        golangci-lint run ./keypair/... ./cert/... ./signing/... --out-format=tab 2>/dev/null | cut -f3 | sort | uniq -c | sort -nr | head -10
-    silent: false
-
+  # Code Quality
   format:
     desc: Format all Go code
     cmds:
@@ -249,196 +75,17 @@ tasks:
       - 'echo "✅ Code formatted"'
     silent: true
 
-  format:check:
-    desc: Check if code is properly formatted
+  lint:
+    desc: Run comprehensive linting (go vet + golangci-lint)
     cmds:
-      - |
-        if [ -n "$(gofmt -l .)" ]; then
-          echo "❌ The following files need formatting:"
-          gofmt -l .
-          exit 1
-        else
-          echo "✅ All files are properly formatted"
-        fi
-    silent: true
-
-  # Module Management
-  mod:verify:
-    desc: Verify module dependencies
-    cmds:
-      - go mod verify
-      - 'echo "✅ Module dependencies verified"'
-    silent: true
-
-  mod:tidy:
-    desc: Clean up module dependencies
-    cmds:
-      - go mod tidy
-      - 'echo "✅ Module dependencies tidied"'
-    silent: true
-
-  mod:update:
-    desc: Update all dependencies to latest versions
-    cmds:
-      - go get -u ./...
-      - go mod tidy
-      - 'echo "✅ Dependencies updated"'
-    silent: true
-
-  mod:graph:
-    desc: Show module dependency graph
-    cmds:
-      - go mod graph
-
-
-  clean:
-    desc: Clean build artifacts and generated files
-    cmds:
-      - rm -rf bin/ dist/ _output/ output/
-      - rm -f *.test *.out *.html
-      - rm -rf examples/keypair/output/
-      - rm -rf examples/certificates/output/
-      - rm -rf examples/signing/output/
-      - rm -rf format_output/
-      - rm -f *.pem *.key *.crt *.csr
-      - 'echo "✅ Cleaned build artifacts and generated files"'
-    silent: true
-
-  clean:cache:
-    desc: Clean Go build and test cache
-    cmds:
-      - go clean -cache
-      - go clean -testcache
-      - 'echo "✅ Go cache cleaned"'
-    silent: true
-
-  clean:all:
-    desc: Clean everything including module cache
-    deps: [clean, clean:cache]
-    cmds:
-      - go clean -modcache
-      - 'echo "✅ All caches and artifacts cleaned"'
-    silent: true
-
-  # Environment Tasks
-  env:check:
-    desc: Validate Go environment setup
-    cmds:
-      - go version
-      - go env GOPATH
-      - go env GOROOT
-      - go env GOOS
-      - go env GOARCH
-      - 'echo "✅ Go environment validated"'
-
-  env:doctor:
-    desc: Check project health and dependencies
-    cmds:
-      - 'echo "🔍 Checking project health..."'
-      - go version
-      - go mod verify
       - go vet ./...
-      - 'echo "✅ Project health check complete"'
+      - golangci-lint run ./...
+      - 'echo "✅ Linting complete"'
     silent: true
 
-  # Benchmark Tasks
-  bench:
-    desc: Run all benchmarks
-    cmds:
-      - go test -bench=. ./...
-
-  # Security Tasks
-  security:check:
-    desc: Check for known vulnerabilities in dependencies
-    cmds:
-      - go list -json -m all | nancy sleuth
-
-  security:install:
-    desc: Install security scanning tools
-    cmds:
-      - go install github.com/sonatype-nexus-community/nancy@latest
-      - 'echo "✅ Security tools installed"'
-    silent: true
-
-  # Git Tasks
-  git:status:
-    desc: Show git status and current branch
-    cmds:
-      - git status
-      - git branch --show-current
-
-  git:update:
-    desc: Pull latest changes from repository
-    cmds:
-      - git pull
-
-  git:sync:
-    desc: Sync with remote repository
-    cmds:
-      - git fetch --all
-      - git pull
-
-  git:commit:
-    desc: Add and commit changes with message (usage - task git:commit -- "your commit message")
-    cmds:
-      - git add .
-      - git commit -m "{{.CLI_ARGS}}"
-
-  # Documentation Tasks
-  docs:install:
-    desc: Install documentation tools
-    cmds:
-      - |
-        if ! command -v godoc &> /dev/null; then
-          echo "⚠️  godoc not found. Installing..."
-          go install golang.org/x/tools/cmd/godoc@latest
-        fi
-      - 'echo "✅ Documentation tools installed"'
-    silent: true
-
-  docs:generate:
-    desc: Generate documentation files for all packages
-    deps: [docs:install]
-    cmds:
-      - mkdir -p output/docs/
-      - |
-        echo "# GoPKI Library Documentation" > output/docs/README.md
-        echo "" >> output/docs/README.md
-        echo "## Keypair Package" >> output/docs/README.md
-        go doc -all ./keypair >> output/docs/README.md
-        echo "" >> output/docs/README.md
-        echo "## Certificate Package" >> output/docs/README.md
-        go doc -all ./cert >> output/docs/README.md
-        echo "" >> output/docs/README.md
-        echo "## Signing Package" >> output/docs/README.md
-        go doc -all ./signing >> output/docs/README.md
-        echo "" >> output/docs/README.md
-        echo "## Formats Package" >> output/docs/README.md
-        go doc -all ./signing/formats >> output/docs/README.md
-      - 'echo "✅ Documentation generated in output/docs/README.md"'
-      - 'echo "💡 For interactive docs, run: task docs:serve"'
-    generates:
-      - output/docs/README.md
-    silent: true
-
-  docs:serve:
-    desc: Start godoc server for interactive documentation
-    cmds:
-      - 'echo "🌐 Starting godoc server on http://localhost:6060"'
-      - 'echo "📖 Visit http://localhost:6060/pkg/{{.MODULE}}/ to view documentation"'
-      - godoc -http=:6060
-
-  docs:clean:
-    desc: Clean generated documentation
-    cmds:
-      - rm -rf output/docs/
-      - 'echo "✅ Documentation cleaned"'
-    silent: true
-
-  # Example Management
+  # Examples
   examples:run:
     desc: Run all examples
-    deps: [build]
     cmds:
       - 'echo "🔐 Running keypair examples..."'
       - go run -tags example ./examples/keypair/main.go
@@ -446,7 +93,7 @@ tasks:
       - 'echo "📜 Running certificate examples..."'
       - go run -tags example ./examples/certificates/main.go
       - 'echo ""'
-      - 'echo "✍️ Running document signing examples..."'
+      - 'echo "✍️ Running signing examples..."'
       - go run -tags example ./examples/signing/main.go
       - 'echo ""'
       - 'echo "🔒 Running encryption examples..."'
@@ -454,94 +101,24 @@ tasks:
       - 'echo ""'
       - 'echo "📦 Running PKCS#12 examples..."'
       - go run -tags example ./examples/pkcs12/main.go
-      - 'echo "✅ All examples completed successfully!"'
+      - 'echo "✅ All examples completed!"'
     silent: true
 
-  examples:keypair:
-    desc: Run keypair examples only
-    deps: [build]
+  # Clean
+  clean:
+    desc: Clean build artifacts and caches
     cmds:
-      - go run -tags example ./examples/keypair/main.go
+      - rm -rf bin/ output/
+      - rm -rf examples/*/output/
+      - rm -f *.test *.out *.html *.pem *.key *.crt *.csr
+      - go clean -cache -testcache
+      - 'echo "✅ Cleaned build artifacts and caches"'
     silent: true
 
-  examples:certificates:
-    desc: Run certificate examples only
-    deps: [build]
-    cmds:
-      - go run -tags example ./examples/certificates/main.go
-    silent: true
-
-  examples:signing:
-    desc: Run signing examples only
-    deps: [build]
-    cmds:
-      - go run -tags example ./examples/signing/main.go
-    silent: true
-
-  examples:encryption:
-    desc: Run encryption examples only
-    deps: [build]
-    cmds:
-      - go run -tags example ./examples/encryption/main.go
-    silent: true
-
-  examples:pkcs12:
-    desc: Run PKCS#12 examples only
-    deps: [build]
-    cmds:
-      - go run -tags example ./examples/pkcs12/main.go
-    silent: true
-
-  examples:clean:
-    desc: Clean example output directories
-    cmds:
-      - rm -rf examples/keypair/output/
-      - rm -rf examples/certificates/output/
-      - rm -rf examples/signing/output/
-      - rm -rf examples/encryption/output/
-      - rm -rf examples/pkcs12/output/
-      - 'echo "✅ Example outputs cleaned"'
-    silent: true
-
-  # CI/CD Pipeline Tasks
+  # CI/CD
   ci:
-    desc: Run complete CI pipeline locally
-    deps: [format:check, lint:security, test:coverage, build]
+    desc: Run CI pipeline (format, lint, test, build, examples)
+    deps: [format, lint, test, build, examples:run]
     cmds:
-      - 'echo "✅ CI pipeline completed successfully"'
-    silent: true
-
-  ci:quick:
-    desc: Run quick CI checks (format, lint, basic tests)
-    deps: [format:check, lint, test]
-    cmds:
-      - 'echo "✅ Quick CI checks completed"'
-    silent: true
-
-  ci:full:
-    desc: Run comprehensive CI pipeline with all checks
-    deps: [format:check, lint:full, lint:security, test:coverage, build, examples:run]
-    cmds:
-      - 'echo "✅ Full CI pipeline completed successfully"'
-    silent: true
-
-  release:check:
-    desc: Check if project is ready for release
-    deps: [format:check, lint:full, test:coverage, build]
-    cmds:
-      - |
-        echo "🔍 Release Readiness Check:"
-        echo "  ✅ Code formatting verified"
-        echo "  ✅ Linting checks passed"
-        echo "  ✅ Test coverage analyzed"
-        echo "  ✅ Build successful"
-        echo ""
-        echo "📦 Project appears ready for release!"
-    silent: false
-
-  pre-commit:
-    desc: Run pre-commit checks (format, quick lint, basic tests)
-    deps: [format, lint, test:quick]
-    cmds:
-      - 'echo "✅ Pre-commit checks completed"'
+      - 'echo "✅ CI pipeline completed"'
     silent: true
