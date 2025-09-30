@@ -1,3 +1,10 @@
+## [1.17.2](https://github.com/jasoet/gopki/compare/v1.17.1...v1.17.2) (2025-09-30)
+
+
+### 🐛 Bug Fixes
+
+* **test:** reduce parallelism in compatibility tests to prevent runner OOM ([aafacf5](https://github.com/jasoet/gopki/commit/aafacf565f90044c362088e6941effec73e981e2))
+
 ## [1.17.1](https://github.com/jasoet/gopki/compare/v1.17.0...v1.17.1) (2025-09-30)
 
 
