@@ -128,7 +128,7 @@ tasks:
       - |
         echo "🔗 Running OpenSSL Compatibility Tests..."
         echo "   This tests interoperability between GoPKI and OpenSSL"
-      - go test -mod=mod ./compatibility/... -v -tags=compatibility -timeout=10m
+      - go test -mod=mod ./compatibility/... -v -tags=compatibility -timeout=10m -p=1
       - 'echo "✅ OpenSSL compatibility tests completed"'
     silent: false
 
