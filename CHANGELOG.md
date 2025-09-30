@@ -1,3 +1,10 @@
+## [1.17.0](https://github.com/jasoet/gopki/compare/v1.16.0...v1.17.0) (2025-09-30)
+
+
+### ✨ Features
+
+* **ci:** optimize test pipeline with Taskfile integration ([2253f55](https://github.com/jasoet/gopki/commit/2253f559fe9336e97fb1bbb98392fedd01b0ce1e))
+
 ## [1.16.0](https://github.com/jasoet/gopki/compare/v1.15.0...v1.16.0) (2025-09-30)
 
 
