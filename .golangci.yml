@@ -228,14 +228,12 @@ issues:
         - ineffassign  # Ed25519 error assignment pattern acceptable
         - govet        # nilness check for generic types acceptable (SA4023)
         - staticcheck  # SA4023 generic type comparisons acceptable
-        - goimports    # Import formatting specific to package structure
 
     # Exclude for signing package patterns
     - path: signing/.*\.go
       linters:
         - ineffassign  # Ed25519 sign pattern reassigns err intentionally
         - staticcheck  # SA4006 err value never used acceptable for Ed25519 pattern
-        - goimports    # Import formatting specific to internal crypto
         - lll          # Long error messages in signing functions acceptable
 
   max-issues-per-linter: 0

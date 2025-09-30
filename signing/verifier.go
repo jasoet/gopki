@@ -9,8 +9,9 @@ import (
 	"fmt"
 	"time"
 
-	internalcrypto "github.com/jasoet/gopki/internal/crypto"
 	"github.com/smallstep/pkcs7"
+
+	internalcrypto "github.com/jasoet/gopki/internal/crypto"
 )
 
 // VerifySignature verifies a signature against the original data.

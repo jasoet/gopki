@@ -8,10 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/encryption"
 	"github.com/jasoet/gopki/keypair/algo"
-	"github.com/stretchr/testify/assert"
 )
 
 // Helper function to create test certificate

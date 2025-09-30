@@ -50,9 +50,10 @@ import (
 	"io"
 	"time"
 
-	"github.com/jasoet/gopki/encryption"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/crypto/pbkdf2"
+
+	"github.com/jasoet/gopki/encryption"
 )
 
 // EncryptAESGCM encrypts data using AES-GCM authenticated encryption with the provided key.

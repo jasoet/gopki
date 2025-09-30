@@ -4,8 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jasoet/gopki/keypair/algo"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/jasoet/gopki/keypair/algo"
 )
 
 func TestDefaultEncryptOptions(t *testing.T) {

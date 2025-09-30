@@ -40,13 +40,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/smallstep/pkcs7"
+
 	"github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/encryption"
 	"github.com/jasoet/gopki/encryption/asymmetric"
 	"github.com/jasoet/gopki/encryption/symmetric"
 	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
-	"github.com/smallstep/pkcs7"
 )
 
 // Encrypt encrypts data using envelope encryption (hybrid approach) for efficient

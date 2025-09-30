@@ -12,11 +12,12 @@ import (
 	"io"
 	"os"
 
+	"github.com/smallstep/pkcs7"
+
 	"github.com/jasoet/gopki/cert"
 	internalcrypto "github.com/jasoet/gopki/internal/crypto"
 	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
-	"github.com/smallstep/pkcs7"
 )
 
 // SignDocument signs a document using the provided key pair and certificate.

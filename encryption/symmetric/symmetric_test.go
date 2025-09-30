@@ -7,8 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jasoet/gopki/encryption"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/jasoet/gopki/encryption"
 )
 
 func TestEncryptAESGCM(t *testing.T) {
