@@ -1,3 +1,36 @@
+## [1.16.0](https://github.com/jasoet/gopki/compare/v1.15.0...v1.16.0) (2025-09-30)
+
+
+### ✨ Features
+
+* **encryption:** add OpenSSL-compatible envelope encryption mode ([6c487ab](https://github.com/jasoet/gopki/commit/6c487abf8550615ff25056ff7bd57e2d22041206)), closes [PKCS#7](https://github.com/jasoet/PKCS/issues/7) [PKCS#7](https://github.com/jasoet/PKCS/issues/7)
+
+
+### 📚 Documentation
+
+* clean up documentation by removing excessive line numbers and counts ([e6f237e](https://github.com/jasoet/gopki/commit/e6f237e7e5d15a9c18e95e90e766f4e7ba6c6eca))
+* **compatibility:** add detailed compatibility report and testing instructions ([8d3c2ee](https://github.com/jasoet/gopki/commit/8d3c2eed6a032c4c0433ce13673059577d549f4a))
+* update compatibility report with OpenSSL envelope encryption ([1c66fe8](https://github.com/jasoet/gopki/commit/1c66fe8f715014f1cc2394f2bd7649b1aeade88d)), closes [PKCS#7](https://github.com/jasoet/PKCS/issues/7)
+
+
+### ✅ Tests
+
+* **compatibility:** add comprehensive OpenSSL envelope encryption test ([e88e2ac](https://github.com/jasoet/gopki/commit/e88e2ac241e444c4009d7a629325fac92f2ea5b8)), closes [PKCS#7](https://github.com/jasoet/PKCS/issues/7)
+* **compatibility:** add encryption compatibility tests with OpenSSL for multiple algorithms ([248ea29](https://github.com/jasoet/gopki/commit/248ea297f525565157ccc4f3319f92eba3140573))
+* **compatibility:** handle OpenSSL version differences for Ed25519 ([c85f8bb](https://github.com/jasoet/gopki/commit/c85f8bbe1da3340216bc6837e8a83b742749f29a))
+* **compatibility:** update encryption tests to handle expected RSA-OAEP and AES-GCM limitations ([023e611](https://github.com/jasoet/gopki/commit/023e61159cbc74792df1a8c4101162d231c4e48f))
+* **encryption/compatibility:** add comprehensive tests for CMS cycle and encryption compatibility ([686c922](https://github.com/jasoet/gopki/commit/686c922de728df9333d8ef84012edc1b0fcdb3ea))
+
+
+### 👷 CI/CD
+
+* install OpenSSL and OpenSSH for compatibility tests ([918ec3c](https://github.com/jasoet/gopki/commit/918ec3cb05c58dd1dc33ef8d71d1789417782c97))
+* simplify workflow by removing compatibility tests from CI ([861aeba](https://github.com/jasoet/gopki/commit/861aebae536d70505cdeeefc403f5bedce440493))
+* streamline workflow to use Taskfile and exclude compatibility tests ([575aaa7](https://github.com/jasoet/gopki/commit/575aaa7f9b8a42b5311a8832494ec15c48d77cac))
+* update upload-artifact action from v3 to v4 ([09980e1](https://github.com/jasoet/gopki/commit/09980e1c79b914210f24b19c1e3b20d68d9f5166))
+* upgrade OpenSSL to 3.3.2 for full Ed25519 support ([ccf55cb](https://github.com/jasoet/gopki/commit/ccf55cbe01c8da6b9fe454953fcb5ebc8a198658))
+* **workflows:** add test suite and coverage upload to semantic-release workflow ([bb75dda](https://github.com/jasoet/gopki/commit/bb75dda116c0746e3c7cb83abcb6596b7823d9de))
+
 ## [1.15.0](https://github.com/jasoet/gopki/compare/v1.14.0...v1.15.0) (2025-09-22)
 
 
