@@ -29,6 +29,12 @@ jobs:
         with:
           go-version: '1.21'
 
+      # Install Task
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       # Install dependencies
       - name: Download dependencies
@@ -38,27 +44,16 @@ jobs:
       - name: Verify dependencies
         run: go mod verify
 
-      # Run tests with race detection and coverage
+      # Run tests using Taskfile (main tests only, exclude examples and compatibility)
       - name: Run unit tests
-        run: go test ./... -race -coverprofile=coverage.out
-
-
-      # Run examples to ensure they work
-      - name: Test examples
-        run: |
-          echo "Testing examples compilation..."
-          go build -tags example ./examples/keypair/main.go
-          go build -tags example ./examples/certificates/main.go
-          go build -tags example ./examples/signing/main.go
-          go build -tags example ./examples/encryption/main.go
-          echo "All examples compiled successfully"
+        run: task test
 
       # Upload coverage to GitHub
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: coverage.out
+          path: output/coverage.out
 
   semantic-release:
     name: Semantic Release

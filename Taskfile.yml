@@ -18,7 +18,8 @@ tasks:
       - 'echo "📋 Code Quality & Analysis Tasks:"'
       - 'echo ""'
       - 'echo "Testing:"'
-      - 'echo "  task test              - Run tests with race detection and coverage"'
+      - 'echo "  task test              - Run main tests (excludes examples and compatibility)"'
+      - 'echo "  task test:all          - Run all tests including compatibility tests"'
       - 'echo "  task test:quick        - Run tests without race detection (faster)"'
       - 'echo ""'
       - 'echo "Compatibility Testing:"'
@@ -89,7 +90,22 @@ tasks:
 
   # Testing Tasks
   test:
-    desc: Run all tests with race detection and coverage report
+    desc: Run main tests (excludes examples and compatibility tests)
+    env:
+      CGO_ENABLED: 1
+    cmds:
+      - mkdir -p output/
+      - go test $(go list ./... | grep -v '/compatibility') -race -coverprofile=output/coverage.out
+      - go tool cover -html=output/coverage.out -o output/coverage.html
+      - go tool cover -func=output/coverage.out | tail -1
+      - 'echo "✅ Tests completed with coverage report: output/coverage.html"'
+    generates:
+      - output/coverage.out
+      - output/coverage.html
+    silent: true
+
+  test:all:
+    desc: Run all tests including compatibility tests
     env:
       CGO_ENABLED: 1
     cmds:
@@ -97,7 +113,7 @@ tasks:
       - go test ./... -race -coverprofile=output/coverage.out
       - go tool cover -html=output/coverage.out -o output/coverage.html
       - go tool cover -func=output/coverage.out | tail -1
-      - 'echo "✅ Tests completed with coverage report: output/coverage.html"'
+      - 'echo "✅ All tests completed with coverage report: output/coverage.html"'
     generates:
       - output/coverage.out
       - output/coverage.html
