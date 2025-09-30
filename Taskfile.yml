@@ -69,10 +69,11 @@ tasks:
 
   # Code Quality
   format:
-    desc: Format all Go code
+    desc: Format all Go code and organize imports
     cmds:
+      - goimports -w .
       - go fmt ./...
-      - 'echo "✅ Code formatted"'
+      - 'echo "✅ Code formatted and imports organized"'
     silent: true
 
   lint:
