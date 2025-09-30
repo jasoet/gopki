@@ -150,6 +150,10 @@ func EncodeToCMS(data *EncryptedData) (CMS, error) {
 //   - *ecdsa.PrivateKey for ECDSA keys
 //   - ed25519.PrivateKey for Ed25519 keys
 //
+// This function auto-detects two formats:
+//  1. GoPKI format: JSON-wrapped envelope structure (supports RSA/ECDSA/Ed25519)
+//  2. OpenSSL format: Standard PKCS#7 EnvelopedData (RSA only)
+//
 // Usage examples:
 //
 //	// Type inference (recommended)
@@ -174,10 +178,10 @@ func DecodeFromCMS[T any](cmsData CMS, cert *x509.Certificate, privateKey T) (*E
 		return nil, fmt.Errorf("failed to decrypt PKCS7 content: %w", err)
 	}
 
-	// Try to deserialize as envelope container (for envelope encryption)
+	// Try to deserialize as envelope container (GoPKI format with JSON wrapper)
 	var container envelopeContainer
 	if err := json.Unmarshal(decryptedContent, &container); err == nil {
-		// Successfully deserialized envelope structure - reconstruct EncryptedData
+		// Successfully deserialized envelope structure - this is GoPKI format
 		result := &EncryptedData{
 			Format:       FormatCMS,
 			Algorithm:    container.Algorithm,
@@ -207,22 +211,19 @@ func DecodeFromCMS[T any](cmsData CMS, cert *x509.Certificate, privateKey T) (*E
 		return result, nil
 	}
 
-	// Not envelope encryption or failed to deserialize - treat as simple encrypted data
+	// Not GoPKI format - this is standard OpenSSL PKCS#7 EnvelopedData
+	// The decryptedContent is the actual plaintext data (OpenSSL-compatible format)
 	result := &EncryptedData{
-		Format:     FormatCMS,
-		Algorithm:  AlgorithmRSAOAEP, // Assume RSA for non-envelope
-		Data:       decryptedContent,
-		Recipients: make([]*RecipientInfo, 0),
-		Metadata:   make(map[string]any),
-		Timestamp:  time.Now(),
+		Format:    FormatCMS,
+		Algorithm: AlgorithmEnvelope,
+		Data:      decryptedContent, // This is the plaintext after full envelope decryption
+		Recipients: []*RecipientInfo{{
+			Certificate:            cert,
+			KeyEncryptionAlgorithm: AlgorithmRSAOAEP,
+		}},
+		Metadata:  map[string]any{"openssl_compatible": true, "already_decrypted": true},
+		Timestamp: time.Now(),
 	}
-
-	// Create a basic recipient info
-	recipInfo := &RecipientInfo{
-		Certificate:            cert,
-		KeyEncryptionAlgorithm: AlgorithmRSAOAEP,
-	}
-	result.Recipients = append(result.Recipients, recipInfo)
 
 	return result, nil
 }

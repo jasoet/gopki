@@ -200,6 +200,11 @@ type EncryptOptions struct {
 	KDF *KDFParams
 	// Custom metadata
 	Metadata map[string]any
+	// OpenSSL compatibility mode (RSA only)
+	// When true, uses standard PKCS#7 EnvelopedData format compatible with OpenSSL
+	// When false (default), uses GoPKI's custom format supporting RSA/ECDSA/Ed25519
+	// Note: Only works with RSA keys - ECDSA/Ed25519 will return error if this is true
+	OpenSSLCompatible bool
 }
 
 // DecryptOptions contains options for decryption operations
@@ -216,6 +221,11 @@ type DecryptOptions struct {
 	SkipExpirationCheck bool
 	// Additional validation options
 	ValidationOptions map[string]any
+	// Try OpenSSL format first during decryption
+	// When true, attempts to decode as standard PKCS#7 EnvelopedData first
+	// Falls back to GoPKI format if that fails
+	// When false (default), auto-detects format based on structure
+	TryOpenSSLFormat bool
 }
 
 // Encryptor provides type-safe encryption operations
@@ -276,6 +286,7 @@ func DefaultEncryptOptions() EncryptOptions {
 		CertificateRecipients: nil,
 		KDF:                   nil,
 		Metadata:              make(map[string]any),
+		OpenSSLCompatible:     false, // Use GoPKI format by default
 	}
 }
 
@@ -288,6 +299,7 @@ func DefaultDecryptOptions() DecryptOptions {
 		VerifyTime:          time.Time{}, // Zero time means use current time
 		SkipExpirationCheck: false,
 		ValidationOptions:   make(map[string]any),
+		TryOpenSSLFormat:    false, // Auto-detect format by default
 	}
 }
 
@@ -338,6 +350,15 @@ func EncodeData(data *EncryptedData) ([]byte, error) {
 	if data == nil {
 		return nil, errors.New("encrypted data is nil")
 	}
+
+	// Check if this is already OpenSSL-compatible format
+	if data.Metadata != nil {
+		if isOpenSSL, ok := data.Metadata["openssl_compatible"].(bool); ok && isOpenSSL {
+			// Already in PKCS#7 EnvelopedData format, just return the Data field
+			return data.Data, nil
+		}
+	}
+
 	return EncodeToCMS(data)
 }
 

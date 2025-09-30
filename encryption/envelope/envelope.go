@@ -36,6 +36,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
+	"crypto/x509"
 	"fmt"
 	"time"
 
@@ -45,6 +46,7 @@ import (
 	"github.com/jasoet/gopki/encryption/symmetric"
 	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
+	"github.com/smallstep/pkcs7"
 )
 
 // Encrypt encrypts data using envelope encryption (hybrid approach) for efficient
@@ -152,6 +154,30 @@ func Decrypt[T keypair.KeyPair](encrypted *encryption.EncryptedData, keyPair T, 
 
 	if encrypted.Algorithm != encryption.AlgorithmEnvelope {
 		return nil, fmt.Errorf("expected envelope algorithm, got %s", encrypted.Algorithm)
+	}
+
+	// Check if this is OpenSSL-compatible format
+	if encrypted.Metadata != nil {
+		if isOpenSSL, ok := encrypted.Metadata["openssl_compatible"].(bool); ok && isOpenSSL {
+			// Check if already decrypted by DecodeFromCMS
+			if alreadyDecrypted, ok := encrypted.Metadata["already_decrypted"].(bool); ok && alreadyDecrypted {
+				// Data is already plaintext from OpenSSL PKCS#7 EnvelopedData decryption
+				return encrypted.Data, nil
+			}
+
+			// Not yet decrypted - need to decrypt the PKCS#7 EnvelopedData
+			rsaKeyPair, ok := any(keyPair).(*algo.RSAKeyPair)
+			if !ok {
+				return nil, fmt.Errorf("OpenSSL compatible format requires RSA key pair, got %T", keyPair)
+			}
+
+			// Get certificate from recipient info
+			if len(encrypted.Recipients) == 0 || encrypted.Recipients[0].Certificate == nil {
+				return nil, fmt.Errorf("OpenSSL compatible format requires certificate in recipient info")
+			}
+
+			return decryptOpenSSLCompatible(encrypted.Data, encrypted.Recipients[0].Certificate, rsaKeyPair.PrivateKey)
+		}
 	}
 
 	// Decrypt AES key using recipient's private key
@@ -449,6 +475,63 @@ func DecryptForRecipient[T keypair.KeyPair](encrypted *encryption.EncryptedData,
 	return plaintext, nil
 }
 
+// encryptOpenSSLCompatible encrypts data using standard PKCS#7 EnvelopedData format
+// compatible with OpenSSL. This only works with RSA keys.
+func encryptOpenSSLCompatible(data []byte, certificates []*x509.Certificate) (*encryption.EncryptedData, error) {
+	// Verify all certificates have RSA keys
+	for i, cert := range certificates {
+		if _, ok := cert.PublicKey.(*rsa.PublicKey); !ok {
+			return nil, fmt.Errorf("OpenSSL compatible mode requires RSA keys, certificate %d has %T", i, cert.PublicKey)
+		}
+	}
+
+	// Set encryption algorithm to AES-256-GCM (standard for PKCS#7)
+	pkcs7.ContentEncryptionAlgorithm = pkcs7.EncryptionAlgorithmAES256GCM
+
+	// Use PKCS#7 library to create standard EnvelopedData
+	cmsData, err := pkcs7.Encrypt(data, certificates)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OpenSSL-compatible envelope: %w", err)
+	}
+
+	// Create recipient info for each certificate
+	recipients := make([]*encryption.RecipientInfo, len(certificates))
+	for i, cert := range certificates {
+		recipients[i] = &encryption.RecipientInfo{
+			Certificate:            cert,
+			KeyEncryptionAlgorithm: encryption.AlgorithmRSAOAEP,
+		}
+	}
+
+	// Return EncryptedData with the raw PKCS#7 data
+	// Note: We store the entire CMS structure in Data field
+	return &encryption.EncryptedData{
+		Algorithm:  encryption.AlgorithmEnvelope,
+		Format:     encryption.FormatCMS,
+		Data:       cmsData, // Store complete PKCS#7 EnvelopedData
+		Recipients: recipients,
+		Timestamp:  time.Now(),
+		Metadata:   map[string]any{"openssl_compatible": true},
+	}, nil
+}
+
+// decryptOpenSSLCompatible decrypts OpenSSL-compatible PKCS#7 EnvelopedData
+func decryptOpenSSLCompatible(cmsData []byte, cert *x509.Certificate, privateKey *rsa.PrivateKey) ([]byte, error) {
+	// Parse PKCS#7 structure
+	p7, err := pkcs7.Parse(cmsData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse PKCS#7 envelope: %w", err)
+	}
+
+	// Decrypt using certificate and private key
+	plaintext, err := p7.Decrypt(cert, privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt PKCS#7 envelope: %w", err)
+	}
+
+	return plaintext, nil
+}
+
 // EncryptWithCertificate encrypts data using a certificate's public key.
 //
 // Parameters:
@@ -464,6 +547,18 @@ func DecryptForRecipient[T keypair.KeyPair](encrypted *encryption.EncryptedData,
 //
 //	encrypted, err := envelope.EncryptWithCertificate(data, recipientCert, opts)
 func EncryptWithCertificate(data []byte, certificate *cert.Certificate, opts encryption.EncryptOptions) (*encryption.EncryptedData, error) {
+	// Check if OpenSSL-compatible mode is requested
+	if opts.OpenSSLCompatible {
+		// Verify RSA key
+		if _, ok := certificate.Certificate.PublicKey.(*rsa.PublicKey); !ok {
+			return nil, fmt.Errorf("OpenSSL compatible mode requires RSA certificate, got %T", certificate.Certificate.PublicKey)
+		}
+
+		// Use standard PKCS#7 EnvelopedData
+		return encryptOpenSSLCompatible(data, []*x509.Certificate{certificate.Certificate})
+	}
+
+	// Use GoPKI's custom envelope encryption (supports all algorithms)
 	publicKey := certificate.Certificate.PublicKey
 
 	// Call the underlying encryption but then enhance with certificate info

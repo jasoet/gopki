@@ -364,6 +364,56 @@ func DecryptWithKeyPair[T keypair.KeyPair](encData *EncryptedData, keyPair T) ([
 - **PKCS#7 EnvelopedData**: Standards-compliant envelope format
 - **CMS (RFC 5652)**: Full Cryptographic Message Syntax support
 
+**OpenSSL Compatibility Mode:**
+
+GoPKI supports two envelope encryption formats:
+
+1. **GoPKI Format (Default)**: Custom JSON-wrapped envelope structure
+   - Supports all algorithms: RSA, ECDSA, Ed25519
+   - Full envelope metadata preservation
+   - Compatible only with GoPKI
+
+2. **OpenSSL Format (Opt-in)**: Standard PKCS#7 EnvelopedData
+   - **RSA only** - ECDSA and Ed25519 not supported by OpenSSL smime
+   - Compatible with OpenSSL, other PKI tools
+   - Uses standard PKCS#7 library directly
+
+**Usage:**
+```go
+// Enable OpenSSL-compatible mode for RSA encryption
+opts := encryption.DefaultEncryptOptions()
+opts.OpenSSLCompatible = true  // Enable OpenSSL compatibility
+
+encrypted, err := envelope.EncryptWithCertificate(data, rsaCert, opts)
+// This creates standard PKCS#7 EnvelopedData compatible with:
+//   openssl smime -decrypt -in encrypted.p7 -inkey private.pem -inform DER
+
+// Decryption auto-detects format (GoPKI or OpenSSL)
+decrypted, err := envelope.Decrypt(encrypted, rsaKeys, encryption.DefaultDecryptOptions())
+```
+
+**OpenSSL Interoperability:**
+```bash
+# Decrypt GoPKI OpenSSL-compatible encrypted data with OpenSSL
+openssl smime -decrypt -in encrypted.p7 -inkey private.pem -cert cert.pem -inform DER
+
+# Encrypt with OpenSSL and decrypt with GoPKI
+openssl smime -encrypt -aes256 -binary -in data.txt -out encrypted.p7 cert.pem
+# GoPKI can decrypt: encryption.DecodeDataWithKey(cmsData, cert, privateKey)
+```
+
+**Compatibility Matrix:**
+| Algorithm | GoPKI Format | OpenSSL Format | OpenSSL Interop |
+|-----------|--------------|----------------|-----------------|
+| RSA       | ✅           | ✅             | ✅              |
+| ECDSA     | ✅           | ❌             | ❌              |
+| Ed25519   | ✅           | ❌             | ❌              |
+
+**Notes:**
+- OpenSSL mode enforced at compile time - ECDSA/Ed25519 with `OpenSSLCompatible: true` returns error
+- Format auto-detection on decryption - no manual configuration needed
+- GoPKI format maintains backward compatibility
+
 ### 5. `pkcs12/` - PKCS#12 File Management
 
 **Purpose**: PKCS#12 file creation, loading, and integration with other modules

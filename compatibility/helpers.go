@@ -1408,3 +1408,33 @@ func (h *OpenSSLHelper) ValidateCMSWithOpenSSL(cmsData []byte) error {
 	}
 	return err
 }
+
+// TempDir returns the temporary directory path
+func (h *OpenSSLHelper) TempDir() string {
+	return h.tempDir
+}
+
+// WriteFile writes content to a file
+func (h *OpenSSLHelper) WriteFile(filepath string, content []byte) error {
+	return os.WriteFile(filepath, content, 0600)
+}
+
+// ReadFile reads content from a file
+func (h *OpenSSLHelper) ReadFile(filepath string) ([]byte, error) {
+	return os.ReadFile(filepath)
+}
+
+// RunOpenSSLCommand runs a raw OpenSSL command string
+func (h *OpenSSLHelper) RunOpenSSLCommand(cmd string) ([]byte, error) {
+	parts := strings.Fields(cmd)
+	if len(parts) == 0 {
+		return nil, fmt.Errorf("empty command")
+	}
+
+	// Remove "openssl" from the beginning if present
+	if parts[0] == "openssl" {
+		parts = parts[1:]
+	}
+
+	return h.RunOpenSSL(parts...)
+}
