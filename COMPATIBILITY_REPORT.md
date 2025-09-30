@@ -95,6 +95,30 @@ This document provides a comprehensive report on GoPKI's compatibility with exte
   - X25519 key agreement: ✓ OpenSSL verified
   - Combined X25519 + AES-GCM: ✓ Full encryption/decryption
 
+#### **Envelope Encryption (RSA: 100% Compatible)**
+- **OpenSSL SMIME Interoperability**: Full RSA compatibility
+  - OpenSSL smime → GoPKI decrypt: ✓ Fully verified
+  - Standard PKCS#7 EnvelopedData: ✓ Auto-detected and decrypted
+  - OpenSSL round-trip (encrypt/decrypt): ✓ Validated
+  - RSA-only support: ✅ OpenSSL smime requirement
+  - ECDSA/Ed25519: ❌ Not supported by OpenSSL smime (documented limitation)
+
+- **Real-World Validation**:
+  ```bash
+  # OpenSSL encrypts
+  openssl smime -encrypt -aes256 -binary -in data.txt -out encrypted.p7 cert.pem
+
+  # GoPKI decrypts
+  decoded := encryption.DecodeDataWithKey(cmsData, cert, privateKey)
+  # ✓ Works! Auto-detects OpenSSL format and decrypts successfully
+  ```
+
+- **GoPKI OpenSSL-Compatible Mode**: Opt-in OpenSSL format
+  - `opts.OpenSSLCompatible = true`: Creates standard PKCS#7 EnvelopedData
+  - Format auto-detection on decryption: ✓ Seamless
+  - Backward compatible: ✓ GoPKI format remains default
+  - Production ready: ✓ Tested with real OpenSSL commands
+
 ### ⚠️ Limited Compatibility Features
 
 #### **RSA-OAEP Encryption (Parameter Differences)**
@@ -150,11 +174,16 @@ This document provides a comprehensive report on GoPKI's compatibility with exte
 | ECDH Key Agreement | ✅ | - | RFC 6090 | Full |
 | X25519 Key Agreement | ✅ | - | RFC 7748 | Full |
 | AES-GCM | ⚠️ | - | NIST SP 800-38D | Limited³ |
+| **Envelope Encryption** |
+| RSA Envelope (OpenSSL smime) | ✅ | - | RFC 5652 | Full |
+| ECDSA Envelope (GoPKI only) | N/A | - | Custom | GoPKI Only⁴ |
+| Ed25519 Envelope (GoPKI only) | N/A | - | Custom | GoPKI Only⁴ |
 
 **Notes:**
 1. Ed25519 PKCS#7: GoPKI creates valid signatures, OpenSSL has limited support
 2. RSA-OAEP: Parameter differences between implementations
 3. AES-GCM: OpenSSL version dependent for direct compatibility
+4. ECDSA/Ed25519 Envelope: OpenSSL smime doesn't support these algorithms, GoPKI provides custom implementation
 
 ## Security Standards Compliance
 
