@@ -3,6 +3,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -58,7 +59,7 @@ func compactSerializationExample() {
 	// RS256
 	fmt.Println("\n🔐 RS256 Compact Signature:")
 	rsaKeys, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
-	compactRS256, err := jws.SignCompact(payload, rsaKeys, "RS256", "rsa-signing-key")
+	compactRS256, err := jws.SignCompact(payload, rsaKeys.PrivateKey, "RS256", "rsa-signing-key")
 	if err != nil {
 		log.Fatal("Failed to sign with RS256:", err)
 	}
@@ -66,7 +67,7 @@ func compactSerializationExample() {
 	fmt.Printf("   Format: header.payload.signature (3 parts)\n")
 
 	// Verify
-	verifiedPayload, err := jws.VerifyCompact(compactRS256, rsaKeys)
+	verifiedPayload, err := jws.VerifyCompact(compactRS256, rsaKeys.PublicKey, "RS256")
 	if err != nil {
 		log.Fatal("Failed to verify RS256:", err)
 	}
@@ -76,27 +77,27 @@ func compactSerializationExample() {
 	// ES256
 	fmt.Println("\n🔐 ES256 Compact Signature:")
 	ecKeys, _ := algo.GenerateECDSAKeyPair(algo.P256)
-	compactES256, _ := jws.SignCompact(payload, ecKeys, "ES256", "ec-signing-key")
+	compactES256, _ := jws.SignCompact(payload, ecKeys.PrivateKey, "ES256", "ec-signing-key")
 	fmt.Printf("   Signature: %s...\n", compactES256[:80])
-	jws.VerifyCompact(compactES256, ecKeys)
+	jws.VerifyCompact(compactES256, ecKeys.PublicKey, "ES256")
 	fmt.Println("   ✓ Verified successfully")
 	os.WriteFile("output/jws_compact_es256.txt", []byte(compactES256), 0o644)
 
 	// EdDSA
 	fmt.Println("\n🔐 EdDSA Compact Signature:")
 	edKeys, _ := algo.GenerateEd25519KeyPair()
-	compactEdDSA, _ := jws.SignCompact(payload, edKeys, "EdDSA", "ed-signing-key")
+	compactEdDSA, _ := jws.SignCompact(payload, edKeys.PrivateKey, "EdDSA", "ed-signing-key")
 	fmt.Printf("   Signature: %s...\n", compactEdDSA[:80])
-	jws.VerifyCompact(compactEdDSA, edKeys)
+	jws.VerifyCompact(compactEdDSA, edKeys.PublicKey, "EdDSA")
 	fmt.Println("   ✓ Verified successfully")
 	os.WriteFile("output/jws_compact_eddsa.txt", []byte(compactEdDSA), 0o644)
 
 	// HMAC (HS256)
 	fmt.Println("\n🔐 HS256 Compact Signature (HMAC):")
 	secret := []byte("shared-secret-key-minimum-32-bytes-for-security")
-	compactHS256, _ := jws.SignCompactWithSecret(payload, secret, "HS256", "hmac-key")
+	compactHS256, _ := jws.SignCompactWithSecret(payload, secret, "HS256")
 	fmt.Printf("   Signature: %s...\n", compactHS256[:80])
-	jws.VerifyCompactWithSecret(compactHS256, secret)
+	jws.VerifyCompactWithSecret(compactHS256, secret, "HS256")
 	fmt.Println("   ✓ Verified successfully")
 	os.WriteFile("output/jws_compact_hs256.txt", []byte(compactHS256), 0o644)
 }
@@ -108,13 +109,13 @@ func jsonSerializationExample() {
 	fmt.Println("\n📄 JSON Serialization (Single Signature):")
 	rsaKeys, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
 
-	signature := jws.Signature{
-		Signer:    rsaKeys,
+	signer := &jws.Signer{
+		Key:       rsaKeys.PrivateKey,
 		Algorithm: "RS256",
 		KeyID:     "company-signing-key-2024",
 	}
 
-	jwsJSON, err := jws.SignJSON(payload, []jws.Signature{signature})
+	jwsJSON, err := jws.SignJSON(payload, []*jws.Signer{signer})
 	if err != nil {
 		log.Fatal("Failed to create JSON signature:", err)
 	}
@@ -122,15 +123,20 @@ func jsonSerializationExample() {
 	fmt.Printf("   Payload: %s\n", string(payload))
 	fmt.Printf("   Signatures: 1\n")
 	fmt.Printf("   Algorithm: RS256\n")
-	fmt.Printf("   Key ID: %s\n", signature.KeyID)
+	fmt.Printf("   Key ID: %s\n", signer.KeyID)
 
 	// Marshal to JSON
-	jsonBytes, _ := jwsJSON.Marshal()
+	jsonBytes, _ := json.Marshal(jwsJSON)
 	fmt.Printf("   JSON Length: %d bytes\n", len(jsonBytes))
 	os.WriteFile("output/jws_json_single.json", jsonBytes, 0o644)
 
 	// Verify
-	verifiedPayload, err := jws.VerifyJSON(jwsJSON, rsaKeys)
+	verifier := &jws.Verifier{
+		Key:       rsaKeys.PublicKey,
+		Algorithm: "RS256",
+		KeyID:     "company-signing-key-2024",
+	}
+	verifiedPayload, err := jws.VerifyJSON(jwsJSON, []*jws.Verifier{verifier})
 	if err != nil {
 		log.Fatal("Failed to verify JSON signature:", err)
 	}
@@ -160,20 +166,20 @@ func multiSignatureExample() {
 	fmt.Println("     Role: CTO")
 	fmt.Println("     Signature Algorithm: EdDSA")
 
-	// Create signatures
-	signatures := []jws.Signature{
+	// Create signers
+	signers := []*jws.Signer{
 		{
-			Signer:    aliceKeys,
+			Key:       aliceKeys.PrivateKey,
 			Algorithm: "RS256",
 			KeyID:     "alice-ceo-2024",
 		},
 		{
-			Signer:    bobKeys,
+			Key:       bobKeys.PrivateKey,
 			Algorithm: "ES256",
 			KeyID:     "bob-cfo-2024",
 		},
 		{
-			Signer:    carolKeys,
+			Key:       carolKeys.PrivateKey,
 			Algorithm: "EdDSA",
 			KeyID:     "carol-cto-2024",
 		},
@@ -181,7 +187,7 @@ func multiSignatureExample() {
 
 	// Sign document
 	fmt.Println("\n   Creating multi-signature JWS...")
-	multiSigned, err := jws.SignJSON(document, signatures)
+	multiSigned, err := jws.SignJSON(document, signers)
 	if err != nil {
 		log.Fatal("Failed to create multi-signature:", err)
 	}
@@ -189,24 +195,39 @@ func multiSignatureExample() {
 	fmt.Printf("   ✓ Document signed by %d parties\n", len(multiSigned.Signatures))
 
 	// Marshal to JSON
-	jsonBytes, _ := multiSigned.Marshal()
+	jsonBytes, _ := json.Marshal(multiSigned)
 	fmt.Printf("   ✓ JSON size: %d bytes\n", len(jsonBytes))
 	os.WriteFile("output/jws_multi_signature.json", jsonBytes, 0o644)
 
 	// Verify each signature individually
 	fmt.Println("\n   Verifying signatures:")
 
-	_, err = jws.VerifyJSON(multiSigned, aliceKeys)
+	aliceVerifier := &jws.Verifier{
+		Key:       aliceKeys.PublicKey,
+		Algorithm: "RS256",
+		KeyID:     "alice-ceo-2024",
+	}
+	_, err = jws.VerifyJSON(multiSigned, []*jws.Verifier{aliceVerifier})
 	if err == nil {
 		fmt.Println("   ✓ Alice's signature valid")
 	}
 
-	_, err = jws.VerifyJSON(multiSigned, bobKeys)
+	bobVerifier := &jws.Verifier{
+		Key:       bobKeys.PublicKey,
+		Algorithm: "ES256",
+		KeyID:     "bob-cfo-2024",
+	}
+	_, err = jws.VerifyJSON(multiSigned, []*jws.Verifier{bobVerifier})
 	if err == nil {
 		fmt.Println("   ✓ Bob's signature valid")
 	}
 
-	_, err = jws.VerifyJSON(multiSigned, carolKeys)
+	carolVerifier := &jws.Verifier{
+		Key:       carolKeys.PublicKey,
+		Algorithm: "EdDSA",
+		KeyID:     "carol-cto-2024",
+	}
+	_, err = jws.VerifyJSON(multiSigned, []*jws.Verifier{carolVerifier})
 	if err == nil {
 		fmt.Println("   ✓ Carol's signature valid")
 	}
@@ -227,7 +248,7 @@ func detachedContentExample() {
 
 	// Create detached signature (payload is empty in JWS)
 	fmt.Println("\n   Creating detached signature...")
-	detachedSig, err := jws.SignDetached(largeDocument, rsaKeys, "RS256", "doc-signer-2024")
+	detachedSig, err := jws.SignDetached(largeDocument, rsaKeys.PrivateKey, "RS256", "doc-signer-2024")
 	if err != nil {
 		log.Fatal("Failed to create detached signature:", err)
 	}
@@ -247,13 +268,13 @@ func detachedContentExample() {
 
 	// Verify detached signature
 	fmt.Println("\n   Verifying detached signature with document...")
-	verifiedPayload, err := jws.VerifyDetached(detachedSig, largeDocument, rsaKeys)
+	err = jws.VerifyDetached(detachedSig, largeDocument, rsaKeys.PublicKey, "RS256")
 	if err != nil {
 		log.Fatal("Failed to verify detached signature:", err)
 	}
 
 	fmt.Printf("   ✓ Signature valid for document\n")
-	fmt.Printf("   ✓ Verified payload length: %d bytes\n", len(verifiedPayload))
+	fmt.Printf("   ✓ Document length: %d bytes\n", len(largeDocument))
 }
 
 func documentSigningExample() {
@@ -285,33 +306,43 @@ Signatures required from:
 	fmt.Println("\n   Document Type: Employment Contract")
 	fmt.Println("   Signers: HR Director, Department Manager")
 
-	signatures := []jws.Signature{
+	signers := []*jws.Signer{
 		{
-			Signer:    hrKeys,
+			Key:       hrKeys.PrivateKey,
 			Algorithm: "RS256",
 			KeyID:     "hr-director-jane-smith",
 		},
 		{
-			Signer:    managerKeys,
+			Key:       managerKeys.PrivateKey,
 			Algorithm: "ES256",
 			KeyID:     "manager-bob-jones",
 		},
 	}
 
-	signedContract, _ := jws.SignJSON(contract, signatures)
+	signedContract, _ := jws.SignJSON(contract, signers)
 
 	fmt.Printf("   ✓ Contract signed by %d parties\n", len(signedContract.Signatures))
 
-	jsonBytes, _ := signedContract.Marshal()
+	jsonBytes, _ := json.Marshal(signedContract)
 	os.WriteFile("output/jws_contract_signed.json", jsonBytes, 0o644)
 
 	fmt.Println("   ✓ Signed contract saved to output/jws_contract_signed.json")
 
 	// Verify both signatures
-	jws.VerifyJSON(signedContract, hrKeys)
+	hrVerifier := &jws.Verifier{
+		Key:       hrKeys.PublicKey,
+		Algorithm: "RS256",
+		KeyID:     "hr-director-jane-smith",
+	}
+	jws.VerifyJSON(signedContract, []*jws.Verifier{hrVerifier})
 	fmt.Println("   ✓ HR Director signature verified")
 
-	jws.VerifyJSON(signedContract, managerKeys)
+	managerVerifier := &jws.Verifier{
+		Key:       managerKeys.PublicKey,
+		Algorithm: "ES256",
+		KeyID:     "manager-bob-jones",
+	}
+	jws.VerifyJSON(signedContract, []*jws.Verifier{managerVerifier})
 	fmt.Println("   ✓ Department Manager signature verified")
 }
 
@@ -334,9 +365,9 @@ func contractApprovalExample() {
 	cfoKeys, _ := algo.GenerateEd25519KeyPair()
 
 	// All sign the proposal
-	signatures := []jws.Signature{
+	signers := []*jws.Signer{
 		{
-			Signer:    managerKeys,
+			Key:       managerKeys.PrivateKey,
 			Algorithm: "ES256",
 			KeyID:     "manager-alice",
 			UnprotectedHeader: map[string]interface{}{
@@ -345,7 +376,7 @@ func contractApprovalExample() {
 			},
 		},
 		{
-			Signer:    directorKeys,
+			Key:       directorKeys.PrivateKey,
 			Algorithm: "ES384",
 			KeyID:     "director-bob",
 			UnprotectedHeader: map[string]interface{}{
@@ -354,7 +385,7 @@ func contractApprovalExample() {
 			},
 		},
 		{
-			Signer:    vpKeys,
+			Key:       vpKeys.PrivateKey,
 			Algorithm: "RS256",
 			KeyID:     "vp-carol",
 			UnprotectedHeader: map[string]interface{}{
@@ -363,7 +394,7 @@ func contractApprovalExample() {
 			},
 		},
 		{
-			Signer:    cfoKeys,
+			Key:       cfoKeys.PrivateKey,
 			Algorithm: "EdDSA",
 			KeyID:     "cfo-dave",
 			UnprotectedHeader: map[string]interface{}{
@@ -374,12 +405,12 @@ func contractApprovalExample() {
 		},
 	}
 
-	signedProposal, _ := jws.SignJSON(proposal, signatures)
+	signedProposal, _ := jws.SignJSON(proposal, signers)
 
-	fmt.Printf("\n   ✓ Proposal approved by %d levels\n", len(signatures))
+	fmt.Printf("\n   ✓ Proposal approved by %d levels\n", len(signers))
 
 	// Save with pretty formatting
-	jsonBytes, _ := signedProposal.MarshalIndent("", "  ")
+	jsonBytes, _ := json.MarshalIndent(signedProposal, "", "  ")
 	os.WriteFile("output/jws_approval_chain.json", jsonBytes, 0o644)
 
 	fmt.Println("   ✓ Approval chain saved to output/jws_approval_chain.json")
@@ -397,7 +428,7 @@ func contractApprovalExample() {
 				timestamp = t
 			}
 		}
-		fmt.Printf("   %d. %s - %s (key: %s)\n", i+1, role, timestamp, sig.Protected["kid"])
+		fmt.Printf("   %d. %s - %s\n", i+1, role, timestamp)
 	}
 
 	fmt.Println("\n   ✅ Full approval chain verified")

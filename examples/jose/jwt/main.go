@@ -73,12 +73,12 @@ func rsaSignatureExample() {
 		Audience:  jwt.Audience{"web-app", "mobile-app"},
 		ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
 		IssuedAt:  time.Now().Unix(),
-		ID:        "jwt-rsa-example-001",
+		JWTID:     "jwt-rsa-example-001",
 	}
 
 	// Test RS256
 	fmt.Println("\n📝 RS256 (RSASSA-PKCS1-v1_5 with SHA-256):")
-	tokenRS256, err := jwt.Sign(claims, keyPair, "RS256", "rsa-key-2024")
+	tokenRS256, err := jwt.Sign(&claims, keyPair.PrivateKey, jwt.RS256, &jwt.SignOptions{KeyID: "rsa-key-2024"})
 	if err != nil {
 		log.Fatal("Failed to sign with RS256:", err)
 	}
@@ -86,7 +86,7 @@ func rsaSignatureExample() {
 	fmt.Printf("   Length: %d bytes\n", len(tokenRS256))
 
 	// Verify RS256
-	verifiedClaims, err := jwt.Verify(tokenRS256, keyPair)
+	verifiedClaims, err := jwt.Verify(tokenRS256, keyPair.PublicKey, nil)
 	if err != nil {
 		log.Fatal("Failed to verify RS256 token:", err)
 	}
@@ -97,17 +97,17 @@ func rsaSignatureExample() {
 
 	// Test RS384
 	fmt.Println("\n📝 RS384 (RSASSA-PKCS1-v1_5 with SHA-384):")
-	tokenRS384, _ := jwt.Sign(claims, keyPair, "RS384", "rsa-key-2024")
+	tokenRS384, _ := jwt.Sign(&claims, keyPair.PrivateKey, jwt.RS384, &jwt.SignOptions{KeyID: "rsa-key-2024"})
 	fmt.Printf("   Token: %s...\n", tokenRS384[:60])
-	jwt.Verify(tokenRS384, keyPair)
+	jwt.Verify(tokenRS384, keyPair.PublicKey, nil)
 	fmt.Println("   ✓ Verified successfully")
 	os.WriteFile("output/jwt_rs384.txt", []byte(tokenRS384), 0o644)
 
 	// Test RS512
 	fmt.Println("\n📝 RS512 (RSASSA-PKCS1-v1_5 with SHA-512):")
-	tokenRS512, _ := jwt.Sign(claims, keyPair, "RS512", "rsa-key-2024")
+	tokenRS512, _ := jwt.Sign(&claims, keyPair.PrivateKey, jwt.RS512, &jwt.SignOptions{KeyID: "rsa-key-2024"})
 	fmt.Printf("   Token: %s...\n", tokenRS512[:60])
-	jwt.Verify(tokenRS512, keyPair)
+	jwt.Verify(tokenRS512, keyPair.PublicKey, nil)
 	fmt.Println("   ✓ Verified successfully")
 	os.WriteFile("output/jwt_rs512.txt", []byte(tokenRS512), 0o644)
 }
@@ -123,30 +123,30 @@ func ecdsaSignatureExample() {
 		IssuedAt:  time.Now().Unix(),
 	}
 
-	tokenES256, err := jwt.Sign(claims, keyPairP256, "ES256", "ec-p256-key")
+	tokenES256, err := jwt.Sign(&claims, keyPairP256.PrivateKey, jwt.ES256, &jwt.SignOptions{KeyID: "ec-p256-key"})
 	if err != nil {
 		log.Fatal("Failed to sign with ES256:", err)
 	}
 	fmt.Printf("   Token: %s...\n", tokenES256[:60])
-	jwt.Verify(tokenES256, keyPairP256)
+	jwt.Verify(tokenES256, keyPairP256.PublicKey, nil)
 	fmt.Println("   ✓ Verified successfully")
 	os.WriteFile("output/jwt_es256.txt", []byte(tokenES256), 0o644)
 
 	// Test ES384 (P-384)
 	fmt.Println("\n📝 ES384 (ECDSA with P-384 and SHA-384):")
 	keyPairP384, _ := algo.GenerateECDSAKeyPair(algo.P384)
-	tokenES384, _ := jwt.Sign(claims, keyPairP384, "ES384", "ec-p384-key")
+	tokenES384, _ := jwt.Sign(&claims, keyPairP384.PrivateKey, jwt.ES384, &jwt.SignOptions{KeyID: "ec-p384-key"})
 	fmt.Printf("   Token: %s...\n", tokenES384[:60])
-	jwt.Verify(tokenES384, keyPairP384)
+	jwt.Verify(tokenES384, keyPairP384.PublicKey, nil)
 	fmt.Println("   ✓ Verified successfully")
 	os.WriteFile("output/jwt_es384.txt", []byte(tokenES384), 0o644)
 
 	// Test ES512 (P-521)
 	fmt.Println("\n📝 ES512 (ECDSA with P-521 and SHA-512):")
 	keyPairP521, _ := algo.GenerateECDSAKeyPair(algo.P521)
-	tokenES512, _ := jwt.Sign(claims, keyPairP521, "ES512", "ec-p521-key")
+	tokenES512, _ := jwt.Sign(&claims, keyPairP521.PrivateKey, jwt.ES512, &jwt.SignOptions{KeyID: "ec-p521-key"})
 	fmt.Printf("   Token: %s...\n", tokenES512[:60])
-	jwt.Verify(tokenES512, keyPairP521)
+	jwt.Verify(tokenES512, keyPairP521.PublicKey, nil)
 	fmt.Println("   ✓ Verified successfully")
 	os.WriteFile("output/jwt_es512.txt", []byte(tokenES512), 0o644)
 }
@@ -167,14 +167,14 @@ func ed25519SignatureExample() {
 	}
 
 	fmt.Println("\n📝 EdDSA (Ed25519 signature):")
-	tokenEdDSA, err := jwt.Sign(claims, keyPair, "EdDSA", "ed25519-key-001")
+	tokenEdDSA, err := jwt.Sign(&claims, keyPair.PrivateKey, jwt.EdDSA, &jwt.SignOptions{KeyID: "ed25519-key-001"})
 	if err != nil {
 		log.Fatal("Failed to sign with EdDSA:", err)
 	}
 	fmt.Printf("   Token: %s...\n", tokenEdDSA[:60])
 	fmt.Printf("   Length: %d bytes\n", len(tokenEdDSA))
 
-	verifiedClaims, err := jwt.Verify(tokenEdDSA, keyPair)
+	verifiedClaims, err := jwt.Verify(tokenEdDSA, keyPair.PublicKey, nil)
 	if err != nil {
 		log.Fatal("Failed to verify EdDSA token:", err)
 	}
@@ -194,27 +194,27 @@ func hmacSignatureExample() {
 
 	// Test HS256
 	fmt.Println("\n📝 HS256 (HMAC with SHA-256):")
-	tokenHS256, err := jwt.SignWithSecret(claims, secret, "HS256", "hmac-key")
+	tokenHS256, err := jwt.SignWithSecret(&claims, secret, jwt.HS256)
 	if err != nil {
 		log.Fatal("Failed to sign with HS256:", err)
 	}
 	fmt.Printf("   Token: %s...\n", tokenHS256[:60])
-	jwt.VerifyWithSecret(tokenHS256, secret)
+	jwt.VerifyWithSecret(tokenHS256, secret, nil)
 	fmt.Println("   ✓ Verified successfully")
 	os.WriteFile("output/jwt_hs256.txt", []byte(tokenHS256), 0o644)
 
 	// Test HS384
 	fmt.Println("\n📝 HS384 (HMAC with SHA-384):")
-	tokenHS384, _ := jwt.SignWithSecret(claims, secret, "HS384", "hmac-key")
+	tokenHS384, _ := jwt.SignWithSecret(&claims, secret, jwt.HS384)
 	fmt.Printf("   Token: %s...\n", tokenHS384[:60])
-	jwt.VerifyWithSecret(tokenHS384, secret)
+	jwt.VerifyWithSecret(tokenHS384, secret, nil)
 	fmt.Println("   ✓ Verified successfully")
 
 	// Test HS512
 	fmt.Println("\n📝 HS512 (HMAC with SHA-512):")
-	tokenHS512, _ := jwt.SignWithSecret(claims, secret, "HS512", "hmac-key")
+	tokenHS512, _ := jwt.SignWithSecret(&claims, secret, jwt.HS512)
 	fmt.Printf("   Token: %s...\n", tokenHS512[:60])
-	jwt.VerifyWithSecret(tokenHS512, secret)
+	jwt.VerifyWithSecret(tokenHS512, secret, nil)
 	fmt.Println("   ✓ Verified successfully")
 }
 
@@ -229,12 +229,14 @@ func claimsValidationExample() {
 		ExpiresAt: time.Now().Add(-1 * time.Hour).Unix(), // Expired 1 hour ago
 		IssuedAt:  time.Now().Add(-2 * time.Hour).Unix(),
 	}
-	expiredToken, _ := jwt.Sign(expiredClaims, keyPair, "RS256", "test-key")
+	expiredToken, _ := jwt.Sign(&expiredClaims, keyPair.PrivateKey, jwt.RS256, &jwt.SignOptions{KeyID: "test-key"})
 
-	opts := jwt.ValidationOptions{
-		RequireExpiry: true,
+	opts := &jwt.VerifyOptions{
+		Validation: &jwt.ValidationOptions{
+			ValidateExpiry: true,
+		},
 	}
-	_, err := jwt.VerifyWithOptions(expiredToken, keyPair, opts)
+	_, err := jwt.Verify(expiredToken, keyPair.PublicKey, opts)
 	if err != nil {
 		fmt.Printf("   ✓ Correctly rejected: %v\n", err)
 	}
@@ -247,12 +249,14 @@ func claimsValidationExample() {
 		NotBefore: time.Now().Add(1 * time.Hour).Unix(), // Valid in 1 hour
 		ExpiresAt: time.Now().Add(2 * time.Hour).Unix(),
 	}
-	futureToken, _ := jwt.Sign(futureClaims, keyPair, "RS256", "test-key")
+	futureToken, _ := jwt.Sign(&futureClaims, keyPair.PrivateKey, jwt.RS256, &jwt.SignOptions{KeyID: "test-key"})
 
-	opts = jwt.ValidationOptions{
-		RequireNotBefore: true,
+	opts = &jwt.VerifyOptions{
+		Validation: &jwt.ValidationOptions{
+			ValidateNotBefore: true,
+		},
 	}
-	_, err = jwt.VerifyWithOptions(futureToken, keyPair, opts)
+	_, err = jwt.Verify(futureToken, keyPair.PublicKey, opts)
 	if err != nil {
 		fmt.Printf("   ✓ Correctly rejected: %v\n", err)
 	}
@@ -264,12 +268,15 @@ func claimsValidationExample() {
 		Subject:   "user-789",
 		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
 	}
-	token, _ := jwt.Sign(claims, keyPair, "RS256", "test-key")
+	token, _ := jwt.Sign(&claims, keyPair.PrivateKey, jwt.RS256, &jwt.SignOptions{KeyID: "test-key"})
 
-	opts = jwt.ValidationOptions{
-		ExpectedIssuer: "auth.example.com",
+	opts = &jwt.VerifyOptions{
+		Validation: &jwt.ValidationOptions{
+			ValidateIssuer: true,
+			ExpectedIssuer: "auth.example.com",
+		},
 	}
-	_, err = jwt.VerifyWithOptions(token, keyPair, opts)
+	_, err = jwt.Verify(token, keyPair.PublicKey, opts)
 	if err != nil {
 		fmt.Printf("   ✓ Correctly rejected: %v\n", err)
 	}
@@ -282,12 +289,15 @@ func claimsValidationExample() {
 		Audience:  jwt.Audience{"web-app"},
 		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
 	}
-	token, _ = jwt.Sign(claims, keyPair, "RS256", "test-key")
+	token, _ = jwt.Sign(&claims, keyPair.PrivateKey, jwt.RS256, &jwt.SignOptions{KeyID: "test-key"})
 
-	opts = jwt.ValidationOptions{
-		ExpectedAudience: []string{"mobile-app"}, // Different audience
+	opts = &jwt.VerifyOptions{
+		Validation: &jwt.ValidationOptions{
+			ValidateAudience: true,
+			ExpectedAudience: []string{"mobile-app"}, // Different audience
+		},
 	}
-	_, err = jwt.VerifyWithOptions(token, keyPair, opts)
+	_, err = jwt.Verify(token, keyPair.PublicKey, opts)
 	if err != nil {
 		fmt.Printf("   ✓ Correctly rejected: %v\n", err)
 	}
@@ -299,13 +309,15 @@ func claimsValidationExample() {
 		Subject:   "user-202",
 		ExpiresAt: time.Now().Add(-30 * time.Second).Unix(), // Expired 30 seconds ago
 	}
-	skewToken, _ := jwt.Sign(skewClaims, keyPair, "RS256", "test-key")
+	skewToken, _ := jwt.Sign(&skewClaims, keyPair.PrivateKey, jwt.RS256, &jwt.SignOptions{KeyID: "test-key"})
 
-	opts = jwt.ValidationOptions{
-		RequireExpiry: true,
-		ClockSkew:     60 * time.Second, // Allow 60 second skew
+	opts = &jwt.VerifyOptions{
+		Validation: &jwt.ValidationOptions{
+			ValidateExpiry: true,
+			ClockSkew:      60 * time.Second, // Allow 60 second skew
+		},
 	}
-	verifiedClaims, err := jwt.VerifyWithOptions(skewToken, keyPair, opts)
+	verifiedClaims, err := jwt.Verify(skewToken, keyPair.PublicKey, opts)
 	if err == nil {
 		fmt.Printf("   ✓ Accepted with clock skew: subject=%s\n", verifiedClaims.Subject)
 	}
@@ -319,21 +331,21 @@ func apiAuthenticationExample() {
 	// 1. User logs in, server issues JWT
 	fmt.Println("\n   Step 1: User Login → Server Issues JWT")
 	loginClaims := jwt.Claims{
-		Issuer:   "api.myapp.com",
-		Subject:  "user-alice-123",
-		Audience: jwt.Audience{"api.myapp.com"},
+		Issuer:    "api.myapp.com",
+		Subject:   "user-alice-123",
+		Audience:  jwt.Audience{"api.myapp.com"},
 		ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
 		IssuedAt:  time.Now().Unix(),
 		NotBefore: time.Now().Unix(),
-		ID:       "session-abc-def-456",
-		Custom: map[string]interface{}{
+		JWTID:     "session-abc-def-456",
+		Extra: map[string]interface{}{
 			"email": "alice@example.com",
 			"role":  "admin",
 			"perms": []string{"read", "write", "delete"},
 		},
 	}
 
-	accessToken, _ := jwt.Sign(loginClaims, keyPair, "RS256", "api-key-2024-10")
+	accessToken, _ := jwt.Sign(&loginClaims, keyPair.PrivateKey, jwt.RS256, &jwt.SignOptions{KeyID: "api-key-2024-10"})
 	fmt.Printf("   Generated access token: %s...\n", accessToken[:50])
 
 	// Save token
@@ -345,22 +357,26 @@ func apiAuthenticationExample() {
 
 	// 3. Server validates JWT on each request
 	fmt.Println("\n   Step 3: Server Validates JWT")
-	opts := jwt.ValidationOptions{
-		RequireExpiry:    true,
-		RequireNotBefore: true,
-		ExpectedIssuer:   "api.myapp.com",
-		ExpectedAudience: []string{"api.myapp.com"},
-		ClockSkew:        10 * time.Second,
+	opts := &jwt.VerifyOptions{
+		Validation: &jwt.ValidationOptions{
+			ValidateExpiry:    true,
+			ValidateNotBefore: true,
+			ValidateIssuer:    true,
+			ExpectedIssuer:    "api.myapp.com",
+			ValidateAudience:  true,
+			ExpectedAudience:  []string{"api.myapp.com"},
+			ClockSkew:         10 * time.Second,
+		},
 	}
 
-	verifiedClaims, err := jwt.VerifyWithOptions(accessToken, keyPair, opts)
+	verifiedClaims, err := jwt.Verify(accessToken, keyPair.PublicKey, opts)
 	if err != nil {
 		log.Fatal("Token validation failed:", err)
 	}
 
 	fmt.Printf("   ✓ Token valid: user=%s\n", verifiedClaims.Subject)
-	fmt.Printf("   ✓ Role: %v\n", verifiedClaims.Custom["role"])
-	fmt.Printf("   ✓ Permissions: %v\n", verifiedClaims.Custom["perms"])
+	fmt.Printf("   ✓ Role: %v\n", verifiedClaims.Extra["role"])
+	fmt.Printf("   ✓ Permissions: %v\n", verifiedClaims.Extra["perms"])
 	fmt.Printf("   ✓ Token expires in: %.0f hours\n",
 		time.Until(time.Unix(verifiedClaims.ExpiresAt, 0)).Hours())
 }
@@ -375,30 +391,30 @@ func serviceToServiceExample() {
 	fmt.Println("\n   Service A → Service B Request")
 
 	serviceClaims := jwt.Claims{
-		Issuer:   "service-a.internal",
-		Subject:  "service-a",
-		Audience: jwt.Audience{"service-b.internal"},
+		Issuer:    "service-a.internal",
+		Subject:   "service-a",
+		Audience:  jwt.Audience{"service-b.internal"},
 		ExpiresAt: time.Now().Add(5 * time.Minute).Unix(),
 		IssuedAt:  time.Now().Unix(),
-		Custom: map[string]interface{}{
+		Extra: map[string]interface{}{
 			"request_id": "req-789-xyz",
 			"operation":  "fetch-user-data",
 		},
 	}
 
-	serviceToken, _ := jwt.SignWithSecret(serviceClaims, sharedSecret, "HS256", "mesh-key")
+	serviceToken, _ := jwt.SignWithSecret(&serviceClaims, sharedSecret, jwt.HS256)
 	fmt.Printf("   Generated service token: %s...\n", serviceToken[:50])
 
 	// Service B validates the token
 	fmt.Println("\n   Service B Validates Token")
-	verifiedClaims, err := jwt.VerifyWithSecret(serviceToken, sharedSecret)
+	verifiedClaims, err := jwt.VerifyWithSecret(serviceToken, sharedSecret, nil)
 	if err != nil {
 		log.Fatal("Service token validation failed:", err)
 	}
 
 	fmt.Printf("   ✓ Token valid from: %s\n", verifiedClaims.Issuer)
-	fmt.Printf("   ✓ Operation: %v\n", verifiedClaims.Custom["operation"])
-	fmt.Printf("   ✓ Request ID: %v\n", verifiedClaims.Custom["request_id"])
+	fmt.Printf("   ✓ Operation: %v\n", verifiedClaims.Extra["operation"])
+	fmt.Printf("   ✓ Request ID: %v\n", verifiedClaims.Extra["request_id"])
 
 	// Pretty print full claims
 	fmt.Println("\n   Full Claims (JSON):")

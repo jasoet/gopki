@@ -376,3 +376,211 @@ func TestECDSACoordinatePadding(t *testing.T) {
 		assert.Equal(t, keyPair.PublicKey.Y, ecKey.Y)
 	}
 }
+
+// Test JWKSet MarshalIndent
+func TestJWKSetMarshalIndent(t *testing.T) {
+	rsa1, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
+	jwk1, _ := FromPublicKey(rsa1.PublicKey, "sig", "indent-key-1")
+
+	set := &JWKSet{}
+	set.Add(jwk1)
+
+	data, err := set.MarshalIndent("", "  ")
+	require.NoError(t, err)
+	assert.NotEmpty(t, data)
+	assert.Contains(t, string(data), "\n") // Should have newlines for indentation
+}
+
+// Test IsPrivate for different key types
+func TestIsPrivateVariants(t *testing.T) {
+	t.Run("EC public key", func(t *testing.T) {
+		keyPair, _ := algo.GenerateECDSAKeyPair(algo.P256)
+		jwk, _ := FromPublicKey(keyPair.PublicKey, "sig", "ec-test")
+		assert.False(t, jwk.IsPrivate())
+	})
+
+	t.Run("EC private key with d parameter", func(t *testing.T) {
+		keyPair, _ := algo.GenerateECDSAKeyPair(algo.P256)
+		jwk, _ := FromPublicKey(keyPair.PublicKey, "sig", "ec-test")
+		jwk.D = "test-d-value" // Simulate private key
+		assert.True(t, jwk.IsPrivate())
+	})
+
+	t.Run("Ed25519 public key", func(t *testing.T) {
+		keyPair, _ := algo.GenerateEd25519KeyPair()
+		jwk, _ := FromPublicKey(keyPair.PublicKey, "sig", "ed-test")
+		assert.False(t, jwk.IsPrivate())
+	})
+
+	t.Run("Ed25519 (OKP) - not supported as private", func(t *testing.T) {
+		// OKP private keys are not supported in current implementation
+		keyPair, _ := algo.GenerateEd25519KeyPair()
+		jwk, _ := FromPublicKey(keyPair.PublicKey, "sig", "ed-test")
+		jwk.D = "test-d-value"
+		assert.False(t, jwk.IsPrivate()) // OKP always returns false
+	})
+
+	t.Run("oct symmetric key", func(t *testing.T) {
+		jwk := &JWK{
+			KeyType: "oct",
+			K:       "symmetric-key-data",
+		}
+		assert.True(t, jwk.IsPrivate()) // Symmetric keys are private
+	})
+}
+
+// Test validation for different key types
+func TestValidation(t *testing.T) {
+	t.Run("Valid RSA JWK", func(t *testing.T) {
+		jwk := &JWK{
+			KeyType: "RSA",
+			N:       "AQAB",
+			E:       "AQAB",
+		}
+		err := jwk.validate()
+		assert.NoError(t, err)
+	})
+
+	t.Run("Invalid RSA - missing N", func(t *testing.T) {
+		jwk := &JWK{
+			KeyType: "RSA",
+			E:       "AQAB",
+		}
+		err := jwk.validate()
+		assert.ErrorIs(t, err, ErrMissingRequiredField)
+	})
+
+	t.Run("Valid EC JWK", func(t *testing.T) {
+		jwk := &JWK{
+			KeyType: "EC",
+			Curve:   "P-256",
+			X:       "AQAB",
+			Y:       "AQAB",
+		}
+		err := jwk.validate()
+		assert.NoError(t, err)
+	})
+
+	t.Run("Invalid EC - missing curve", func(t *testing.T) {
+		jwk := &JWK{
+			KeyType: "EC",
+			X:       "AQAB",
+			Y:       "AQAB",
+		}
+		err := jwk.validate()
+		assert.ErrorIs(t, err, ErrMissingRequiredField)
+	})
+
+	t.Run("Valid OKP JWK", func(t *testing.T) {
+		jwk := &JWK{
+			KeyType: "OKP",
+			Curve:   "Ed25519",
+			X:       "AQAB",
+		}
+		err := jwk.validate()
+		assert.NoError(t, err)
+	})
+
+	t.Run("Invalid OKP - missing curve", func(t *testing.T) {
+		jwk := &JWK{
+			KeyType: "OKP",
+			X:       "AQAB",
+		}
+		err := jwk.validate()
+		assert.ErrorIs(t, err, ErrMissingRequiredField)
+	})
+
+	t.Run("Unknown key type", func(t *testing.T) {
+		jwk := &JWK{
+			KeyType: "UNKNOWN",
+		}
+		err := jwk.validate()
+		assert.ErrorIs(t, err, ErrInvalidKeyType)
+	})
+}
+
+// Test error paths in import functions
+func TestImportErrors(t *testing.T) {
+	t.Run("Invalid base64 in RSA N", func(t *testing.T) {
+		jwk := &JWK{
+			KeyType: "RSA",
+			N:       "!!!invalid base64!!!",
+			E:       "AQAB",
+		}
+		_, err := jwk.ToPublicKey()
+		assert.Error(t, err)
+	})
+
+	t.Run("Invalid base64 in RSA E", func(t *testing.T) {
+		jwk := &JWK{
+			KeyType: "RSA",
+			N:       "AQAB",
+			E:       "!!!invalid base64!!!",
+		}
+		_, err := jwk.ToPublicKey()
+		assert.Error(t, err)
+	})
+
+	t.Run("Invalid base64 in EC X", func(t *testing.T) {
+		jwk := &JWK{
+			KeyType: "EC",
+			Curve:   "P-256",
+			X:       "!!!invalid!!!",
+			Y:       "AQAB",
+		}
+		_, err := jwk.ToPublicKey()
+		assert.Error(t, err)
+	})
+
+	t.Run("Invalid base64 in EC Y", func(t *testing.T) {
+		jwk := &JWK{
+			KeyType: "EC",
+			Curve:   "P-256",
+			X:       "AQAB",
+			Y:       "!!!invalid!!!",
+		}
+		_, err := jwk.ToPublicKey()
+		assert.Error(t, err)
+	})
+
+	t.Run("Invalid base64 in OKP X", func(t *testing.T) {
+		jwk := &JWK{
+			KeyType: "OKP",
+			Curve:   "Ed25519",
+			X:       "!!!invalid!!!",
+		}
+		_, err := jwk.ToPublicKey()
+		assert.Error(t, err)
+	})
+
+	t.Run("Invalid Ed25519 key length", func(t *testing.T) {
+		jwk := &JWK{
+			KeyType: "OKP",
+			Curve:   "Ed25519",
+			X:       "AQAB", // Too short for Ed25519 (needs 32 bytes)
+		}
+		_, err := jwk.ToPublicKey()
+		assert.Error(t, err)
+	})
+}
+
+// Test export errors
+func TestExportErrors(t *testing.T) {
+	t.Run("Nil RSA public key", func(t *testing.T) {
+		var rsaKey *rsa.PublicKey
+		_, err := FromPublicKey(rsaKey, "sig", "test")
+		assert.Error(t, err)
+	})
+
+	t.Run("Nil ECDSA public key", func(t *testing.T) {
+		var ecKey *ecdsa.PublicKey
+		_, err := FromPublicKey(ecKey, "sig", "test")
+		assert.Error(t, err)
+	})
+
+	t.Run("Nil Ed25519 public key", func(t *testing.T) {
+		var edKey ed25519.PublicKey
+		_, err := FromPublicKey(edKey, "sig", "test")
+		assert.Error(t, err)
+	})
+}

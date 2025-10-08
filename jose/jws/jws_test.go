@@ -40,8 +40,8 @@ func TestCompactSignVerify(t *testing.T) {
 	payload := []byte(`{"action": "transfer", "amount": 1000}`)
 
 	tests := []struct {
-		name string
-		alg  jwt.Algorithm
+		name      string
+		alg       jwt.Algorithm
 		setupKeys func(t *testing.T) (interface{}, interface{})
 	}{
 		{
@@ -456,4 +456,102 @@ func TestMixedAlgorithmsJSON(t *testing.T) {
 	verified, err = VerifyJSON(token, verifiers)
 	require.NoError(t, err)
 	assert.Equal(t, payload, verified)
+}
+
+// Test additional hash algorithms (SHA-384, SHA-512)
+func TestAdditionalHashAlgorithms(t *testing.T) {
+	payload := []byte("test-data")
+
+	t.Run("RS384", func(t *testing.T) {
+		privKey, pubKey := generateRSAKey(t)
+		token, err := SignCompact(payload, privKey, jwt.RS384, "test-key")
+		require.NoError(t, err)
+
+		_, err = VerifyCompact(token, pubKey, jwt.RS384)
+		require.NoError(t, err)
+	})
+
+	t.Run("RS512", func(t *testing.T) {
+		privKey, pubKey := generateRSAKey(t)
+		token, err := SignCompact(payload, privKey, jwt.RS512, "test-key")
+		require.NoError(t, err)
+
+		_, err = VerifyCompact(token, pubKey, jwt.RS512)
+		require.NoError(t, err)
+	})
+
+	t.Run("ES384", func(t *testing.T) {
+		privateKey, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+		require.NoError(t, err)
+		pubKey := &privateKey.PublicKey
+
+		token, err := SignCompact(payload, privateKey, jwt.ES384, "test-key")
+		require.NoError(t, err)
+
+		_, err = VerifyCompact(token, pubKey, jwt.ES384)
+		require.NoError(t, err)
+	})
+
+	t.Run("ES512", func(t *testing.T) {
+		privateKey, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+		require.NoError(t, err)
+		pubKey := &privateKey.PublicKey
+
+		token, err := SignCompact(payload, privateKey, jwt.ES512, "test-key")
+		require.NoError(t, err)
+
+		_, err = VerifyCompact(token, pubKey, jwt.ES512)
+		require.NoError(t, err)
+	})
+
+	t.Run("HS384", func(t *testing.T) {
+		secret := []byte("my-secret-key-for-hs384-testing")
+		token, err := SignCompactWithSecret(payload, secret, jwt.HS384)
+		require.NoError(t, err)
+
+		_, err = VerifyCompactWithSecret(token, secret, jwt.HS384)
+		require.NoError(t, err)
+	})
+
+	t.Run("HS512", func(t *testing.T) {
+		secret := []byte("my-secret-key-for-hs512-testing")
+		token, err := SignCompactWithSecret(payload, secret, jwt.HS512)
+		require.NoError(t, err)
+
+		_, err = VerifyCompactWithSecret(token, secret, jwt.HS512)
+		require.NoError(t, err)
+	})
+}
+
+// Test unsupported algorithm errors
+func TestUnsupportedAlgorithms(t *testing.T) {
+	payload := []byte("test")
+
+	t.Run("Unsupported Sign algorithm", func(t *testing.T) {
+		privKey, _ := generateRSAKey(t)
+		_, err := SignCompact(payload, privKey, "UNSUPPORTED", "test-key")
+		assert.Error(t, err)
+	})
+
+	t.Run("Unsupported Verify algorithm", func(t *testing.T) {
+		_, pubKey := generateRSAKey(t)
+		// Create a valid token structure but with unsupported alg
+		token := "eyJhbGciOiJVTlNVUFBPUlRFRCJ9.cGF5bG9hZA.c2lnbmF0dXJl"
+		_, err := VerifyCompact(token, pubKey, "UNSUPPORTED")
+		assert.Error(t, err)
+	})
+}
+
+// Test detached signature with additional key types
+func TestDetachedWithECDSA(t *testing.T) {
+	content := []byte("important document")
+	privKey, pubKey := generateECDSAKey(t)
+
+	// Sign detached
+	detached, err := SignDetached(content, privKey, jwt.ES256, "ec-key")
+	require.NoError(t, err)
+
+	// Verify
+	err = VerifyDetached(detached, content, pubKey, jwt.ES256)
+	require.NoError(t, err)
 }

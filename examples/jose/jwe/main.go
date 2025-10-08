@@ -3,6 +3,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -251,7 +252,7 @@ This information is highly confidential and restricted to:
 	encrypted, _ := jwe.EncryptJSON(document, recipients, "A256GCM", keyAlgs, keyIDs)
 
 	// Save
-	jsonBytes, _ := encrypted.MarshalIndent("", "  ")
+	jsonBytes, _ := json.MarshalIndent(encrypted, "", "  ")
 	os.WriteFile("output/jwe_confidential_ma.json", jsonBytes, 0o644)
 
 	fmt.Println("\n   ✓ Document encrypted for 3 authorized recipients")
@@ -333,7 +334,7 @@ Database Credentials:
 	fmt.Println("\n   Encrypting sprint data for all team members...")
 	encrypted, _ := jwe.EncryptJSON(sharedData, recipients, "A256GCM", keyAlgs, keyIDs)
 
-	jsonBytes, _ := encrypted.MarshalIndent("", "  ")
+	jsonBytes, _ := json.MarshalIndent(encrypted, "", "  ")
 	os.WriteFile("output/jwe_team_sprint.json", jsonBytes, 0o644)
 
 	fmt.Printf("   ✓ Encrypted for %d team members\n", len(recipients))
