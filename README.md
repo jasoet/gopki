@@ -5,7 +5,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/jasoet/gopki)](https://goreportcard.com/report/github.com/jasoet/gopki)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Production-ready Go library for PKI operations** with **type-safe cryptography through Go generics**. Full X.509, PKCS#7/CMS, PKCS#12, and SSH format support with 80.3% test coverage across 844+ tests.
+**Production-ready Go library for PKI operations** with **type-safe cryptography through Go generics**. Full X.509, PKCS#7/CMS, PKCS#12, SSH, and JOSE (JWT/JWS/JWE/JWK) support with 80.3% test coverage across 900+ tests.
 
 ## ✨ Why GoPKI?
 
@@ -43,6 +43,7 @@ This README provides a quick reference. For detailed navigation paths, common bu
 | **Digital Signatures** | [`signing/README.md`](signing/README.md) | [`docs/OPENSSL_COMPAT.md`](docs/OPENSSL_COMPAT.md) | `signing/signer.go`, `signing/formats/` |
 | **Certificate Operations** | [`cert/README.md`](cert/README.md) | Certificate examples | `cert/cert.go`, `cert/ca.go` |
 | **PKCS#12 Files** | [`pkcs12/README.md`](pkcs12/README.md) | Module tests | `pkcs12/pkcs12.go` |
+| **JOSE (JWT/JWS/JWE/JWK)** | [`jose/README.md`](jose/README.md) | JOSE modules | `jose/jwt/`, `jose/jws/`, `jose/jwe/`, `jose/jwk/` |
 | **OpenSSL Compatibility** | [`docs/OPENSSL_COMPAT.md`](docs/OPENSSL_COMPAT.md) | `compatibility/` tests | `compatibility/helpers.go` |
 | **Testing** | `Taskfile.yml` | Module-specific tests | `*_test.go` files |
 
@@ -183,7 +184,7 @@ Signing:
 
 ## 🏗️ Architecture
 
-GoPKI is structured as **five core modules** with strong type relationships:
+GoPKI is structured as **six core modules** with strong type relationships:
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
@@ -193,13 +194,13 @@ GoPKI is structured as **five core modules** with strong type relationships:
 └─────────────────┘    └──────────────────┘    └─────────────────┘
          ▲                        ▲                       ▲
          │                        │                       │
-         └────────┬─────────────────────────────────────────┘
-                  ▼                ▼
-         ┌─────────────────┐    ┌──────────────────┐
-         │  encryption/    │    │    pkcs12/       │
-         │ Data Encryption │    │ PKCS#12 Files    │
-         │ (89.1% coverage)│    │ (79.1% coverage) │
-         └─────────────────┘    └──────────────────┘
+         └────────┬───────────────┴───────────────────────┘
+                  ▼                ▼                      ▼
+         ┌─────────────────┐    ┌──────────────────┐   ┌─────────────────┐
+         │  encryption/    │    │    pkcs12/       │   │     jose/       │
+         │ Data Encryption │    │ PKCS#12 Files    │   │  JWT/JWS/JWE/JWK│
+         │ (89.1% coverage)│    │ (79.1% coverage) │   │ (79.6% coverage)│
+         └─────────────────┘    └──────────────────┘   └─────────────────┘
 ```
 
 **Module Documentation:**
@@ -208,6 +209,7 @@ GoPKI is structured as **five core modules** with strong type relationships:
 - **[`signing/README.md`](signing/README.md)** - Digital signatures, PKCS#7/CMS formats
 - **[`encryption/README.md`](encryption/README.md)** - Multi-algorithm encryption, envelope encryption
 - **[`pkcs12/README.md`](pkcs12/README.md)** - PKCS#12 file management and certificate bundling
+- **[`jose/README.md`](jose/README.md)** - JOSE support: JWT, JWS, JWE, JWK for JSON-based security
 
 **Detailed Architecture:** See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for complete system design
 
@@ -401,6 +403,12 @@ task format:check      # Verify code formatting
 - **PKCS #7** - Cryptographic Message Syntax
 - **PKCS #12** - Personal Information Exchange
 - **OpenSSH** - SSH public/private key formats
+- **RFC 7515** - JSON Web Signature (JWS)
+- **RFC 7516** - JSON Web Encryption (JWE)
+- **RFC 7517** - JSON Web Key (JWK)
+- **RFC 7518** - JSON Web Algorithms (JWA)
+- **RFC 7519** - JSON Web Token (JWT)
+- **RFC 8037** - CFRG Elliptic Curve Algorithms for JOSE
 
 ## 💻 Development
 
