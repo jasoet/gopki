@@ -244,4 +244,4 @@ yarn-debug.log*
 yarn-error.log*
 
 .task/
-output/
+output/jose/jwt/coverage.html
