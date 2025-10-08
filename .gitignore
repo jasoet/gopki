@@ -244,4 +244,11 @@ yarn-debug.log*
 yarn-error.log*
 
 .task/
+
+# Coverage reports
+coverage.html
+**/coverage.html
+coverage.out
+
+# Output directories
 output/
