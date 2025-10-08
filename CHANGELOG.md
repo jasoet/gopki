@@ -1,3 +1,10 @@
+## [1.18.0](https://github.com/jasoet/gopki/compare/v1.17.3...v1.18.0) (2025-10-08)
+
+
+### ✨ Features
+
+* implement JOSE support with comprehensive tests and examples ([#2](https://github.com/jasoet/gopki/issues/2)) ([2d437f9](https://github.com/jasoet/gopki/commit/2d437f90a5b3ccda39564bad8caf3d089dfdb2d4))
+
 ## [1.17.3](https://github.com/jasoet/gopki/compare/v1.17.2...v1.17.3) (2025-09-30)
 
 
