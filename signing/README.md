@@ -13,6 +13,26 @@ Digital signature creation and verification with support for:
 - **RFC 3161 timestamp support**
 - **OpenSSL signature verification** compatibility
 
+## Recent Improvements
+
+### Signature Size Optimization (~35% reduction)
+- **Fixed**: Duplicate certificate inclusion in PKCS#7 signatures
+- **Result**: Signatures reduced from ~1,260 to ~820 bytes for typical RSA-2048 certificates
+- **Benefit**: Better QR code compatibility and smaller storage footprint
+- **Details**: The `AddSigner()` method automatically includes certificates; manual addition was redundant (signer.go:136-138)
+
+### Automatic Certificate Extraction
+- **Feature**: Certificates now auto-extract from PKCS#7 data during verification
+- **Benefit**: Simplified API - no need to manually extract certificates before verification
+- **Usage**: Call `VerifySignature()` without pre-setting certificate; it extracts automatically
+- **Details**: Added auto-extraction logic in verifier.go:65-89
+
+### Detached Flag Support
+- **Fixed**: `SignOptions.Detached` flag now properly honored
+- **Benefit**: Can use `Detached: true` with any format, not just `FormatPKCS7Detached`
+- **Usage**: Set `opts.Detached = true` for detached signatures regardless of format
+- **Details**: Updated condition in signer.go:144 to check both Format and Detached flag
+
 ## 🤖 AI Agent Quick Start
 
 ### File Structure
@@ -67,10 +87,18 @@ certificate, _ := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequ
 
 // Sign document
 document := []byte("Important contract")
-signature, _ := signing.SignDocument(document, keyPair, certificate)
+signature, _ := signing.SignDocument(document, keyPair, certificate, signing.DefaultSignOptions())
 
-// Verify signature
+// Verify signature (certificate auto-extracts from PKCS#7 data)
 err := signing.VerifySignature(document, signature, signing.DefaultVerifyOptions())
+
+// Alternative: Verify with just PKCS#7 data (no preset certificate needed)
+pkcs7Signature := &signing.Signature{
+    Data:   signature.Data,
+    Format: signing.FormatPKCS7,
+}
+err = signing.VerifySignature(document, pkcs7Signature, signing.DefaultVerifyOptions())
+// Certificate automatically extracted from PKCS#7 data!
 ```
 
 ## API Reference

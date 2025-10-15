@@ -132,18 +132,16 @@ func SignDocument[T keypair.KeyPair](data []byte, keyPair T, certificate *cert.C
 			return nil, fmt.Errorf("failed to add signer: %w", err)
 		}
 
-		// Add certificates if requested
-		if opts.IncludeCertificate {
-			signedData.AddCertificate(certificate.Certificate)
-		}
+		// Note: AddSigner already includes the certificate automatically
+		// No need to add it again to avoid duplication
 
 		// Add extra certificates
 		for _, extraCert := range opts.ExtraCertificates {
 			signedData.AddCertificate(extraCert)
 		}
 
-		// Create detached signature if requested
-		if opts.Format == FormatPKCS7Detached {
+		// Create detached signature if requested (check both Format and Detached flag)
+		if opts.Format == FormatPKCS7Detached || opts.Detached {
 			signedData.Detach()
 		}
 

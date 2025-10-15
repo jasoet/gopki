@@ -17,6 +17,7 @@ import (
 	"github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
+	"github.com/smallstep/pkcs7"
 )
 
 func TestSignAndVerifyRSA(t *testing.T) {
@@ -304,16 +305,24 @@ func TestSigningOptions(t *testing.T) {
 		}
 
 		if signature.Certificate != nil {
-			t.Error("Expected certificate not to be included")
+			t.Error("Expected certificate not to be included in signature object")
 		}
 
-		// Verification should fail without certificate
+		// Verification should succeed via auto-extraction (Issue #2 fix)
+		// Even though signature.Certificate is nil, the certificate is still
+		// embedded in the PKCS#7 data (due to AddSigner behavior) and gets auto-extracted
 		err = VerifySignature(testData, signature, DefaultVerifyOptions())
-		if err != ErrMissingCertificate {
-			t.Errorf("Expected ErrMissingCertificate, got %v", err)
+		if err != nil {
+			t.Errorf("Verification should succeed via auto-extraction: %v", err)
 		}
 
-		// Verify with explicit certificate
+		// Verify certificate was auto-extracted and populated
+		if signature.Certificate == nil {
+			t.Error("Expected certificate to be auto-extracted during verification")
+		}
+
+		// Verify with explicit certificate should also work
+		signature.Certificate = nil // Reset for this test
 		err = VerifyWithCertificate(testData, signature, certificate.Certificate, DefaultVerifyOptions())
 		if err != nil {
 			t.Errorf("Failed to verify with explicit certificate: %v", err)
@@ -1571,5 +1580,213 @@ func TestExtractCertificateChainFromSignature(t *testing.T) {
 	_, err = ExtractCertificateChainFromSignature(sigWithEmptyChain)
 	if err == nil {
 		t.Error("Certificate chain extraction should fail when signature has empty certificate chain")
+	}
+}
+
+// TestCertificateAutoExtraction tests the automatic certificate extraction feature (Issue #2 fix)
+func TestCertificateAutoExtraction(t *testing.T) {
+	// Generate RSA key pair
+	manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA key pair: %v", err)
+	}
+	keyPair := manager.KeyPair()
+
+	// Create certificate
+	certificate, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "Test Auto-Extract",
+		},
+		ValidFor: 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create certificate: %v", err)
+	}
+
+	testData := []byte("Test data for auto-extraction")
+
+	// Sign document
+	signature, err := SignDocument(testData, keyPair, certificate, DefaultSignOptions())
+	if err != nil {
+		t.Fatalf("Failed to sign document: %v", err)
+	}
+
+	// Create a new signature object WITHOUT certificate (simulates receiving PKCS#7 data)
+	verifySignature := &Signature{
+		Data:   signature.Data,
+		Format: FormatPKCS7,
+		// Certificate: nil  ← Not set!
+	}
+
+	// Verify should succeed by auto-extracting certificate from PKCS#7
+	err = VerifySignature(testData, verifySignature, DefaultVerifyOptions())
+	if err != nil {
+		t.Errorf("Auto-extraction should allow verification without preset certificate: %v", err)
+	}
+
+	// Certificate should now be populated
+	if verifySignature.Certificate == nil {
+		t.Error("Certificate should be auto-extracted and populated")
+	} else {
+		if verifySignature.Certificate.Subject.CommonName != "Test Auto-Extract" {
+			t.Errorf("Expected CommonName 'Test Auto-Extract', got '%s'", verifySignature.Certificate.Subject.CommonName)
+		}
+	}
+}
+
+// TestDetachedSignatureWithFlag tests that the Detached flag works (Issue #3 fix)
+func TestDetachedSignatureWithFlag(t *testing.T) {
+	// Generate ECDSA key pair
+	manager, err := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
+	if err != nil {
+		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
+	}
+	keyPair := manager.KeyPair()
+
+	// Create certificate
+	certificate, err := cert.CreateSelfSignedCertificate(keyPair, cert.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "Test Detached Flag",
+		},
+		ValidFor: 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create certificate: %v", err)
+	}
+
+	testData := []byte("Test data for detached flag")
+
+	// Test using Detached flag (instead of FormatPKCS7Detached)
+	opts := DefaultSignOptions()
+	opts.Format = FormatPKCS7  // Use regular format
+	opts.Detached = true       // But set Detached flag
+
+	signature, err := SignDocument(testData, keyPair, certificate, opts)
+	if err != nil {
+		t.Fatalf("Failed to sign with Detached flag: %v", err)
+	}
+
+	// Parse PKCS#7 to verify it's actually detached
+	p7, err := pkcs7.Parse(signature.Data)
+	if err != nil {
+		t.Fatalf("Failed to parse PKCS#7: %v", err)
+	}
+
+	// Detached signatures should have empty content
+	if len(p7.Content) > 0 {
+		t.Errorf("Detached signature should have no embedded content, got %d bytes", len(p7.Content))
+	}
+}
+
+// TestPKCS7NoDuplicateCertificates tests that PKCS#7 signatures don't contain duplicate certificates
+// This test ensures signature size optimization (Issue #1 regression prevention)
+func TestPKCS7NoDuplicateCertificates(t *testing.T) {
+	algorithms := []struct {
+		name     string
+		generate func() (interface{}, *cert.Certificate, error)
+	}{
+		{
+			name: "RSA",
+			generate: func() (interface{}, *cert.Certificate, error) {
+				manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+				if err != nil {
+					return nil, nil, err
+				}
+				kp := manager.KeyPair()
+				c, err := cert.CreateSelfSignedCertificate(kp, cert.CertificateRequest{
+					Subject:  pkix.Name{CommonName: "RSA Duplicate Test"},
+					ValidFor: 24 * time.Hour,
+				})
+				return kp, c, err
+			},
+		},
+		{
+			name: "ECDSA",
+			generate: func() (interface{}, *cert.Certificate, error) {
+				manager, err := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
+				if err != nil {
+					return nil, nil, err
+				}
+				kp := manager.KeyPair()
+				c, err := cert.CreateSelfSignedCertificate(kp, cert.CertificateRequest{
+					Subject:  pkix.Name{CommonName: "ECDSA Duplicate Test"},
+					ValidFor: 24 * time.Hour,
+				})
+				return kp, c, err
+			},
+		},
+		{
+			name: "Ed25519",
+			generate: func() (interface{}, *cert.Certificate, error) {
+				manager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey]("")
+				if err != nil {
+					return nil, nil, err
+				}
+				kp := manager.KeyPair()
+				c, err := cert.CreateSelfSignedCertificate(kp, cert.CertificateRequest{
+					Subject:  pkix.Name{CommonName: "Ed25519 Duplicate Test"},
+					ValidFor: 24 * time.Hour,
+				})
+				return kp, c, err
+			},
+		},
+	}
+
+	testData := []byte("Test data for duplicate certificate detection")
+
+	for _, alg := range algorithms {
+		t.Run(alg.name, func(t *testing.T) {
+			keyPair, certificate, err := alg.generate()
+			if err != nil {
+				t.Fatalf("Failed to generate %s keys: %v", alg.name, err)
+			}
+
+			var signature *Signature
+			switch kp := keyPair.(type) {
+			case *algo.RSAKeyPair:
+				signature, err = SignDocument(testData, kp, certificate, DefaultSignOptions())
+			case *algo.ECDSAKeyPair:
+				signature, err = SignDocument(testData, kp, certificate, DefaultSignOptions())
+			case *algo.Ed25519KeyPair:
+				signature, err = SignDocument(testData, kp, certificate, DefaultSignOptions())
+			}
+
+			if err != nil {
+				t.Fatalf("Failed to sign with %s: %v", alg.name, err)
+			}
+
+			// Parse PKCS#7 structure
+			p7, err := pkcs7.Parse(signature.Data)
+			if err != nil {
+				t.Fatalf("Failed to parse PKCS#7: %v", err)
+			}
+
+			// Check certificate count - should have exactly 1 certificate
+			certCount := len(p7.Certificates)
+			if certCount != 1 {
+				t.Errorf("PKCS#7 should contain exactly 1 certificate, found %d (possible duplicate)", certCount)
+			}
+
+			// Check for duplicate certificates by comparing fingerprints
+			seen := make(map[string]bool)
+			duplicates := 0
+			for _, cert := range p7.Certificates {
+				fingerprint := string(cert.Raw)
+				if seen[fingerprint] {
+					duplicates++
+					t.Errorf("Duplicate certificate detected in PKCS#7 signature")
+				}
+				seen[fingerprint] = true
+			}
+
+			if duplicates > 0 {
+				t.Errorf("Found %d duplicate certificate(s) in PKCS#7 signature", duplicates)
+			}
+
+			// Log success
+			if certCount == 1 && duplicates == 0 {
+				t.Logf("✓ %s PKCS#7 signature contains exactly 1 unique certificate (no duplicates)", alg.name)
+			}
+		})
 	}
 }
