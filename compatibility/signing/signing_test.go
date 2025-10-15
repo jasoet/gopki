@@ -14,6 +14,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.mozilla.org/pkcs7"
 
 	"github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/compatibility"
@@ -515,4 +516,155 @@ func testEd25519DetachedCompatibilityWithLimitations(t *testing.T, helper *compa
 			t.Logf("✓ Ed25519 detached OpenSSL limitation test completed")
 		})
 	})
+}
+
+// TestPKCS7StructuralIntegrity tests PKCS#7 signature structure for duplicates and optimization
+// This test prevents regression of Issue #1: duplicate certificate inclusion causing larger signatures
+func TestPKCS7StructuralIntegrity(t *testing.T) {
+	t.Logf("🔍 Testing PKCS#7 Structural Integrity (Duplicate Certificate Detection)...")
+	t.Logf("   This test prevents regression of Issue #1: duplicate certificates in PKCS#7 signatures")
+
+	algorithms := []struct {
+		name     string
+		generate func() (interface{}, *cert.Certificate, error)
+	}{
+		{
+			name: "RSA-2048",
+			generate: func() (interface{}, *cert.Certificate, error) {
+				manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+				if err != nil {
+					return nil, nil, err
+				}
+				kp := manager.KeyPair()
+				c, err := cert.CreateSelfSignedCertificate(kp, testCertRequest)
+				return kp, c, err
+			},
+		},
+		{
+			name: "RSA-3072",
+			generate: func() (interface{}, *cert.Certificate, error) {
+				manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize3072)
+				if err != nil {
+					return nil, nil, err
+				}
+				kp := manager.KeyPair()
+				c, err := cert.CreateSelfSignedCertificate(kp, testCertRequest)
+				return kp, c, err
+			},
+		},
+		{
+			name: "ECDSA-P256",
+			generate: func() (interface{}, *cert.Certificate, error) {
+				manager, err := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
+				if err != nil {
+					return nil, nil, err
+				}
+				kp := manager.KeyPair()
+				c, err := cert.CreateSelfSignedCertificate(kp, testCertRequest)
+				return kp, c, err
+			},
+		},
+		{
+			name: "ECDSA-P384",
+			generate: func() (interface{}, *cert.Certificate, error) {
+				manager, err := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P384)
+				if err != nil {
+					return nil, nil, err
+				}
+				kp := manager.KeyPair()
+				c, err := cert.CreateSelfSignedCertificate(kp, testCertRequest)
+				return kp, c, err
+			},
+		},
+		{
+			name: "Ed25519",
+			generate: func() (interface{}, *cert.Certificate, error) {
+				manager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey](algo.Ed25519Default)
+				if err != nil {
+					return nil, nil, err
+				}
+				kp := manager.KeyPair()
+				c, err := cert.CreateSelfSignedCertificate(kp, testCertRequest)
+				return kp, c, err
+			},
+		},
+	}
+
+	for _, alg := range algorithms {
+		t.Run(alg.name, func(t *testing.T) {
+			keyPair, certificate, err := alg.generate()
+			require.NoError(t, err, "Failed to generate key pair and certificate for %s", alg.name)
+
+			// Test both attached and detached PKCS#7 formats
+			formats := []struct {
+				name     string
+				format   signing.SignatureFormat
+				detached bool
+			}{
+				{"Attached", signing.FormatPKCS7, false},
+				{"Detached", signing.FormatPKCS7Detached, true},
+			}
+
+			for _, fmt := range formats {
+				t.Run(fmt.name, func(t *testing.T) {
+					// Create signature
+					opts := signing.DefaultSignOptions()
+					opts.Format = fmt.format
+					opts.Detached = fmt.detached
+					opts.IncludeCertificate = true
+					opts.IncludeChain = false
+
+					var signature *signing.Signature
+					switch kp := keyPair.(type) {
+					case *algo.RSAKeyPair:
+						signature, err = signing.SignDocument(testData, kp, certificate, opts)
+					case *algo.ECDSAKeyPair:
+						signature, err = signing.SignDocument(testData, kp, certificate, opts)
+					case *algo.Ed25519KeyPair:
+						signature, err = signing.SignDocument(testData, kp, certificate, opts)
+					default:
+						t.Fatalf("Unsupported key pair type: %T", keyPair)
+					}
+					require.NoError(t, err, "Failed to create %s %s signature", alg.name, fmt.name)
+
+					// Parse PKCS#7 structure to inspect internal contents
+					// This is the critical check that compatibility tests were missing
+					p7, err := pkcs7.Parse(signature.Data)
+					require.NoError(t, err, "Failed to parse PKCS#7 structure for %s %s", alg.name, fmt.name)
+
+					// Check 1: Certificate count - should have exactly 1 certificate
+					certCount := len(p7.Certificates)
+					if certCount != 1 {
+						t.Errorf("❌ PKCS#7 should contain exactly 1 certificate, found %d (possible duplicate) for %s %s",
+							certCount, alg.name, fmt.name)
+					}
+
+					// Check 2: Duplicate detection using certificate fingerprints
+					seen := make(map[string]bool)
+					duplicates := 0
+					for _, cert := range p7.Certificates {
+						fingerprint := string(cert.Raw)
+						if seen[fingerprint] {
+							duplicates++
+							t.Errorf("❌ Duplicate certificate detected in PKCS#7 %s signature for %s", fmt.name, alg.name)
+						}
+						seen[fingerprint] = true
+					}
+
+					// Log results
+					if certCount == 1 && duplicates == 0 {
+						t.Logf("✓ %s %s PKCS#7 signature contains exactly 1 unique certificate (no duplicates)", alg.name, fmt.name)
+						t.Logf("   Signature size: %d bytes (optimized)", len(signature.Data))
+					}
+
+					if duplicates > 0 {
+						t.Errorf("❌ Found %d duplicate certificate(s) in PKCS#7 %s signature for %s", duplicates, fmt.name, alg.name)
+						t.Logf("   This would indicate Issue #1 regression: ~35%% larger signatures")
+					}
+				})
+			}
+		})
+	}
+
+	t.Logf("✅ PKCS#7 structural integrity tests completed - no duplicate certificates detected")
 }

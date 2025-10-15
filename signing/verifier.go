@@ -62,6 +62,32 @@ func VerifySignature(data []byte, signature *Signature, opts VerifyOptions) erro
 		return fmt.Errorf("signature is nil")
 	}
 
+	// Auto-extract certificate from PKCS#7 if not already set
+	if signature.Certificate == nil && (signature.Format == FormatPKCS7 || signature.Format == FormatPKCS7Detached) {
+		// Check if this is an Ed25519 PKCS#7 signature (has special handling)
+		if isEd25519, err := internalcrypto.IsEd25519PKCS7(signature.Data); err == nil && isEd25519 {
+			// Ed25519 PKCS#7 verification auto-populates certificate
+			// Will be handled in verifyEd25519PKCS7Signature
+		} else {
+			// For RSA/ECDSA, extract certificate from PKCS#7
+			p7, err := pkcs7.Parse(signature.Data)
+			if err != nil {
+				return fmt.Errorf("failed to parse PKCS#7 for certificate extraction: %w", err)
+			}
+
+			if len(p7.Certificates) > 0 {
+				// Try to get the signer certificate
+				signerCert := p7.GetOnlySigner()
+				if signerCert != nil {
+					signature.Certificate = signerCert
+				} else {
+					// If multiple signers or GetOnlySigner returns nil, use first certificate
+					signature.Certificate = p7.Certificates[0]
+				}
+			}
+		}
+	}
+
 	if signature.Certificate == nil {
 		return ErrMissingCertificate
 	}
