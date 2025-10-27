@@ -17,7 +17,7 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "Valid HTTPS config",
 			config: &Config{
-				Address: "https://vault.example.com",
+				Address: "https://openbao.example.com",
 				Token:   "test-token",
 			},
 			wantErr: false,
@@ -41,7 +41,7 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "Missing token",
 			config: &Config{
-				Address: "https://vault.example.com",
+				Address: "https://openbao.example.com",
 			},
 			wantErr: true,
 			errMsg:  "token is required",
@@ -58,7 +58,7 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "Invalid scheme",
 			config: &Config{
-				Address: "ftp://vault.example.com",
+				Address: "ftp://openbao.example.com",
 				Token:   "test-token",
 			},
 			wantErr: true,
@@ -67,7 +67,7 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "Sets default mount",
 			config: &Config{
-				Address: "https://vault.example.com",
+				Address: "https://openbao.example.com",
 				Token:   "test-token",
 				// Mount not specified
 			},
@@ -76,7 +76,7 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "Custom mount",
 			config: &Config{
-				Address: "https://vault.example.com",
+				Address: "https://openbao.example.com",
 				Token:   "test-token",
 				Mount:   "pki-intermediate",
 			},
@@ -85,7 +85,7 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "With namespace",
 			config: &Config{
-				Address:   "https://vault.example.com",
+				Address:   "https://openbao.example.com",
 				Token:     "test-token",
 				Namespace: "admin/engineering",
 			},
@@ -94,7 +94,7 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "With TLS config",
 			config: &Config{
-				Address: "https://vault.example.com",
+				Address: "https://openbao.example.com",
 				Token:   "test-token",
 				TLSConfig: &tls.Config{
 					InsecureSkipVerify: true,
@@ -139,7 +139,7 @@ func TestConfig_Validate(t *testing.T) {
 
 func TestConfig_ValidateDefaults(t *testing.T) {
 	config := &Config{
-		Address: "https://vault.example.com",
+		Address: "https://openbao.example.com",
 		Token:   "test-token",
 	}
 
@@ -162,7 +162,7 @@ func TestConfig_ValidatePreservesCustomValues(t *testing.T) {
 	customTimeout := 60 * time.Second
 
 	config := &Config{
-		Address: "https://vault.example.com",
+		Address: "https://openbao.example.com",
 		Token:   "test-token",
 		Mount:   customMount,
 		Timeout: customTimeout,
@@ -208,7 +208,7 @@ func TestDefaultRetryConfig(t *testing.T) {
 
 func TestRetryConfig(t *testing.T) {
 	config := &Config{
-		Address: "https://vault.example.com",
+		Address: "https://openbao.example.com",
 		Token:   "test-token",
 		RetryConfig: &RetryConfig{
 			MaxRetries: 5,
@@ -234,7 +234,7 @@ func TestConfig_HTTPClient(t *testing.T) {
 	}
 
 	config := &Config{
-		Address:    "https://vault.example.com",
+		Address:    "https://openbao.example.com",
 		Token:      "test-token",
 		HTTPClient: customClient,
 	}

@@ -22,7 +22,7 @@ func TestNewClient(t *testing.T) {
 		{
 			name: "Valid configuration",
 			config: &Config{
-				Address: "https://vault.example.com",
+				Address: "https://openbao.example.com",
 				Token:   "test-token",
 				Mount:   "pki",
 			},
@@ -45,7 +45,7 @@ func TestNewClient(t *testing.T) {
 		{
 			name: "Missing token",
 			config: &Config{
-				Address: "https://vault.example.com",
+				Address: "https://openbao.example.com",
 			},
 			wantErr: true,
 			errMsg:  "token is required",
@@ -61,7 +61,7 @@ func TestNewClient(t *testing.T) {
 		{
 			name: "Default mount path",
 			config: &Config{
-				Address: "https://vault.example.com",
+				Address: "https://openbao.example.com",
 				Token:   "test-token",
 			},
 			wantErr: false,
@@ -69,7 +69,7 @@ func TestNewClient(t *testing.T) {
 		{
 			name: "Custom mount path",
 			config: &Config{
-				Address: "https://vault.example.com",
+				Address: "https://openbao.example.com",
 				Token:   "test-token",
 				Mount:   "pki-intermediate",
 			},
@@ -78,7 +78,7 @@ func TestNewClient(t *testing.T) {
 		{
 			name: "With namespace",
 			config: &Config{
-				Address:   "https://vault.example.com",
+				Address:   "https://openbao.example.com",
 				Token:     "test-token",
 				Namespace: "admin/team",
 			},
@@ -87,7 +87,7 @@ func TestNewClient(t *testing.T) {
 		{
 			name: "With TLS config",
 			config: &Config{
-				Address: "https://vault.example.com",
+				Address: "https://openbao.example.com",
 				Token:   "test-token",
 				TLSConfig: &tls.Config{
 					InsecureSkipVerify: true,
@@ -98,7 +98,7 @@ func TestNewClient(t *testing.T) {
 		{
 			name: "With custom timeout",
 			config: &Config{
-				Address: "https://vault.example.com",
+				Address: "https://openbao.example.com",
 				Token:   "test-token",
 				Timeout: 60 * time.Second,
 			},
@@ -150,7 +150,7 @@ func TestNewClient(t *testing.T) {
 
 func TestClient_Config(t *testing.T) {
 	config := &Config{
-		Address: "https://vault.example.com",
+		Address: "https://openbao.example.com",
 		Token:   "test-token",
 		Mount:   "pki-test",
 	}
@@ -172,7 +172,7 @@ func TestClient_Config(t *testing.T) {
 
 func TestClient_Close(t *testing.T) {
 	client, err := NewClient(&Config{
-		Address: "https://vault.example.com",
+		Address: "https://openbao.example.com",
 		Token:   "test-token",
 	})
 	if err != nil {
@@ -501,7 +501,7 @@ func TestClient_Ping(t *testing.T) {
 
 func TestClient_Sys(t *testing.T) {
 	client, err := NewClient(&Config{
-		Address: "https://vault.example.com",
+		Address: "https://openbao.example.com",
 		Token:   "test-token",
 	})
 	if err != nil {
@@ -519,7 +519,7 @@ func TestClient_Sys(t *testing.T) {
 
 func TestClient_Logical(t *testing.T) {
 	client, err := NewClient(&Config{
-		Address: "https://vault.example.com",
+		Address: "https://openbao.example.com",
 		Token:   "test-token",
 	})
 	if err != nil {

@@ -8,18 +8,18 @@ import (
 	"time"
 )
 
-// Config contains configuration for connecting to Vault/OpenBao.
+// Config contains configuration for connecting to OpenBao.
 type Config struct {
-	// Address is the Vault/OpenBao server URL (required)
-	// Example: "https://vault.example.com"
+	// Address is the OpenBao server URL (required)
+	// Example: "https://openbao.example.com"
 	Address string
 
-	// Token is the Vault authentication token (required)
+	// Token is the OpenBao authentication token (required)
 	// Example: "hvs.CAESIHNPbm..."
 	// Security: Store securely, use environment variables
 	Token string
 
-	// Namespace is the Vault namespace (optional, Enterprise only)
+	// Namespace is the OpenBao namespace (optional, Enterprise only)
 	// Example: "admin/engineering"
 	Namespace string
 
@@ -76,28 +76,28 @@ func DefaultRetryConfig() *RetryConfig {
 // Validate checks if the configuration is valid.
 func (c *Config) Validate() error {
 	if c.Address == "" {
-		return fmt.Errorf("vault: address is required")
+		return fmt.Errorf("bao: address is required")
 	}
 
 	if c.Token == "" {
-		return fmt.Errorf("vault: token is required")
+		return fmt.Errorf("bao: token is required")
 	}
 
 	// Parse and validate URL
 	parsedURL, err := url.Parse(c.Address)
 	if err != nil {
-		return fmt.Errorf("vault: invalid address: %w", err)
+		return fmt.Errorf("bao: invalid address: %w", err)
 	}
 
 	// Check scheme
 	if parsedURL.Scheme != "https" && parsedURL.Scheme != "http" {
-		return fmt.Errorf("vault: address must use http or https scheme")
+		return fmt.Errorf("bao: address must use http or https scheme")
 	}
 
 	// Warn about insecure connections
 	if parsedURL.Scheme == "http" {
 		// Log warning (will be implemented with actual logging)
-		// log.Warn("vault: using insecure HTTP connection")
+		// log.Warn("bao: using insecure HTTP connection")
 	}
 
 	// Set defaults

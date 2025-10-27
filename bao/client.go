@@ -4,27 +4,23 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/url"
 
 	"github.com/openbao/openbao/api/v2"
 )
 
-// Client represents a Vault/OpenBao PKI client.
+// Client represents an OpenBao PKI client.
 type Client struct {
-	config     *Config
-	client     *api.Client  // OpenBao SDK client
-	httpClient *http.Client // Kept for backward compatibility
-	baseURL    *url.URL     // Kept for backward compatibility
+	config *Config
+	client *api.Client // OpenBao SDK client
 }
 
-// NewClient creates a new Vault/OpenBao client using the OpenBao SDK.
+// NewClient creates a new OpenBao client using the OpenBao SDK.
 // The client validates the configuration and establishes connection settings.
 //
 // Example:
 //
 //	client, err := bao.NewClient(&bao.Config{
-//	    Address: "https://vault.example.com",
+//	    Address: "https://openbao.example.com",
 //	    Token:   os.Getenv("BAO_TOKEN"),
 //	    Mount:   "pki",
 //	})
@@ -81,17 +77,9 @@ func NewClient(config *Config) (*Client, error) {
 		client.SetNamespace(config.Namespace)
 	}
 
-	// Parse base URL (kept for backward compatibility)
-	baseURL, err := url.Parse(config.Address)
-	if err != nil {
-		return nil, fmt.Errorf("bao: parse address: %w", err)
-	}
-
 	return &Client{
-		config:     config,
-		client:     client,
-		httpClient: apiConfig.HttpClient,
-		baseURL:    baseURL,
+		config: config,
+		client: client,
 	}, nil
 }
 
