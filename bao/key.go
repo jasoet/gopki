@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"reflect"
 
 	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
@@ -19,10 +20,9 @@ import (
 
 // GenerateKeyOptions contains parameters for generating a key in OpenBao.
 type GenerateKeyOptions struct {
-	KeyName  string // Name for the key
-	KeyType  string // "rsa", "ec", "ed25519" (set automatically by typed functions)
-	KeyBits  int    // For RSA: 2048, 3072, 4096; For EC: 224, 256, 384, 521
-	Exported bool   // If true, private key is returned; if false, key stays in OpenBao
+	KeyName string // Name for the key
+	KeyType string // "rsa", "ec", "ed25519" (set automatically by typed functions)
+	KeyBits int    // For RSA: 2048, 3072, 4096; For EC: 224, 256, 384, 521
 }
 
 // ImportKeyOptions contains parameters for importing a key to OpenBao.
@@ -44,9 +44,18 @@ type ImportKeyOptions struct {
 //   - *algo.RSAKeyPair
 //   - *algo.ECDSAKeyPair
 //   - *algo.Ed25519KeyPair
+//
+// The keyPair field is populated when:
+//   - Key is generated with GenerateXXXKey() (exported generation)
+//   - Key is imported with ImportXXXKey() (we have the private key)
+//
+// The keyPair field is nil when:
+//   - Key is created with CreateXXXKey() (internal generation in OpenBao)
+//   - Key is retrieved with GetXXXKey() (only metadata available)
 type KeyClient[K keypair.KeyPair] struct {
 	client  *Client
 	keyInfo *KeyInfo
+	keyPair K // Only set when key was generated/imported with private key material
 }
 
 // KeyInfo returns the key metadata.
@@ -54,118 +63,54 @@ func (kc *KeyClient[K]) KeyInfo() *KeyInfo {
 	return kc.keyInfo
 }
 
-// Export exports the key pair from OpenBao with full type safety.
-// Returns the exact key pair type K.
+// KeyPair returns the cached key pair if available.
+// Returns an error if the key pair is not cached (e.g., key was created with CreateXXXKey).
+//
+// The key pair is available when:
+//   - Key was generated with GenerateXXXKey() (exported generation)
+//   - Key was imported with ImportXXXKey()
+//
+// The key pair is NOT available when:
+//   - Key was created with CreateXXXKey() (internal generation)
+//   - Key was retrieved with GetXXXKey() (only metadata retrieved)
 //
 // Example:
 //
-//	rsaKeys, _ := bao.GetRSAKey(ctx, client, "key-id")
-//	keyPair, err := rsaKeys.Export(ctx)  // Returns *algo.RSAKeyPair
-func (kc *KeyClient[K]) Export(ctx context.Context) (K, error) {
+//	keyClient, err := client.GenerateRSAKey(ctx, &GenerateKeyOptions{...})
+//	keyPair, err := keyClient.KeyPair()  // Returns the keypair
+//	// Use keyPair.PrivateKey, keyPair.PublicKey
+func (kc *KeyClient[K]) KeyPair() (K, error) {
 	var zero K
-
-	if kc.keyInfo == nil || kc.keyInfo.KeyID == "" {
-		return zero, fmt.Errorf("bao: key info not available")
+	// Use reflection to check if keyPair is nil (handles typed nil properly)
+	v := reflect.ValueOf(kc.keyPair)
+	if !v.IsValid() || v.IsZero() {
+		return zero, fmt.Errorf("bao: key pair not available (key was created internally or retrieved without private key)")
 	}
+	return kc.keyPair, nil
+}
 
-	// Use SDK to export key
-	path := fmt.Sprintf("%s/key/%s/export", kc.client.config.Mount, kc.keyInfo.KeyID)
-	secret, err := kc.client.client.Logical().ReadWithContext(ctx, path)
-	if err != nil {
-		return zero, fmt.Errorf("bao: export key: %w (key may not be exportable)", err)
-	}
-	if secret == nil || secret.Data == nil {
-		return zero, fmt.Errorf("bao: export key: empty response")
-	}
-
-	// Extract private key data
-	privateKeyPEM, ok := secret.Data["private_key"].(string)
-	if !ok || privateKeyPEM == "" {
-		return zero, fmt.Errorf("bao: export key: no private key in response")
-	}
-
-	// Parse private key PEM
-	block, _ := pem.Decode([]byte(privateKeyPEM))
-	if block == nil {
-		return zero, fmt.Errorf("bao: export key: failed to decode PEM")
-	}
-
-	// Parse based on key type from keyInfo
-	switch kc.keyInfo.KeyType {
-	case "rsa":
-		// Try PKCS#1 first
-		privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-		if err != nil {
-			// Try PKCS#8 format
-			pkcs8Key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-			if err != nil {
-				return zero, fmt.Errorf("bao: export RSA key: parse private key: %w", err)
-			}
-			var ok bool
-			privateKey, ok = pkcs8Key.(*rsa.PrivateKey)
-			if !ok {
-				return zero, fmt.Errorf("bao: export RSA key: expected RSA key, got %T", pkcs8Key)
-			}
-		}
-
-		keyPair := &algo.RSAKeyPair{
-			PrivateKey: privateKey,
-			PublicKey:  &privateKey.PublicKey,
-		}
-		return any(keyPair).(K), nil
-
-	case "ec":
-		// Try EC private key format first
-		privateKey, err := x509.ParseECPrivateKey(block.Bytes)
-		if err != nil {
-			// Try PKCS#8 format
-			pkcs8Key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-			if err != nil {
-				return zero, fmt.Errorf("bao: export ECDSA key: parse private key: %w", err)
-			}
-			var ok bool
-			privateKey, ok = pkcs8Key.(*ecdsa.PrivateKey)
-			if !ok {
-				return zero, fmt.Errorf("bao: export ECDSA key: expected ECDSA key, got %T", pkcs8Key)
-			}
-		}
-
-		keyPair := &algo.ECDSAKeyPair{
-			PrivateKey: privateKey,
-			PublicKey:  &privateKey.PublicKey,
-		}
-		return any(keyPair).(K), nil
-
-	case "ed25519":
-		// Ed25519 keys are always in PKCS#8 format
-		pkcs8Key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-		if err != nil {
-			return zero, fmt.Errorf("bao: export Ed25519 key: parse private key: %w", err)
-		}
-
-		privateKey, ok := pkcs8Key.(ed25519.PrivateKey)
-		if !ok {
-			return zero, fmt.Errorf("bao: export Ed25519 key: expected Ed25519 key, got %T", pkcs8Key)
-		}
-
-		publicKey := privateKey.Public().(ed25519.PublicKey)
-
-		keyPair := &algo.Ed25519KeyPair{
-			PrivateKey: privateKey,
-			PublicKey:  publicKey,
-		}
-		return any(keyPair).(K), nil
-
-	default:
-		return zero, fmt.Errorf("bao: export key: unsupported key type '%s'", kc.keyInfo.KeyType)
-	}
+// HasKeyPair returns true if the key pair is cached and available.
+// This is a convenience method to check availability without handling errors.
+//
+// Example:
+//
+//	keyClient, err := client.CreateRSAKey(ctx, &GenerateKeyOptions{...})
+//	if keyClient.HasKeyPair() {
+//	    keyPair, _ := keyClient.KeyPair()
+//	    // Use the keypair
+//	} else {
+//	    // Key is managed internally by OpenBao
+//	}
+func (kc *KeyClient[K]) HasKeyPair() bool {
+	v := reflect.ValueOf(kc.keyPair)
+	return v.IsValid() && !v.IsZero()
 }
 
 // Delete deletes this key from OpenBao.
 //
 // Example:
 //
-//	rsaKeys, _ := bao.GetRSAKey(ctx, client, "key-id")
+//	rsaKeys, _ := client.GetRSAKey(ctx, "key-id")
 //	err := rsaKeys.Delete(ctx)
 func (kc *KeyClient[K]) Delete(ctx context.Context) error {
 	if kc.keyInfo == nil || kc.keyInfo.KeyID == "" {
@@ -339,15 +284,19 @@ func (c *Client) UpdateKeyName(ctx context.Context, keyRef string, newName strin
 // Generate Key - Entry Points
 // ============================================================================
 
-// GenerateRSAKey generates an RSA key in OpenBao and returns a type-safe KeyClient.
+// GenerateRSAKey generates an RSA key and returns a KeyClient with the key pair cached.
+// The key is also stored in OpenBao for future use.
+// Access the keypair using keyClient.KeyPair().
 //
 // Example:
 //
-//	rsaKeys, err := bao.GenerateRSAKey(ctx, client, &bao.GenerateKeyOptions{
+//	keyClient, err := client.GenerateRSAKey(ctx, &bao.GenerateKeyOptions{
 //	    KeyName: "my-rsa-key",
 //	    KeyBits: 2048,
 //	})
-func GenerateRSAKey(ctx context.Context, client *Client, opts *GenerateKeyOptions) (*KeyClient[*algo.RSAKeyPair], error) {
+//	keyPair, err := keyClient.KeyPair()  // Get the cached keypair
+//	// Use keyPair.PrivateKey, keyPair.PublicKey immediately
+func (c *Client) GenerateRSAKey(ctx context.Context, opts *GenerateKeyOptions) (*KeyClient[*algo.RSAKeyPair], error) {
 	if opts == nil {
 		opts = &GenerateKeyOptions{}
 	}
@@ -355,18 +304,43 @@ func GenerateRSAKey(ctx context.Context, client *Client, opts *GenerateKeyOption
 	if opts.KeyBits == 0 {
 		opts.KeyBits = 2048
 	}
-	return generateKeyTyped[*algo.RSAKeyPair](ctx, client, opts)
+	return generateKeyExported[*algo.RSAKeyPair](ctx, c, opts)
 }
 
-// GenerateECDSAKey generates an ECDSA key in OpenBao and returns a type-safe KeyClient.
+// CreateRSAKey creates an RSA key in OpenBao without returning the private key.
+// The key is stored securely in OpenBao and cannot be retrieved later.
+// Use this when you want OpenBao to manage the key internally (e.g., for signing operations).
 //
 // Example:
 //
-//	ecKeys, err := bao.GenerateECDSAKey(ctx, client, &bao.GenerateKeyOptions{
+//	keyClient, err := client.CreateRSAKey(ctx, &bao.GenerateKeyOptions{
+//	    KeyName: "my-managed-rsa-key",
+//	    KeyBits: 2048,
+//	})
+//	// Key is stored in OpenBao, use keyClient for operations
+func (c *Client) CreateRSAKey(ctx context.Context, opts *GenerateKeyOptions) (*KeyClient[*algo.RSAKeyPair], error) {
+	if opts == nil {
+		opts = &GenerateKeyOptions{}
+	}
+	opts.KeyType = "rsa"
+	if opts.KeyBits == 0 {
+		opts.KeyBits = 2048
+	}
+	return generateKeyInternal[*algo.RSAKeyPair](ctx, c, opts)
+}
+
+// GenerateECDSAKey generates an ECDSA key and returns a KeyClient with the key pair cached.
+// The key is also stored in OpenBao for future use.
+// Access the keypair using keyClient.KeyPair().
+//
+// Example:
+//
+//	keyClient, err := client.GenerateECDSAKey(ctx, &bao.GenerateKeyOptions{
 //	    KeyName: "my-ec-key",
 //	    KeyBits: 256,
 //	})
-func GenerateECDSAKey(ctx context.Context, client *Client, opts *GenerateKeyOptions) (*KeyClient[*algo.ECDSAKeyPair], error) {
+//	keyPair, err := keyClient.KeyPair()  // Get the cached keypair
+func (c *Client) GenerateECDSAKey(ctx context.Context, opts *GenerateKeyOptions) (*KeyClient[*algo.ECDSAKeyPair], error) {
 	if opts == nil {
 		opts = &GenerateKeyOptions{}
 	}
@@ -374,26 +348,66 @@ func GenerateECDSAKey(ctx context.Context, client *Client, opts *GenerateKeyOpti
 	if opts.KeyBits == 0 {
 		opts.KeyBits = 256
 	}
-	return generateKeyTyped[*algo.ECDSAKeyPair](ctx, client, opts)
+	return generateKeyExported[*algo.ECDSAKeyPair](ctx, c, opts)
 }
 
-// GenerateEd25519Key generates an Ed25519 key in OpenBao and returns a type-safe KeyClient.
+// CreateECDSAKey creates an ECDSA key in OpenBao without returning the private key.
+// The key is stored securely in OpenBao and cannot be retrieved later.
 //
 // Example:
 //
-//	edKeys, err := bao.GenerateEd25519Key(ctx, client, &bao.GenerateKeyOptions{
+//	keyClient, err := client.CreateECDSAKey(ctx, &bao.GenerateKeyOptions{
+//	    KeyName: "my-managed-ec-key",
+//	    KeyBits: 256,
+//	})
+func (c *Client) CreateECDSAKey(ctx context.Context, opts *GenerateKeyOptions) (*KeyClient[*algo.ECDSAKeyPair], error) {
+	if opts == nil {
+		opts = &GenerateKeyOptions{}
+	}
+	opts.KeyType = "ec"
+	if opts.KeyBits == 0 {
+		opts.KeyBits = 256
+	}
+	return generateKeyInternal[*algo.ECDSAKeyPair](ctx, c, opts)
+}
+
+// GenerateEd25519Key generates an Ed25519 key and returns a KeyClient with the key pair cached.
+// The key is also stored in OpenBao for future use.
+// Access the keypair using keyClient.KeyPair().
+//
+// Example:
+//
+//	keyClient, err := client.GenerateEd25519Key(ctx, &bao.GenerateKeyOptions{
 //	    KeyName: "my-ed25519-key",
 //	})
-func GenerateEd25519Key(ctx context.Context, client *Client, opts *GenerateKeyOptions) (*KeyClient[*algo.Ed25519KeyPair], error) {
+//	keyPair, err := keyClient.KeyPair()  // Get the cached keypair
+func (c *Client) GenerateEd25519Key(ctx context.Context, opts *GenerateKeyOptions) (*KeyClient[*algo.Ed25519KeyPair], error) {
 	if opts == nil {
 		opts = &GenerateKeyOptions{}
 	}
 	opts.KeyType = "ed25519"
-	return generateKeyTyped[*algo.Ed25519KeyPair](ctx, client, opts)
+	return generateKeyExported[*algo.Ed25519KeyPair](ctx, c, opts)
 }
 
-// generateKeyTyped is the internal generic implementation for key generation.
-func generateKeyTyped[K keypair.KeyPair](ctx context.Context, client *Client, opts *GenerateKeyOptions) (*KeyClient[K], error) {
+// CreateEd25519Key creates an Ed25519 key in OpenBao without returning the private key.
+// The key is stored securely in OpenBao and cannot be retrieved later.
+//
+// Example:
+//
+//	keyClient, err := client.CreateEd25519Key(ctx, &bao.GenerateKeyOptions{
+//	    KeyName: "my-managed-ed25519-key",
+//	})
+func (c *Client) CreateEd25519Key(ctx context.Context, opts *GenerateKeyOptions) (*KeyClient[*algo.Ed25519KeyPair], error) {
+	if opts == nil {
+		opts = &GenerateKeyOptions{}
+	}
+	opts.KeyType = "ed25519"
+	return generateKeyInternal[*algo.Ed25519KeyPair](ctx, c, opts)
+}
+
+// generateKeyInternal is the internal implementation for generating non-exported keys.
+// Keys are stored in OpenBao and private key material is not returned.
+func generateKeyInternal[K keypair.KeyPair](ctx context.Context, client *Client, opts *GenerateKeyOptions) (*KeyClient[K], error) {
 	if opts == nil {
 		return nil, fmt.Errorf("bao: key options are required")
 	}
@@ -414,14 +428,8 @@ func generateKeyTyped[K keypair.KeyPair](ctx context.Context, client *Client, op
 		reqBody["key_bits"] = opts.KeyBits
 	}
 
-	// Determine export type
-	exportType := "internal"
-	if opts.Exported {
-		exportType = "exported"
-	}
-
-	// Use SDK to generate key
-	path := fmt.Sprintf("%s/keys/generate/%s", client.config.Mount, exportType)
+	// Use SDK to generate internal key
+	path := fmt.Sprintf("%s/keys/generate/internal", client.config.Mount)
 	secret, err := client.client.Logical().WriteWithContext(ctx, path, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("bao: generate key: %w", err)
@@ -456,6 +464,145 @@ func generateKeyTyped[K keypair.KeyPair](ctx context.Context, client *Client, op
 	}, nil
 }
 
+// generateKeyExported is the internal implementation for generating exported keys.
+// Returns a KeyClient with the private key cached for immediate use.
+func generateKeyExported[K keypair.KeyPair](ctx context.Context, client *Client, opts *GenerateKeyOptions) (*KeyClient[K], error) {
+	if opts == nil {
+		return nil, fmt.Errorf("bao: key options are required")
+	}
+	if opts.KeyType == "" {
+		return nil, fmt.Errorf("bao: key type is required")
+	}
+
+	// Build request body
+	reqBody := map[string]interface{}{
+		"key_type": opts.KeyType,
+	}
+
+	if opts.KeyName != "" {
+		reqBody["key_name"] = opts.KeyName
+	}
+
+	if opts.KeyType == "rsa" || opts.KeyType == "ec" {
+		reqBody["key_bits"] = opts.KeyBits
+	}
+
+	// Use SDK to generate exported key
+	path := fmt.Sprintf("%s/keys/generate/exported", client.config.Mount)
+	secret, err := client.client.Logical().WriteWithContext(ctx, path, reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("bao: generate key: %w", err)
+	}
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("bao: generate key: empty response")
+	}
+
+	// Extract metadata
+	keyID, _ := secret.Data["key_id"].(string)
+	keyName, _ := secret.Data["key_name"].(string)
+	keyType, _ := secret.Data["key_type"].(string)
+
+	var keyBits int
+	switch v := secret.Data["key_bits"].(type) {
+	case int:
+		keyBits = v
+	case float64:
+		keyBits = int(v)
+	case int64:
+		keyBits = int(v)
+	}
+
+	keyInfo := &KeyInfo{
+		KeyID:   keyID,
+		KeyName: keyName,
+		KeyType: keyType,
+		KeyBits: keyBits,
+	}
+
+	// Extract and parse private key
+	privateKeyPEM, ok := secret.Data["private_key"].(string)
+	if !ok || privateKeyPEM == "" {
+		return nil, fmt.Errorf("bao: generate key: no private key in response")
+	}
+
+	block, _ := pem.Decode([]byte(privateKeyPEM))
+	if block == nil {
+		return nil, fmt.Errorf("bao: generate key: failed to decode PEM")
+	}
+
+	// Parse based on key type
+	switch keyType {
+	case "rsa":
+		privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+		if err != nil {
+			pkcs8Key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+			if err != nil {
+				return nil, fmt.Errorf("bao: parse RSA key: %w", err)
+			}
+			var ok bool
+			privateKey, ok = pkcs8Key.(*rsa.PrivateKey)
+			if !ok {
+				return nil, fmt.Errorf("bao: expected RSA key, got %T", pkcs8Key)
+			}
+		}
+		keyPair := &algo.RSAKeyPair{
+			PrivateKey: privateKey,
+			PublicKey:  &privateKey.PublicKey,
+		}
+		return &KeyClient[K]{
+			client:  client,
+			keyInfo: keyInfo,
+			keyPair: any(keyPair).(K),
+		}, nil
+
+	case "ec":
+		privateKey, err := x509.ParseECPrivateKey(block.Bytes)
+		if err != nil {
+			pkcs8Key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+			if err != nil {
+				return nil, fmt.Errorf("bao: parse ECDSA key: %w", err)
+			}
+			var ok bool
+			privateKey, ok = pkcs8Key.(*ecdsa.PrivateKey)
+			if !ok {
+				return nil, fmt.Errorf("bao: expected ECDSA key, got %T", pkcs8Key)
+			}
+		}
+		keyPair := &algo.ECDSAKeyPair{
+			PrivateKey: privateKey,
+			PublicKey:  &privateKey.PublicKey,
+		}
+		return &KeyClient[K]{
+			client:  client,
+			keyInfo: keyInfo,
+			keyPair: any(keyPair).(K),
+		}, nil
+
+	case "ed25519":
+		pkcs8Key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("bao: parse Ed25519 key: %w", err)
+		}
+		privateKey, ok := pkcs8Key.(ed25519.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("bao: expected Ed25519 key, got %T", pkcs8Key)
+		}
+		publicKey := privateKey.Public().(ed25519.PublicKey)
+		keyPair := &algo.Ed25519KeyPair{
+			PrivateKey: privateKey,
+			PublicKey:  publicKey,
+		}
+		return &KeyClient[K]{
+			client:  client,
+			keyInfo: keyInfo,
+			keyPair: any(keyPair).(K),
+		}, nil
+
+	default:
+		return nil, fmt.Errorf("bao: unsupported key type: %s", keyType)
+	}
+}
+
 // ============================================================================
 // Import Key - Entry Points
 // ============================================================================
@@ -465,11 +612,11 @@ func generateKeyTyped[K keypair.KeyPair](ctx context.Context, client *Client, op
 // Example:
 //
 //	rsaKeyPair, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
-//	rsaKeys, err := bao.ImportRSAKey(ctx, client, rsaKeyPair, &bao.ImportKeyOptions{
+//	rsaKeys, err := client.ImportRSAKey(ctx, rsaKeyPair, &bao.ImportKeyOptions{
 //	    KeyName: "imported-rsa-key",
 //	})
-func ImportRSAKey(ctx context.Context, client *Client, kp *algo.RSAKeyPair, opts *ImportKeyOptions) (*KeyClient[*algo.RSAKeyPair], error) {
-	return importKeyTyped[*algo.RSAKeyPair](ctx, client, kp, opts)
+func (c *Client) ImportRSAKey(ctx context.Context, kp *algo.RSAKeyPair, opts *ImportKeyOptions) (*KeyClient[*algo.RSAKeyPair], error) {
+	return importKeyTyped[*algo.RSAKeyPair](ctx, c, kp, opts)
 }
 
 // ImportECDSAKey imports an ECDSA key pair into OpenBao and returns a type-safe KeyClient.
@@ -477,11 +624,11 @@ func ImportRSAKey(ctx context.Context, client *Client, kp *algo.RSAKeyPair, opts
 // Example:
 //
 //	ecKeyPair, _ := algo.GenerateECDSAKeyPair(algo.P256)
-//	ecKeys, err := bao.ImportECDSAKey(ctx, client, ecKeyPair, &bao.ImportKeyOptions{
+//	ecKeys, err := client.ImportECDSAKey(ctx, ecKeyPair, &bao.ImportKeyOptions{
 //	    KeyName: "imported-ec-key",
 //	})
-func ImportECDSAKey(ctx context.Context, client *Client, kp *algo.ECDSAKeyPair, opts *ImportKeyOptions) (*KeyClient[*algo.ECDSAKeyPair], error) {
-	return importKeyTyped[*algo.ECDSAKeyPair](ctx, client, kp, opts)
+func (c *Client) ImportECDSAKey(ctx context.Context, kp *algo.ECDSAKeyPair, opts *ImportKeyOptions) (*KeyClient[*algo.ECDSAKeyPair], error) {
+	return importKeyTyped[*algo.ECDSAKeyPair](ctx, c, kp, opts)
 }
 
 // ImportEd25519Key imports an Ed25519 key pair into OpenBao and returns a type-safe KeyClient.
@@ -489,11 +636,11 @@ func ImportECDSAKey(ctx context.Context, client *Client, kp *algo.ECDSAKeyPair, 
 // Example:
 //
 //	edKeyPair, _ := algo.GenerateEd25519KeyPair()
-//	edKeys, err := bao.ImportEd25519Key(ctx, client, edKeyPair, &bao.ImportKeyOptions{
+//	edKeys, err := client.ImportEd25519Key(ctx, edKeyPair, &bao.ImportKeyOptions{
 //	    KeyName: "imported-ed25519-key",
 //	})
-func ImportEd25519Key(ctx context.Context, client *Client, kp *algo.Ed25519KeyPair, opts *ImportKeyOptions) (*KeyClient[*algo.Ed25519KeyPair], error) {
-	return importKeyTyped[*algo.Ed25519KeyPair](ctx, client, kp, opts)
+func (c *Client) ImportEd25519Key(ctx context.Context, kp *algo.Ed25519KeyPair, opts *ImportKeyOptions) (*KeyClient[*algo.Ed25519KeyPair], error) {
+	return importKeyTyped[*algo.Ed25519KeyPair](ctx, c, kp, opts)
 }
 
 // importKeyTyped is the internal generic implementation for key import.
@@ -570,6 +717,7 @@ func importKeyTyped[K keypair.KeyPair](ctx context.Context, client *Client, kp K
 			KeyType: keyType,
 			KeyBits: keyBits,
 		},
+		keyPair: kp, // Store the imported keypair
 	}, nil
 }
 
@@ -578,36 +726,39 @@ func importKeyTyped[K keypair.KeyPair](ctx context.Context, client *Client, kp K
 // ============================================================================
 
 // GetRSAKey retrieves an RSA key reference from OpenBao and returns a type-safe KeyClient.
-// Use Export() to retrieve the actual key material.
+// Note: This only retrieves metadata. The private key material is not available
+// unless the key was originally generated with GenerateRSAKey or imported with ImportRSAKey.
 //
 // Example:
 //
-//	rsaKeys, err := bao.GetRSAKey(ctx, client, "rsa-key-id")
-//	keyPair, err := rsaKeys.Export(ctx)
-func GetRSAKey(ctx context.Context, client *Client, keyRef string) (*KeyClient[*algo.RSAKeyPair], error) {
-	return getKeyTyped[*algo.RSAKeyPair](ctx, client, keyRef, "rsa")
+//	rsaKeys, err := client.GetRSAKey(ctx, "rsa-key-id")
+//	// Use rsaKeys for operations like UpdateName(), Delete()
+func (c *Client) GetRSAKey(ctx context.Context, keyRef string) (*KeyClient[*algo.RSAKeyPair], error) {
+	return getKeyTyped[*algo.RSAKeyPair](ctx, c, keyRef, "rsa")
 }
 
 // GetECDSAKey retrieves an ECDSA key reference from OpenBao and returns a type-safe KeyClient.
-// Use Export() to retrieve the actual key material.
+// Note: This only retrieves metadata. The private key material is not available
+// unless the key was originally generated with GenerateECDSAKey or imported with ImportECDSAKey.
 //
 // Example:
 //
-//	ecKeys, err := bao.GetECDSAKey(ctx, client, "ec-key-id")
-//	keyPair, err := ecKeys.Export(ctx)
-func GetECDSAKey(ctx context.Context, client *Client, keyRef string) (*KeyClient[*algo.ECDSAKeyPair], error) {
-	return getKeyTyped[*algo.ECDSAKeyPair](ctx, client, keyRef, "ec")
+//	ecKeys, err := client.GetECDSAKey(ctx, "ec-key-id")
+//	// Use ecKeys for operations like UpdateName(), Delete()
+func (c *Client) GetECDSAKey(ctx context.Context, keyRef string) (*KeyClient[*algo.ECDSAKeyPair], error) {
+	return getKeyTyped[*algo.ECDSAKeyPair](ctx, c, keyRef, "ec")
 }
 
 // GetEd25519Key retrieves an Ed25519 key reference from OpenBao and returns a type-safe KeyClient.
-// Use Export() to retrieve the actual key material.
+// Note: This only retrieves metadata. The private key material is not available
+// unless the key was originally generated with GenerateEd25519Key or imported with ImportEd25519Key.
 //
 // Example:
 //
-//	edKeys, err := bao.GetEd25519Key(ctx, client, "ed25519-key-id")
-//	keyPair, err := edKeys.Export(ctx)
-func GetEd25519Key(ctx context.Context, client *Client, keyRef string) (*KeyClient[*algo.Ed25519KeyPair], error) {
-	return getKeyTyped[*algo.Ed25519KeyPair](ctx, client, keyRef, "ed25519")
+//	edKeys, err := client.GetEd25519Key(ctx, "ed25519-key-id")
+//	// Use edKeys for operations like UpdateName(), Delete()
+func (c *Client) GetEd25519Key(ctx context.Context, keyRef string) (*KeyClient[*algo.Ed25519KeyPair], error) {
+	return getKeyTyped[*algo.Ed25519KeyPair](ctx, c, keyRef, "ed25519")
 }
 
 // getKeyTyped is the internal generic implementation for key retrieval.

@@ -10,328 +10,9 @@ import (
 	"github.com/jasoet/gopki/keypair/algo"
 )
 
-func TestGenerateKey(t *testing.T) {
-	tests := []struct {
-		name       string
-		opts       *GenerateKeyOptions
-		statusCode int
-		response   string
-		wantErr    bool
-		errMsg     string
-	}{
-		{
-			name: "Successful RSA key generation",
-			opts: &GenerateKeyOptions{
-				KeyName: "test-rsa-key",
-				KeyType: "rsa",
-				KeyBits: 2048,
-			},
-			statusCode: 200,
-			response: `{
-				"data": {
-					"key_id": "7c9e6b1a-9c3d-4f8e-a1b2-3c4d5e6f7a8b",
-					"key_name": "test-rsa-key",
-					"key_type": "rsa",
-					"key_bits": 2048
-				}
-			}`,
-			wantErr: false,
-		},
-		{
-			name: "Successful EC key generation",
-			opts: &GenerateKeyOptions{
-				KeyName: "test-ec-key",
-				KeyType: "ec",
-				KeyBits: 256,
-			},
-			statusCode: 200,
-			response: `{
-				"data": {
-					"key_id": "8d0f7c2b-0d4e-5f9f-b2c3-4d5e6f7a8b9c",
-					"key_name": "test-ec-key",
-					"key_type": "ec",
-					"key_bits": 256
-				}
-			}`,
-			wantErr: false,
-		},
-		{
-			name: "Successful Ed25519 key generation",
-			opts: &GenerateKeyOptions{
-				KeyName: "test-ed25519-key",
-				KeyType: "ed25519",
-			},
-			statusCode: 200,
-			response: `{
-				"data": {
-					"key_id": "9e1f8d3c-1e5f-6f0f-c3d4-5e6f7a8b9c0d",
-					"key_name": "test-ed25519-key",
-					"key_type": "ed25519"
-				}
-			}`,
-			wantErr: false,
-		},
-		{
-			name: "RSA key with default key bits",
-			opts: &GenerateKeyOptions{
-				KeyName: "test-rsa-default",
-				KeyType: "rsa",
-			},
-			statusCode: 200,
-			response: `{
-				"data": {
-					"key_id": "0f2g9e4d-2f6g-7g1g-d4e5-6f7a8b9c0d1e",
-					"key_name": "test-rsa-default",
-					"key_type": "rsa",
-					"key_bits": 2048
-				}
-			}`,
-			wantErr: false,
-		},
-		{
-			name:    "Nil options",
-			opts:    nil,
-			wantErr: true,
-			errMsg:  "key options are required",
-		},
-		{
-			name: "Missing key type",
-			opts: &GenerateKeyOptions{
-				KeyName: "test-key",
-			},
-			wantErr: true,
-			errMsg:  "key type is required",
-		},
-		{
-			name: "Invalid key type",
-			opts: &GenerateKeyOptions{
-				KeyName: "test-key",
-				KeyType: "invalid",
-			},
-			wantErr: true,
-			errMsg:  "invalid key type",
-		},
-		{
-			name: "Vault error response",
-			opts: &GenerateKeyOptions{
-				KeyName: "test-key",
-				KeyType: "rsa",
-				KeyBits: 2048,
-			},
-			statusCode: 400,
-			response:   `{"errors": ["invalid key configuration"]}`,
-			wantErr:    true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create mock server
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Only validate if we expect a successful call
-				if !tt.wantErr || tt.statusCode > 0 {
-					if r.Method != "PUT" {
-						t.Errorf("Expected PUT request, got %s", r.Method)
-					}
-					w.WriteHeader(tt.statusCode)
-					w.Write([]byte(tt.response))
-				}
-			}))
-			defer server.Close()
-
-			// Create client
-			client, _ := NewClient(&Config{
-				Address: server.URL,
-				Token:   "test-token",
-				Mount:   "pki",
-			})
-
-			// Call function
-			result, err := client.GenerateKey(context.Background(), tt.opts)
-
-			// Check error
-			if tt.wantErr {
-				if err == nil {
-					t.Error("Expected error, got nil")
-				} else if tt.errMsg != "" && !contains(err.Error(), tt.errMsg) {
-					t.Errorf("Expected error message to contain %q, got %q", tt.errMsg, err.Error())
-				}
-				return
-			}
-
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				return
-			}
-
-			// Validate result
-			if result == nil {
-				t.Fatal("Expected result, got nil")
-			}
-			if result.KeyType != tt.opts.KeyType {
-				t.Errorf("Expected key type %s, got %s", tt.opts.KeyType, result.KeyType)
-			}
-		})
-	}
-}
-
-func TestImportKey(t *testing.T) {
-	// Generate test key pairs
-	rsaKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
-	if err != nil {
-		t.Fatalf("Failed to generate RSA key pair: %v", err)
-	}
-
-	ecdsaKeyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
-	if err != nil {
-		t.Fatalf("Failed to generate ECDSA key pair: %v", err)
-	}
-
-	ed25519KeyPair, err := algo.GenerateEd25519KeyPair()
-	if err != nil {
-		t.Fatalf("Failed to generate Ed25519 key pair: %v", err)
-	}
-
-	tests := []struct {
-		name       string
-		keyPair    interface{}
-		opts       *ImportKeyOptions
-		statusCode int
-		response   string
-		wantErr    bool
-		errMsg     string
-	}{
-		{
-			name:    "Successful RSA key import",
-			keyPair: rsaKeyPair,
-			opts: &ImportKeyOptions{
-				KeyName: "imported-rsa-key",
-			},
-			statusCode: 200,
-			response: `{
-				"data": {
-					"key_id": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
-					"key_name": "imported-rsa-key",
-					"key_type": "rsa"
-				}
-			}`,
-			wantErr: false,
-		},
-		{
-			name:    "Successful ECDSA key import",
-			keyPair: ecdsaKeyPair,
-			opts: &ImportKeyOptions{
-				KeyName: "imported-ec-key",
-			},
-			statusCode: 200,
-			response: `{
-				"data": {
-					"key_id": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
-					"key_name": "imported-ec-key",
-					"key_type": "ec"
-				}
-			}`,
-			wantErr: false,
-		},
-		{
-			name:    "Successful Ed25519 key import",
-			keyPair: ed25519KeyPair,
-			opts: &ImportKeyOptions{
-				KeyName: "imported-ed25519-key",
-			},
-			statusCode: 200,
-			response: `{
-				"data": {
-					"key_id": "3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f",
-					"key_name": "imported-ed25519-key",
-					"key_type": "ed25519"
-				}
-			}`,
-			wantErr: false,
-		},
-		{
-			name:    "Import without key name",
-			keyPair: rsaKeyPair,
-			opts:    &ImportKeyOptions{},
-			statusCode: 200,
-			response: `{
-				"data": {
-					"key_id": "4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a",
-					"key_type": "rsa"
-				}
-			}`,
-			wantErr: false,
-		},
-		{
-			name:    "Nil key pair",
-			keyPair: nil,
-			opts:    &ImportKeyOptions{KeyName: "test"},
-			wantErr: true,
-			errMsg:  "key pair is required",
-		},
-		{
-			name:    "Unsupported key type",
-			keyPair: "invalid-key-type",
-			opts:    &ImportKeyOptions{KeyName: "test"},
-			wantErr: true,
-			errMsg:  "unsupported key pair type",
-		},
-		{
-			name:    "Vault error response",
-			keyPair: rsaKeyPair,
-			opts:    &ImportKeyOptions{KeyName: "test"},
-			statusCode: 400,
-			response:   `{"errors": ["invalid key format"]}`,
-			wantErr:    true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create mock server
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if !tt.wantErr || tt.statusCode > 0 {
-					if r.Method != "PUT" {
-						t.Errorf("Expected PUT request, got %s", r.Method)
-					}
-					w.WriteHeader(tt.statusCode)
-					w.Write([]byte(tt.response))
-				}
-			}))
-			defer server.Close()
-
-			// Create client
-			client, _ := NewClient(&Config{
-				Address: server.URL,
-				Token:   "test-token",
-				Mount:   "pki",
-			})
-
-			// Call function
-			result, err := client.ImportKey(context.Background(), tt.keyPair, tt.opts)
-
-			// Check error
-			if tt.wantErr {
-				if err == nil {
-					t.Error("Expected error, got nil")
-				} else if tt.errMsg != "" && !contains(err.Error(), tt.errMsg) {
-					t.Errorf("Expected error message to contain %q, got %q", tt.errMsg, err.Error())
-				}
-				return
-			}
-
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				return
-			}
-
-			// Validate result
-			if result == nil {
-				t.Fatal("Expected result, got nil")
-			}
-		})
-	}
-}
+// ============================================================================
+// Tests for Client Methods (type-agnostic operations)
+// ============================================================================
 
 func TestListKeys(t *testing.T) {
 	tests := []struct {
@@ -715,76 +396,77 @@ func TestUpdateKeyName(t *testing.T) {
 	}
 }
 
-func TestExportRSAKey(t *testing.T) {
-	// Generate a real RSA key for valid PEM data
-	testKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
-	if err != nil {
-		t.Fatalf("Failed to generate test key: %v", err)
-	}
-	privKeyPEM, err := testKeyPair.PrivateKeyToPEM()
-	if err != nil {
-		t.Fatalf("Failed to convert private key to PEM: %v", err)
-	}
+// ============================================================================
+// Tests for Type-Safe Generic API (New)
+// ============================================================================
 
+func TestGenerateRSAKey_TypeSafe(t *testing.T) {
 	tests := []struct {
 		name       string
-		keyRef     string
+		opts       *GenerateKeyOptions
 		statusCode int
-		exportResp string
+		response   string
 		wantErr    bool
 		errMsg     string
 	}{
 		{
-			name:       "Successful RSA key export",
-			keyRef:     "test-rsa-key",
+			name: "Successful RSA key generation with name",
+			opts: &GenerateKeyOptions{
+				KeyName: "test-rsa-key",
+				KeyBits: 2048,
+			},
 			statusCode: 200,
-			exportResp: createJSONResponse(map[string]interface{}{
-				"private_key": string(privKeyPEM),
-				"key_type":    "rsa",
+			response: createJSONResponse(map[string]interface{}{
+				"key_id":   "key-123",
+				"key_name": "test-rsa-key",
+				"key_type": "rsa",
+				"key_bits": 2048,
 			}),
 			wantErr: false,
 		},
 		{
-			name:    "Empty key reference",
-			keyRef:  "",
-			wantErr: true,
-			errMsg:  "key reference is required",
+			name: "RSA key generation with default bits",
+			opts: &GenerateKeyOptions{
+				KeyName: "test-rsa-default",
+			},
+			statusCode: 200,
+			response: createJSONResponse(map[string]interface{}{
+				"key_id":   "key-456",
+				"key_name": "test-rsa-default",
+				"key_type": "rsa",
+				"key_bits": 2048,
+			}),
+			wantErr: false,
 		},
 		{
-			name:       "Key not exportable",
-			keyRef:     "non-exportable",
-			statusCode: 403,
-			exportResp: `{"errors": ["key is not exportable"]}`,
-			wantErr:    true,
+			name:       "Nil options",
+			opts:       nil,
+			statusCode: 200,
+			response: createJSONResponse(map[string]interface{}{
+				"key_id":   "key-789",
+				"key_type": "rsa",
+				"key_bits": 2048,
+			}),
+			wantErr: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create mock server
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if !tt.wantErr || tt.statusCode > 0 {
-					// Export request
-					if r.Method != "GET" {
-						t.Errorf("Expected GET request, got %s", r.Method)
-					}
-					w.WriteHeader(tt.statusCode)
-					w.Write([]byte(tt.exportResp))
-				}
+				w.WriteHeader(tt.statusCode)
+				w.Write([]byte(tt.response))
 			}))
 			defer server.Close()
 
-			// Create client
 			client, _ := NewClient(&Config{
 				Address: server.URL,
 				Token:   "test-token",
 				Mount:   "pki",
 			})
 
-			// Call function
-			result, err := client.ExportRSAKey(context.Background(), tt.keyRef)
+			result, err := client.CreateRSAKey(context.Background(), tt.opts)
 
-			// Check error
 			if tt.wantErr {
 				if err == nil {
 					t.Error("Expected error, got nil")
@@ -799,96 +481,79 @@ func TestExportRSAKey(t *testing.T) {
 				return
 			}
 
-			// Validate result
 			if result == nil {
 				t.Fatal("Expected result, got nil")
 			}
 
-			// Verify it's an RSA key pair
-			if result.PrivateKey == nil {
-				t.Error("Expected non-nil private key")
+			if result.KeyInfo() == nil {
+				t.Fatal("Expected key info, got nil")
 			}
-			if result.PublicKey == nil {
-				t.Error("Expected non-nil public key")
+
+			if result.KeyInfo().KeyType != "rsa" {
+				t.Errorf("Expected key type 'rsa', got '%s'", result.KeyInfo().KeyType)
 			}
 		})
 	}
 }
 
-func TestExportECDSAKey(t *testing.T) {
-	// Generate a real ECDSA key for valid PEM data
-	testKeyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
-	if err != nil {
-		t.Fatalf("Failed to generate test key: %v", err)
-	}
-	privKeyPEM, err := testKeyPair.PrivateKeyToPEM()
-	if err != nil {
-		t.Fatalf("Failed to convert private key to PEM: %v", err)
-	}
-
+func TestGenerateECDSAKey_TypeSafe(t *testing.T) {
 	tests := []struct {
 		name       string
-		keyRef     string
+		opts       *GenerateKeyOptions
 		statusCode int
-		exportResp string
+		response   string
 		wantErr    bool
-		errMsg     string
 	}{
 		{
-			name:       "Successful ECDSA key export",
-			keyRef:     "test-ec-key",
+			name: "Successful ECDSA key generation",
+			opts: &GenerateKeyOptions{
+				KeyName: "test-ec-key",
+				KeyBits: 256,
+			},
 			statusCode: 200,
-			exportResp: createJSONResponse(map[string]interface{}{
-				"private_key": string(privKeyPEM),
-				"key_type":    "ec",
+			response: createJSONResponse(map[string]interface{}{
+				"key_id":   "key-ec-123",
+				"key_name": "test-ec-key",
+				"key_type": "ec",
+				"key_bits": 256,
 			}),
 			wantErr: false,
 		},
 		{
-			name:    "Empty key reference",
-			keyRef:  "",
-			wantErr: true,
-			errMsg:  "key reference is required",
-		},
-		{
-			name:       "Key not exportable",
-			keyRef:     "non-exportable",
-			statusCode: 403,
-			exportResp: `{"errors": ["key is not exportable"]}`,
-			wantErr:    true,
+			name: "ECDSA key generation with default bits",
+			opts: &GenerateKeyOptions{
+				KeyName: "test-ec-default",
+			},
+			statusCode: 200,
+			response: createJSONResponse(map[string]interface{}{
+				"key_id":   "key-ec-456",
+				"key_name": "test-ec-default",
+				"key_type": "ec",
+				"key_bits": 256,
+			}),
+			wantErr: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create mock server
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if !tt.wantErr || tt.statusCode > 0 {
-					if r.Method != "GET" {
-						t.Errorf("Expected GET request, got %s", r.Method)
-					}
-					w.WriteHeader(tt.statusCode)
-					w.Write([]byte(tt.exportResp))
-				}
+				w.WriteHeader(tt.statusCode)
+				w.Write([]byte(tt.response))
 			}))
 			defer server.Close()
 
-			// Create client
 			client, _ := NewClient(&Config{
 				Address: server.URL,
 				Token:   "test-token",
 				Mount:   "pki",
 			})
 
-			// Call function
-			result, err := client.ExportECDSAKey(context.Background(), tt.keyRef)
+			result, err := client.CreateECDSAKey(context.Background(), tt.opts)
 
-			// Check error
 			if tt.wantErr {
 				if err == nil {
 					t.Error("Expected error, got nil")
-				} else if tt.errMsg != "" && !contains(err.Error(), tt.errMsg) {
-					t.Errorf("Expected error message to contain %q, got %q", tt.errMsg, err.Error())
 				}
 				return
 			}
@@ -898,91 +563,106 @@ func TestExportECDSAKey(t *testing.T) {
 				return
 			}
 
-			// Validate result
-			if result == nil {
-				t.Fatal("Expected result, got nil")
+			if result == nil || result.KeyInfo() == nil {
+				t.Fatal("Expected result with key info, got nil")
 			}
 
-			// Verify it's an ECDSA key pair
-			if result.PrivateKey == nil {
-				t.Error("Expected non-nil private key")
-			}
-			if result.PublicKey == nil {
-				t.Error("Expected non-nil public key")
+			if result.KeyInfo().KeyType != "ec" {
+				t.Errorf("Expected key type 'ec', got '%s'", result.KeyInfo().KeyType)
 			}
 		})
 	}
 }
 
-func TestExportEd25519Key(t *testing.T) {
-	// Generate a real Ed25519 key for valid PEM data
-	testKeyPair, err := algo.GenerateEd25519KeyPair()
+func TestGenerateEd25519Key_TypeSafe(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte(createJSONResponse(map[string]interface{}{
+			"key_id":   "key-ed-123",
+			"key_name": "test-ed25519-key",
+			"key_type": "ed25519",
+		})))
+	}))
+	defer server.Close()
+
+	client, _ := NewClient(&Config{
+		Address: server.URL,
+		Token:   "test-token",
+		Mount:   "pki",
+	})
+
+	result, err := client.CreateEd25519Key(context.Background(), &GenerateKeyOptions{
+		KeyName: "test-ed25519-key",
+	})
+
 	if err != nil {
-		t.Fatalf("Failed to generate test key: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
-	privKeyPEM, err := testKeyPair.PrivateKeyToPEM()
-	if err != nil {
-		t.Fatalf("Failed to convert private key to PEM: %v", err)
+
+	if result == nil || result.KeyInfo() == nil {
+		t.Fatal("Expected result with key info, got nil")
 	}
+
+	if result.KeyInfo().KeyType != "ed25519" {
+		t.Errorf("Expected key type 'ed25519', got '%s'", result.KeyInfo().KeyType)
+	}
+}
+
+func TestImportRSAKey_TypeSafe(t *testing.T) {
+	keyPair, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
 
 	tests := []struct {
 		name       string
-		keyRef     string
+		keyPair    *algo.RSAKeyPair
+		opts       *ImportKeyOptions
 		statusCode int
-		exportResp string
+		response   string
 		wantErr    bool
 		errMsg     string
 	}{
 		{
-			name:       "Successful Ed25519 key export",
-			keyRef:     "test-ed25519-key",
+			name:    "Successful RSA key import",
+			keyPair: keyPair,
+			opts: &ImportKeyOptions{
+				KeyName: "imported-rsa-key",
+			},
 			statusCode: 200,
-			exportResp: createJSONResponse(map[string]interface{}{
-				"private_key": string(privKeyPEM),
-				"key_type":    "ed25519",
+			response: createJSONResponse(map[string]interface{}{
+				"key_id":   "key-imp-123",
+				"key_name": "imported-rsa-key",
+				"key_type": "rsa",
 			}),
 			wantErr: false,
 		},
 		{
-			name:    "Empty key reference",
-			keyRef:  "",
-			wantErr: true,
-			errMsg:  "key reference is required",
-		},
-		{
-			name:       "Key not exportable",
-			keyRef:     "non-exportable",
-			statusCode: 403,
-			exportResp: `{"errors": ["key is not exportable"]}`,
-			wantErr:    true,
+			name:    "Import without name",
+			keyPair: keyPair,
+			opts:    &ImportKeyOptions{},
+			statusCode: 200,
+			response: createJSONResponse(map[string]interface{}{
+				"key_id":   "key-imp-456",
+				"key_type": "rsa",
+			}),
+			wantErr: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create mock server
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if !tt.wantErr || tt.statusCode > 0 {
-					if r.Method != "GET" {
-						t.Errorf("Expected GET request, got %s", r.Method)
-					}
-					w.WriteHeader(tt.statusCode)
-					w.Write([]byte(tt.exportResp))
-				}
+				w.WriteHeader(tt.statusCode)
+				w.Write([]byte(tt.response))
 			}))
 			defer server.Close()
 
-			// Create client
 			client, _ := NewClient(&Config{
 				Address: server.URL,
 				Token:   "test-token",
 				Mount:   "pki",
 			})
 
-			// Call function
-			result, err := client.ExportEd25519Key(context.Background(), tt.keyRef)
+			result, err := client.ImportRSAKey(context.Background(), tt.keyPair, tt.opts)
 
-			// Check error
 			if tt.wantErr {
 				if err == nil {
 					t.Error("Expected error, got nil")
@@ -997,18 +677,503 @@ func TestExportEd25519Key(t *testing.T) {
 				return
 			}
 
-			// Validate result
-			if result == nil {
-				t.Fatal("Expected result, got nil")
+			if result == nil || result.KeyInfo() == nil {
+				t.Fatal("Expected result with key info, got nil")
 			}
 
-			// Verify it's an Ed25519 key pair
-			if len(result.PrivateKey) == 0 {
-				t.Error("Expected non-empty private key")
-			}
-			if len(result.PublicKey) == 0 {
-				t.Error("Expected non-empty public key")
+			if result.KeyInfo().KeyType != "rsa" {
+				t.Errorf("Expected key type 'rsa', got '%s'", result.KeyInfo().KeyType)
 			}
 		})
 	}
+}
+
+func TestImportECDSAKey_TypeSafe(t *testing.T) {
+	keyPair, _ := algo.GenerateECDSAKeyPair(algo.P256)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte(createJSONResponse(map[string]interface{}{
+			"key_id":   "key-ec-imp-123",
+			"key_name": "imported-ec-key",
+			"key_type": "ec",
+		})))
+	}))
+	defer server.Close()
+
+	client, _ := NewClient(&Config{
+		Address: server.URL,
+		Token:   "test-token",
+		Mount:   "pki",
+	})
+
+	result, err := client.ImportECDSAKey(context.Background(), keyPair, &ImportKeyOptions{
+		KeyName: "imported-ec-key",
+	})
+
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if result == nil || result.KeyInfo() == nil {
+		t.Fatal("Expected result with key info, got nil")
+	}
+
+	if result.KeyInfo().KeyType != "ec" {
+		t.Errorf("Expected key type 'ec', got '%s'", result.KeyInfo().KeyType)
+	}
+}
+
+func TestImportEd25519Key_TypeSafe(t *testing.T) {
+	keyPair, _ := algo.GenerateEd25519KeyPair()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte(createJSONResponse(map[string]interface{}{
+			"key_id":   "key-ed-imp-123",
+			"key_name": "imported-ed25519-key",
+			"key_type": "ed25519",
+		})))
+	}))
+	defer server.Close()
+
+	client, _ := NewClient(&Config{
+		Address: server.URL,
+		Token:   "test-token",
+		Mount:   "pki",
+	})
+
+	result, err := client.ImportEd25519Key(context.Background(), keyPair, &ImportKeyOptions{
+		KeyName: "imported-ed25519-key",
+	})
+
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if result == nil || result.KeyInfo() == nil {
+		t.Fatal("Expected result with key info, got nil")
+	}
+
+	if result.KeyInfo().KeyType != "ed25519" {
+		t.Errorf("Expected key type 'ed25519', got '%s'", result.KeyInfo().KeyType)
+	}
+}
+
+func TestGetRSAKey_TypeSafe(t *testing.T) {
+	tests := []struct {
+		name       string
+		keyRef     string
+		statusCode int
+		response   string
+		wantErr    bool
+		errMsg     string
+	}{
+		{
+			name:       "Successful get by ID",
+			keyRef:     "key-123",
+			statusCode: 200,
+			response: createJSONResponse(map[string]interface{}{
+				"key_id":   "key-123",
+				"key_name": "my-rsa-key",
+				"key_type": "rsa",
+				"key_bits": 2048,
+			}),
+			wantErr: false,
+		},
+		{
+			name:    "Empty key reference",
+			keyRef:  "",
+			wantErr: true,
+			errMsg:  "key reference is required",
+		},
+		{
+			name:       "Type mismatch - expected RSA but got EC",
+			keyRef:     "key-456",
+			statusCode: 200,
+			response: createJSONResponse(map[string]interface{}{
+				"key_id":   "key-456",
+				"key_name": "my-ec-key",
+				"key_type": "ec",
+				"key_bits": 256,
+			}),
+			wantErr: true,
+			errMsg:  "key type mismatch",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tt.statusCode > 0 {
+					w.WriteHeader(tt.statusCode)
+					w.Write([]byte(tt.response))
+				}
+			}))
+			defer server.Close()
+
+			client, _ := NewClient(&Config{
+				Address: server.URL,
+				Token:   "test-token",
+				Mount:   "pki",
+			})
+
+			result, err := client.GetRSAKey(context.Background(), tt.keyRef)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error, got nil")
+				} else if tt.errMsg != "" && !contains(err.Error(), tt.errMsg) {
+					t.Errorf("Expected error message to contain %q, got %q", tt.errMsg, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if result == nil || result.KeyInfo() == nil {
+				t.Fatal("Expected result with key info, got nil")
+			}
+
+			if result.KeyInfo().KeyType != "rsa" {
+				t.Errorf("Expected key type 'rsa', got '%s'", result.KeyInfo().KeyType)
+			}
+		})
+	}
+}
+
+func TestGetECDSAKey_TypeSafe(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte(createJSONResponse(map[string]interface{}{
+			"key_id":   "key-ec-123",
+			"key_name": "my-ec-key",
+			"key_type": "ec",
+			"key_bits": 256,
+		})))
+	}))
+	defer server.Close()
+
+	client, _ := NewClient(&Config{
+		Address: server.URL,
+		Token:   "test-token",
+		Mount:   "pki",
+	})
+
+	result, err := client.GetECDSAKey(context.Background(), "key-ec-123")
+
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if result == nil || result.KeyInfo() == nil {
+		t.Fatal("Expected result with key info, got nil")
+	}
+
+	if result.KeyInfo().KeyType != "ec" {
+		t.Errorf("Expected key type 'ec', got '%s'", result.KeyInfo().KeyType)
+	}
+}
+
+func TestGetEd25519Key_TypeSafe(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte(createJSONResponse(map[string]interface{}{
+			"key_id":   "key-ed-123",
+			"key_name": "my-ed25519-key",
+			"key_type": "ed25519",
+		})))
+	}))
+	defer server.Close()
+
+	client, _ := NewClient(&Config{
+		Address: server.URL,
+		Token:   "test-token",
+		Mount:   "pki",
+	})
+
+	result, err := client.GetEd25519Key(context.Background(), "key-ed-123")
+
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if result == nil || result.KeyInfo() == nil {
+		t.Fatal("Expected result with key info, got nil")
+	}
+
+	if result.KeyInfo().KeyType != "ed25519" {
+		t.Errorf("Expected key type 'ed25519', got '%s'", result.KeyInfo().KeyType)
+	}
+}
+
+// Export functionality has been removed - use GenerateXXXKey() functions instead
+// which return the keypair directly when keys are generated.
+//
+// Example:
+//   keyPair, keyInfo, err := client.GenerateRSAKey(ctx, &GenerateKeyOptions{...})
+//   // Use keyPair.PrivateKey immediately
+
+func TestKeyClient_Delete(t *testing.T) {
+	tests := []struct {
+		name       string
+		keyInfo    *KeyInfo
+		statusCode int
+		wantErr    bool
+		errMsg     string
+	}{
+		{
+			name: "Successful delete",
+			keyInfo: &KeyInfo{
+				KeyID:   "key-123",
+				KeyName: "test-key",
+				KeyType: "rsa",
+			},
+			statusCode: 204,
+			wantErr:    false,
+		},
+		{
+			name:    "Delete with nil key info",
+			keyInfo: nil,
+			wantErr: true,
+			errMsg:  "key info not available",
+		},
+		{
+			name: "Delete with empty key ID",
+			keyInfo: &KeyInfo{
+				KeyID: "",
+			},
+			wantErr: true,
+			errMsg:  "key info not available",
+		},
+		{
+			name: "Delete non-existent key",
+			keyInfo: &KeyInfo{
+				KeyID:   "non-existent",
+				KeyName: "non-existent",
+				KeyType: "rsa",
+			},
+			statusCode: 404,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != "DELETE" && tt.statusCode > 0 {
+					t.Errorf("Expected DELETE request, got %s", r.Method)
+				}
+				if tt.statusCode > 0 {
+					w.WriteHeader(tt.statusCode)
+				}
+			}))
+			defer server.Close()
+
+			client, _ := NewClient(&Config{
+				Address: server.URL,
+				Token:   "test-token",
+				Mount:   "pki",
+			})
+
+			kc := &KeyClient[*algo.RSAKeyPair]{
+				client:  client,
+				keyInfo: tt.keyInfo,
+			}
+
+			err := kc.Delete(context.Background())
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error, got nil")
+				} else if tt.errMsg != "" && !contains(err.Error(), tt.errMsg) {
+					t.Errorf("Expected error message to contain %q, got %q", tt.errMsg, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestKeyClient_UpdateName(t *testing.T) {
+	tests := []struct {
+		name       string
+		keyInfo    *KeyInfo
+		newName    string
+		statusCode int
+		wantErr    bool
+		errMsg     string
+	}{
+		{
+			name: "Successful update",
+			keyInfo: &KeyInfo{
+				KeyID:   "key-123",
+				KeyName: "old-name",
+				KeyType: "rsa",
+			},
+			newName:    "new-name",
+			statusCode: 204,
+			wantErr:    false,
+		},
+		{
+			name:    "Update with nil key info",
+			keyInfo: nil,
+			newName: "new-name",
+			wantErr: true,
+			errMsg:  "key info not available",
+		},
+		{
+			name: "Update with empty key ID",
+			keyInfo: &KeyInfo{
+				KeyID: "",
+			},
+			newName: "new-name",
+			wantErr: true,
+			errMsg:  "key info not available",
+		},
+		{
+			name: "Update with empty new name",
+			keyInfo: &KeyInfo{
+				KeyID:   "key-123",
+				KeyName: "old-name",
+				KeyType: "rsa",
+			},
+			newName: "",
+			wantErr: true,
+			errMsg:  "new key name is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tt.statusCode > 0 {
+					if r.Method != "PUT" {
+						t.Errorf("Expected PUT request, got %s", r.Method)
+					}
+					w.WriteHeader(tt.statusCode)
+				}
+			}))
+			defer server.Close()
+
+			client, _ := NewClient(&Config{
+				Address: server.URL,
+				Token:   "test-token",
+				Mount:   "pki",
+			})
+
+			kc := &KeyClient[*algo.RSAKeyPair]{
+				client:  client,
+				keyInfo: tt.keyInfo,
+			}
+
+			err := kc.UpdateName(context.Background(), tt.newName)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error, got nil")
+				} else if tt.errMsg != "" && !contains(err.Error(), tt.errMsg) {
+					t.Errorf("Expected error message to contain %q, got %q", tt.errMsg, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			// Verify cached keyInfo was updated
+			if kc.keyInfo.KeyName != tt.newName {
+				t.Errorf("Expected cached key name '%s', got '%s'", tt.newName, kc.keyInfo.KeyName)
+			}
+		})
+	}
+}
+
+func TestKeyClient_KeyInfo(t *testing.T) {
+	keyInfo := &KeyInfo{
+		KeyID:   "key-123",
+		KeyName: "test-key",
+		KeyType: "rsa",
+		KeyBits: 2048,
+	}
+
+	kc := &KeyClient[*algo.RSAKeyPair]{
+		client:  nil, // Not needed for this test
+		keyInfo: keyInfo,
+	}
+
+	result := kc.KeyInfo()
+
+	if result != keyInfo {
+		t.Error("Expected same KeyInfo instance")
+	}
+}
+
+func TestKeyClient_HasKeyPair(t *testing.T) {
+	t.Run("KeyPair is available", func(t *testing.T) {
+		keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+		if err != nil {
+			t.Fatalf("Failed to generate test key pair: %v", err)
+		}
+
+		keyInfo := &KeyInfo{
+			KeyID:   "key-123",
+			KeyName: "test-key",
+			KeyType: "rsa",
+			KeyBits: 2048,
+		}
+
+		kc := &KeyClient[*algo.RSAKeyPair]{
+			client:  nil, // Not needed for this test
+			keyInfo: keyInfo,
+			keyPair: keyPair,
+		}
+
+		if !kc.HasKeyPair() {
+			t.Error("Expected HasKeyPair() to return true when keypair is set")
+		}
+
+		// Also verify KeyPair() works
+		retrievedKeyPair, err := kc.KeyPair()
+		if err != nil {
+			t.Errorf("Expected KeyPair() to succeed, got error: %v", err)
+		}
+		if retrievedKeyPair != keyPair {
+			t.Error("Expected same keypair instance")
+		}
+	})
+
+	t.Run("KeyPair is not available", func(t *testing.T) {
+		keyInfo := &KeyInfo{
+			KeyID:   "key-123",
+			KeyName: "test-key",
+			KeyType: "rsa",
+			KeyBits: 2048,
+		}
+
+		kc := &KeyClient[*algo.RSAKeyPair]{
+			client:  nil, // Not needed for this test
+			keyInfo: keyInfo,
+			// keyPair is nil (not set)
+		}
+
+		if kc.HasKeyPair() {
+			t.Error("Expected HasKeyPair() to return false when keypair is not set")
+		}
+
+		// Also verify KeyPair() returns error
+		_, err := kc.KeyPair()
+		if err == nil {
+			t.Error("Expected KeyPair() to return error when keypair is not available")
+		}
+	})
 }
