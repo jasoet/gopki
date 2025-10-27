@@ -3,6 +3,7 @@
 package bao_test
 
 import (
+	"crypto/x509/pkix"
 	"testing"
 
 	"github.com/jasoet/gopki/bao"
@@ -73,20 +74,33 @@ func testRSAKeyGoPKIToBao(t *testing.T, keyBits int) {
 	env := SetupBaoTest(t)
 	defer env.Cleanup()
 
+	// Convert int to algo.KeySize
+	var keySize algo.KeySize
+	switch keyBits {
+	case 2048:
+		keySize = algo.KeySize2048
+	case 3072:
+		keySize = algo.KeySize3072
+	case 4096:
+		keySize = algo.KeySize4096
+	default:
+		t.Fatalf("Unsupported key size: %d", keyBits)
+	}
+
 	// Generate key with GoPKI
-	keyPair, err := algo.GenerateRSAKeyPair(keyBits)
+	keyPair, err := algo.GenerateRSAKeyPair(keySize)
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key: %v", err)
 	}
 
 	// Import to Bao
-	keyClient, err := env.Client.ImportRSAKey(env.Ctx, "test-rsa-key", keyPair, &bao.ImportKeyOptions{})
+	keyClient, err := env.Client.ImportRSAKey(env.Ctx, keyPair, &bao.ImportKeyOptions{})
 	if err != nil {
 		t.Fatalf("Failed to import key to Bao: %v", err)
 	}
 
 	// Verify key is accessible
-	keyInfo, err := keyClient.GetKeyInfo(env.Ctx)
+	keyInfo := keyClient.KeyInfo()
 	if err != nil {
 		t.Fatalf("Failed to get key info: %v", err)
 	}
@@ -135,8 +149,8 @@ func testRSAKeyBaoToGoPKI(t *testing.T, keyBits int) {
 		t.Fatalf("Failed to create CSR with Bao key: %v", err)
 	}
 
-	if csr.Subject.CommonName != "test.example.com" {
-		t.Errorf("CSR subject mismatch: expected %q, got %q", "test.example.com", csr.Subject.CommonName)
+	if csr.Request.Subject.CommonName != "test.example.com" {
+		t.Errorf("CSR subject mismatch: expected %q, got %q", "test.example.com", csr.Request.Subject.CommonName)
 	}
 
 	t.Logf("✓ Successfully used Bao RSA-%d key with GoPKI cert module", keyBits)
@@ -154,7 +168,7 @@ func testBaoIssueCertWithGoPKIRSAKey(t *testing.T, keyBits int) {
 	}
 
 	// Create role
-	err = issuer.CreateRole(env.Ctx, "web-server", &bao.RoleOptions{
+	_, err = issuer.CreateRole(env.Ctx, "web-server", &bao.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -209,13 +223,13 @@ func testECDSAKeyGoPKIToBao(t *testing.T, curveSize int) {
 	}
 
 	// Import to Bao
-	keyClient, err := env.Client.ImportECDSAKey(env.Ctx, "test-ecdsa-key", keyPair, &bao.ImportKeyOptions{})
+	keyClient, err := env.Client.ImportECDSAKey(env.Ctx, keyPair, &bao.ImportKeyOptions{})
 	if err != nil {
 		t.Fatalf("Failed to import key to Bao: %v", err)
 	}
 
 	// Verify key is accessible
-	keyInfo, err := keyClient.GetKeyInfo(env.Ctx)
+	keyInfo := keyClient.KeyInfo()
 	if err != nil {
 		t.Fatalf("Failed to get key info: %v", err)
 	}
@@ -268,7 +282,7 @@ func testECDSAKeyBaoToGoPKI(t *testing.T, curveSize int) {
 		t.Fatalf("Failed to create CSR with Bao key: %v", err)
 	}
 
-	if csr.Subject.CommonName != "test.example.com" {
+	if csr.Request.Subject.CommonName != "test.example.com" {
 		t.Errorf("CSR subject mismatch")
 	}
 
@@ -299,7 +313,7 @@ func testBaoIssueCertWithGoPKIECDSAKey(t *testing.T, curveSize int) {
 	}
 
 	// Create role
-	err = issuer.CreateRole(env.Ctx, "web-server", &bao.RoleOptions{
+	_, err = issuer.CreateRole(env.Ctx, "web-server", &bao.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -342,13 +356,13 @@ func testEd25519KeyGoPKIToBao(t *testing.T) {
 	}
 
 	// Import to Bao
-	keyClient, err := env.Client.ImportEd25519Key(env.Ctx, "test-ed25519-key", keyPair, &bao.ImportKeyOptions{})
+	keyClient, err := env.Client.ImportEd25519Key(env.Ctx, keyPair, &bao.ImportKeyOptions{})
 	if err != nil {
 		t.Fatalf("Failed to import key to Bao: %v", err)
 	}
 
 	// Verify key is accessible
-	keyInfo, err := keyClient.GetKeyInfo(env.Ctx)
+	keyInfo := keyClient.KeyInfo()
 	if err != nil {
 		t.Fatalf("Failed to get key info: %v", err)
 	}
@@ -388,7 +402,7 @@ func testEd25519KeyBaoToGoPKI(t *testing.T) {
 		t.Fatalf("Failed to create CSR with Bao key: %v", err)
 	}
 
-	if csr.Subject.CommonName != "test.example.com" {
+	if csr.Request.Subject.CommonName != "test.example.com" {
 		t.Errorf("CSR subject mismatch")
 	}
 
@@ -407,7 +421,7 @@ func testBaoIssueCertWithGoPKIEd25519Key(t *testing.T) {
 	}
 
 	// Create role
-	err = issuer.CreateRole(env.Ctx, "web-server", &bao.RoleOptions{
+	_, err = issuer.CreateRole(env.Ctx, "web-server", &bao.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",

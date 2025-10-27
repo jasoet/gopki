@@ -10,6 +10,7 @@ import (
 
 	"github.com/jasoet/gopki/bao"
 	"github.com/jasoet/gopki/bao/testcontainer"
+	"github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/keypair"
 )
 
@@ -91,7 +92,14 @@ func SetupBaoWithCA(t *testing.T) (*TestEnvironment, *bao.IssuerClient) {
 		t.Fatalf("Failed to create root CA: %v", err)
 	}
 
-	return env, caResp.Issuer
+	// Get issuer client
+	issuer, err := env.Client.GetIssuer(env.Ctx, caResp.IssuerID)
+	if err != nil {
+		env.Cleanup()
+		t.Fatalf("Failed to get issuer: %v", err)
+	}
+
+	return env, issuer
 }
 
 // SetupBaoWithCAAndRole initializes OpenBao with a test CA and role.
@@ -101,7 +109,7 @@ func SetupBaoWithCAAndRole(t *testing.T, roleName string, roleOpts *bao.RoleOpti
 	env, issuer := SetupBaoWithCA(t)
 
 	// Create role
-	err := issuer.CreateRole(env.Ctx, roleName, roleOpts)
+	_, err := issuer.CreateRole(env.Ctx, roleName, roleOpts)
 	if err != nil {
 		env.Cleanup()
 		t.Fatalf("Failed to create role: %v", err)
@@ -124,14 +132,20 @@ func CreateTestRootCA(ctx context.Context, client *bao.Client, issuerName, keyTy
 		return nil, err
 	}
 
-	return caResp.Issuer, nil
+	// Get issuer client
+	issuer, err := client.GetIssuer(ctx, caResp.IssuerID)
+	if err != nil {
+		return nil, err
+	}
+
+	return issuer, nil
 }
 
 // CreateTestIntermediateCA creates a test intermediate CA in OpenBao.
 func CreateTestIntermediateCA(ctx context.Context, client *bao.Client, parentIssuer *bao.IssuerClient, issuerName, keyType string, keyBits int) (*bao.IssuerClient, error) {
-	// Generate intermediate CSR
+	// Generate intermediate CSR (exported to get private key)
 	intermediateResp, err := client.GenerateIntermediateCA(ctx, &bao.CAOptions{
-		Type:       "internal",
+		Type:       "exported",
 		CommonName: "Test Intermediate CA",
 		KeyType:    keyType,
 		KeyBits:    keyBits,
@@ -140,30 +154,39 @@ func CreateTestIntermediateCA(ctx context.Context, client *bao.Client, parentIss
 		return nil, err
 	}
 
-	// Sign intermediate with parent
-	signedCert, err := parentIssuer.SignIntermediate(ctx, intermediateResp.CSR, &bao.SignIntermediateOptions{
-		CommonName: "Test Intermediate CA",
-		TTL:        "43800h", // 5 years
+	// Parse CSR from PEM
+	csrParsed, err := cert.ParseCSRFromPEM([]byte(intermediateResp.CSR))
+	if err != nil {
+		return nil, err
+	}
+
+	// Sign intermediate with parent using client's SignIntermediateCSR
+	signedCert, err := client.SignIntermediateCSR(ctx, csrParsed, &bao.CAOptions{
+		CommonName:    "Test Intermediate CA",
+		TTL:           "43800h", // 5 years
+		MaxPathLength: 0,
 	})
 	if err != nil {
 		return nil, err
 	}
+
+	// Create PEM bundle (signed cert + private key)
+	pemBundle := string(signedCert.PEMData) + "\n" + intermediateResp.PrivateKey
 
 	// Import signed intermediate
-	importResp, err := client.ImportCA(ctx, &bao.ImportCAOptions{
-		PEMBundle:  signedCert.Certificate,
-		IssuerName: issuerName,
+	importedIssuer, err := client.ImportCA(ctx, &bao.CABundle{
+		PEMBundle: pemBundle,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return importResp.Issuer, nil
+	return importedIssuer, nil
 }
 
 // CreateStandardTestRole creates a standard test role with common settings.
 func CreateStandardTestRole(ctx context.Context, issuer *bao.IssuerClient, roleName string) error {
-	return issuer.CreateRole(ctx, roleName, &bao.RoleOptions{
+	_, err := issuer.CreateRole(ctx, roleName, &bao.RoleOptions{
 		AllowedDomains:  []string{"example.com", "test.local"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -172,6 +195,7 @@ func CreateStandardTestRole(ctx context.Context, issuer *bao.IssuerClient, roleN
 		ClientFlag:      true,
 		KeyType:         "any",
 	})
+	return err
 }
 
 // ValidateCertificateChain validates a certificate chain.

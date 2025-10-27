@@ -444,11 +444,6 @@ func testBaoCertGoPKIParse(t *testing.T) {
 	}
 
 	// Parse with GoPKI (convert to PEM and parse back)
-	certPEM := certificate.PEMData
-	if err != nil {
-		t.Fatalf("Failed to encode to PEM: %v", err)
-	}
-
 	parsedCert, err := cert.ParseCertificateFromPEM(certificate.PEMData)
 	if err != nil {
 		t.Fatalf("Failed to parse certificate with GoPKI: %v", err)
@@ -503,7 +498,7 @@ func testBaoCertGoPKIVerify(t *testing.T) {
 	}
 
 	// Verify with GoPKI cert module
-	err = cert.VerifyCertificate(certificate, []*x509.Certificate{caCert})
+	err = cert.VerifyCertificate(certificate, caCert)
 	if err != nil {
 		t.Errorf("Certificate verification failed: %v", err)
 	}
@@ -567,9 +562,17 @@ func testCertificateChainValidation(t *testing.T) {
 	}
 
 	// Verify full chain with GoPKI
-	err = cert.VerifyCertificate(endEntityCert, []*x509.Certificate{intermediateCert, rootCert})
+	// Note: cert.VerifyCertificate verifies cert against single CA
+	// For full chain, verify end-entity -> intermediate
+	err = cert.VerifyCertificate(endEntityCert, intermediateCert)
 	if err != nil {
-		t.Errorf("Full chain verification failed: %v", err)
+		t.Errorf("End-entity to intermediate verification failed: %v", err)
+	}
+
+	// Verify intermediate -> root
+	err = cert.VerifyCertificate(intermediateCert, rootCert)
+	if err != nil {
+		t.Errorf("Intermediate to root verification failed: %v", err)
 	}
 
 	t.Logf("✓ Full certificate chain validated successfully")
@@ -688,10 +691,7 @@ func testWorkflow3BaoManagedKey(t *testing.T) {
 		t.Fatalf("Failed to create key: %v", err)
 	}
 
-	keyInfo, err := keyClient.GetKeyInfo(env.Ctx)
-	if err != nil {
-		t.Fatalf("Failed to get key info: %v", err)
-	}
+	keyInfo := keyClient.KeyInfo()
 
 	// Create role
 	_, err = issuer.CreateRole(env.Ctx, "web-server", &bao.RoleOptions{
