@@ -550,6 +550,75 @@ func issueCertificateWithKeyPair[K keypair.KeyPair](ctx context.Context, client 
 }
 
 // ============================================================================
+// Issue Certificate with Key Reference - Entry Points (OpenBao-managed key)
+// ============================================================================
+
+// IssueRSACertificateWithKeyRef issues a certificate using an existing RSA key in OpenBao.
+// The key is referenced by ID or name and stays securely in OpenBao.
+// OpenBao creates the CSR internally and signs the certificate.
+//
+// The returned CertificateClient does NOT have a cached key pair (HasKeyPair() will be false).
+//
+// Example:
+//
+//	// Key already exists in OpenBao
+//	keyClient, _ := client.GenerateRSAKey(ctx, &GenerateKeyOptions{KeyName: "my-key"})
+//	keyRef := keyClient.KeyInfo().KeyID  // or KeyName
+//
+//	// Issue certificate using that key
+//	certClient, err := client.IssueRSACertificateWithKeyRef(ctx, "web-server", keyRef, &GenerateCertificateOptions{
+//	    CommonName: "app.example.com",
+//	    AltNames:   []string{"www.app.example.com"},
+//	    TTL:        "720h",
+//	})
+func (c *Client) IssueRSACertificateWithKeyRef(ctx context.Context, role string, keyRef string, opts *GenerateCertificateOptions) (*CertificateClient[*algo.RSAKeyPair], error) {
+	return issueCertificateWithKeyRef[*algo.RSAKeyPair](ctx, c, role, keyRef, opts)
+}
+
+// IssueECDSACertificateWithKeyRef issues a certificate using an existing ECDSA key in OpenBao.
+func (c *Client) IssueECDSACertificateWithKeyRef(ctx context.Context, role string, keyRef string, opts *GenerateCertificateOptions) (*CertificateClient[*algo.ECDSAKeyPair], error) {
+	return issueCertificateWithKeyRef[*algo.ECDSAKeyPair](ctx, c, role, keyRef, opts)
+}
+
+// IssueEd25519CertificateWithKeyRef issues a certificate using an existing Ed25519 key in OpenBao.
+func (c *Client) IssueEd25519CertificateWithKeyRef(ctx context.Context, role string, keyRef string, opts *GenerateCertificateOptions) (*CertificateClient[*algo.Ed25519KeyPair], error) {
+	return issueCertificateWithKeyRef[*algo.Ed25519KeyPair](ctx, c, role, keyRef, opts)
+}
+
+// issueCertificateWithKeyRef is the internal implementation for issuing certificates with OpenBao-managed keys.
+func issueCertificateWithKeyRef[K keypair.KeyPair](ctx context.Context, client *Client, role string, keyRef string, opts *GenerateCertificateOptions) (*CertificateClient[K], error) {
+	if role == "" {
+		return nil, fmt.Errorf("bao: role is required")
+	}
+	if keyRef == "" {
+		return nil, fmt.Errorf("bao: key reference is required")
+	}
+	if opts == nil {
+		return nil, fmt.Errorf("bao: options are required")
+	}
+	if opts.CommonName == "" {
+		return nil, fmt.Errorf("bao: common name is required")
+	}
+
+	// Build request body with type="existing" and key_ref
+	reqBody := buildCertificateRequestBody(opts)
+	reqBody["type"] = "existing"
+	reqBody["key_ref"] = keyRef
+
+	path := fmt.Sprintf("%s/issue/%s", client.config.Mount, role)
+	secret, err := client.client.Logical().WriteWithContext(ctx, path, reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("bao: issue certificate with key ref: %w", err)
+	}
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("bao: issue certificate with key ref: empty response")
+	}
+
+	// Parse response WITHOUT private key (key stays in OpenBao)
+	return parseCertificateResponse[K](client, secret.Data, false)
+}
+
+// ============================================================================
 // Sign CSR - Entry Points
 // ============================================================================
 
@@ -748,6 +817,157 @@ func (c *Client) SignSelfIssued(ctx context.Context, certificate *cert.Certifica
 	}
 
 	return signedCert, nil
+}
+
+// ============================================================================
+// Sign CSR with Key Reference - Entry Points
+// ============================================================================
+
+// SignCSRWithKeyRef signs a CSR using a specific key reference in OpenBao.
+// The key is referenced by ID or name and used for signing the CSR.
+//
+// Example:
+//
+//	keyClient, _ := client.GetRSAKey(ctx, "my-signing-key")
+//	keyRef := keyClient.KeyInfo().KeyID
+//
+//	csr, _ := cert.CreateCSR(keyPair, cert.CSRRequest{...})
+//	certificate, err := client.SignCSRWithKeyRef(ctx, "web-server", csr, keyRef, &SignCertificateOptions{
+//	    TTL: "8760h",
+//	})
+func (c *Client) SignCSRWithKeyRef(ctx context.Context, role string, csr *cert.CertificateSigningRequest, keyRef string, opts *SignCertificateOptions) (*cert.Certificate, error) {
+	if role == "" {
+		return nil, fmt.Errorf("bao: role is required")
+	}
+	if csr == nil {
+		return nil, fmt.Errorf("bao: CSR is required")
+	}
+	if keyRef == "" {
+		return nil, fmt.Errorf("bao: key reference is required")
+	}
+
+	reqBody := map[string]interface{}{
+		"csr":     string(csr.PEMData),
+		"key_ref": keyRef,
+	}
+
+	if opts != nil {
+		if opts.CommonName != "" {
+			reqBody["common_name"] = opts.CommonName
+		}
+		if len(opts.AltNames) > 0 {
+			reqBody["alt_names"] = joinStrings(opts.AltNames)
+		}
+		if len(opts.IPSANs) > 0 {
+			reqBody["ip_sans"] = joinStrings(opts.IPSANs)
+		}
+		if len(opts.URISANs) > 0 {
+			reqBody["uri_sans"] = joinStrings(opts.URISANs)
+		}
+		if len(opts.OtherSANs) > 0 {
+			reqBody["other_sans"] = joinStrings(opts.OtherSANs)
+		}
+		if opts.TTL != "" {
+			reqBody["ttl"] = opts.TTL
+		}
+		if opts.Format != "" {
+			reqBody["format"] = opts.Format
+		}
+		if opts.ExcludeCNFromSANs {
+			reqBody["exclude_cn_from_sans"] = true
+		}
+		if opts.NotAfter != "" {
+			reqBody["not_after"] = opts.NotAfter
+		}
+	}
+
+	path := fmt.Sprintf("%s/sign/%s", c.config.Mount, role)
+	secret, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("bao: sign CSR with key ref: %w", err)
+	}
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("bao: sign CSR with key ref: empty response")
+	}
+
+	certificatePEM, ok := secret.Data["certificate"].(string)
+	if !ok {
+		return nil, fmt.Errorf("bao: sign CSR with key ref: invalid certificate data")
+	}
+
+	issuingCAPEM := ""
+	if ca, ok := secret.Data["issuing_ca"].(string); ok {
+		issuingCAPEM = ca
+	}
+
+	certificate, err := vaultCertToGoPKI(certificatePEM, issuingCAPEM)
+	if err != nil {
+		return nil, fmt.Errorf("bao: sign CSR with key ref: %w", err)
+	}
+
+	return certificate, nil
+}
+
+// SignVerbatimWithKeyRef signs a CSR verbatim using a specific key reference in OpenBao.
+// This bypasses role constraints and signs the CSR as-is.
+//
+// Example:
+//
+//	keyRef := "my-ca-key"
+//	csr, _ := cert.CreateCSR(keyPair, cert.CSRRequest{...})
+//	certificate, err := client.SignVerbatimWithKeyRef(ctx, csr, keyRef, &SignVerbatimOptions{
+//	    TTL: "8760h",
+//	})
+func (c *Client) SignVerbatimWithKeyRef(ctx context.Context, csr *cert.CertificateSigningRequest, keyRef string, opts *SignVerbatimOptions) (*cert.Certificate, error) {
+	if csr == nil {
+		return nil, fmt.Errorf("bao: CSR is required")
+	}
+	if keyRef == "" {
+		return nil, fmt.Errorf("bao: key reference is required")
+	}
+
+	reqBody := map[string]interface{}{
+		"csr":     string(csr.PEMData),
+		"key_ref": keyRef,
+	}
+
+	if opts != nil {
+		if opts.TTL != "" {
+			reqBody["ttl"] = opts.TTL
+		}
+		if opts.Format != "" {
+			reqBody["format"] = opts.Format
+		}
+		if opts.NotAfter != "" {
+			reqBody["not_after"] = opts.NotAfter
+		}
+	}
+
+	path := fmt.Sprintf("%s/sign-verbatim", c.config.Mount)
+	secret, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("bao: sign verbatim with key ref: %w", err)
+	}
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("bao: sign verbatim with key ref: empty response")
+	}
+
+	certificatePEM, ok := secret.Data["certificate"].(string)
+	if !ok {
+		return nil, fmt.Errorf("bao: sign verbatim with key ref: invalid certificate data")
+	}
+
+	issuingCAPEM := ""
+	if ca, ok := secret.Data["issuing_ca"].(string); ok {
+		issuingCAPEM = ca
+	}
+
+	certificate, err := vaultCertToGoPKI(certificatePEM, issuingCAPEM)
+	if err != nil {
+		return nil, fmt.Errorf("bao: sign verbatim with key ref: %w", err)
+	}
+
+	return certificate, nil
 }
 
 // ============================================================================

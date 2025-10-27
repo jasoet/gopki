@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
 )
@@ -154,6 +155,67 @@ func (kc *KeyClient[K]) UpdateName(ctx context.Context, newName string) error {
 	kc.keyInfo.KeyName = newName
 
 	return nil
+}
+
+// IssueCertificate issues a certificate using this key.
+// This is a convenience method that links KeyClient with CertificateClient operations.
+//
+// The key must exist in OpenBao (KeyInfo().KeyID must be available).
+// The returned CertificateClient does NOT have a cached key pair (key stays in OpenBao).
+//
+// Example:
+//
+//	keyClient, _ := client.GenerateRSAKey(ctx, &GenerateKeyOptions{KeyName: "my-key"})
+//	certClient, err := keyClient.IssueCertificate(ctx, "web-server", &GenerateCertificateOptions{
+//	    CommonName: "app.example.com",
+//	    TTL:        "720h",
+//	})
+//	cert := certClient.Certificate()
+func (kc *KeyClient[K]) IssueCertificate(ctx context.Context, role string, opts *GenerateCertificateOptions) (*CertificateClient[K], error) {
+	if kc.keyInfo == nil || kc.keyInfo.KeyID == "" {
+		return nil, fmt.Errorf("bao: key info not available")
+	}
+
+	keyRef := kc.keyInfo.KeyID
+	return issueCertificateWithKeyRef[K](ctx, kc.client, role, keyRef, opts)
+}
+
+// SignCSR signs a CSR using this key.
+// This is a convenience method for signing CSRs with a specific key from KeyClient.
+//
+// Example:
+//
+//	keyClient, _ := client.GetRSAKey(ctx, "my-ca-key")
+//	csr, _ := cert.CreateCSR(keyPair, cert.CSRRequest{...})
+//	certificate, err := keyClient.SignCSR(ctx, "web-server", csr, &SignCertificateOptions{
+//	    TTL: "8760h",
+//	})
+func (kc *KeyClient[K]) SignCSR(ctx context.Context, role string, csr *cert.CertificateSigningRequest, opts *SignCertificateOptions) (*cert.Certificate, error) {
+	if kc.keyInfo == nil || kc.keyInfo.KeyID == "" {
+		return nil, fmt.Errorf("bao: key info not available")
+	}
+
+	keyRef := kc.keyInfo.KeyID
+	return kc.client.SignCSRWithKeyRef(ctx, role, csr, keyRef, opts)
+}
+
+// SignVerbatim signs a CSR verbatim using this key.
+// This bypasses role constraints and signs the CSR as-is.
+//
+// Example:
+//
+//	keyClient, _ := client.GetRSAKey(ctx, "my-ca-key")
+//	csr, _ := cert.CreateCSR(keyPair, cert.CSRRequest{...})
+//	certificate, err := keyClient.SignVerbatim(ctx, csr, &SignVerbatimOptions{
+//	    TTL: "8760h",
+//	})
+func (kc *KeyClient[K]) SignVerbatim(ctx context.Context, csr *cert.CertificateSigningRequest, opts *SignVerbatimOptions) (*cert.Certificate, error) {
+	if kc.keyInfo == nil || kc.keyInfo.KeyID == "" {
+		return nil, fmt.Errorf("bao: key info not available")
+	}
+
+	keyRef := kc.keyInfo.KeyID
+	return kc.client.SignVerbatimWithKeyRef(ctx, csr, keyRef, opts)
 }
 
 // ============================================================================
