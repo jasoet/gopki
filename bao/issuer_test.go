@@ -162,7 +162,7 @@ func TestGenerateIntermediateCA(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		opts       *IntermediateCAOptions
+		opts       *CAOptions
 		statusCode int
 		response   string
 		wantErr    bool
@@ -170,7 +170,7 @@ func TestGenerateIntermediateCA(t *testing.T) {
 	}{
 		{
 			name: "Successful internal intermediate CA",
-			opts: &IntermediateCAOptions{
+			opts: &CAOptions{
 				Type:       "internal",
 				CommonName: "Test Intermediate CA",
 				KeyType:    "rsa",
@@ -189,7 +189,7 @@ func TestGenerateIntermediateCA(t *testing.T) {
 		},
 		{
 			name: "Successful exported intermediate CA (CSR)",
-			opts: &IntermediateCAOptions{
+			opts: &CAOptions{
 				Type:       "exported",
 				CommonName: "Test Intermediate CA",
 				KeyType:    "rsa",
@@ -214,7 +214,7 @@ func TestGenerateIntermediateCA(t *testing.T) {
 		},
 		{
 			name: "Missing common name",
-			opts: &IntermediateCAOptions{
+			opts: &CAOptions{
 				Type: "internal",
 			},
 			statusCode: 200,
@@ -442,8 +442,8 @@ func TestImportCA(t *testing.T) {
 				if !getIssuerCalled {
 					t.Error("Expected GetIssuer to be called")
 				}
-				if issuer.IssuerID != "issuer-123" {
-					t.Errorf("Expected issuer ID 'issuer-123', got '%s'", issuer.IssuerID)
+				if issuer.ID() != "issuer-123" {
+					t.Errorf("Expected issuer ID 'issuer-123', got '%s'", issuer.ID())
 				}
 			}
 		})
@@ -513,8 +513,8 @@ func TestGetIssuer(t *testing.T) {
 					t.Error("Expected issuer but got nil")
 					return
 				}
-				if issuer.IssuerID != "issuer-123" {
-					t.Errorf("Expected issuer ID 'issuer-123', got '%s'", issuer.IssuerID)
+				if issuer.ID() != "issuer-123" {
+					t.Errorf("Expected issuer ID 'issuer-123', got '%s'", issuer.ID())
 				}
 			}
 		})

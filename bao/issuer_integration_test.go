@@ -115,11 +115,11 @@ func TestIntegration_CAWorkflow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetIssuer failed: %v", err)
 	}
-	if issuer.IssuerID != rootResp.IssuerID {
-		t.Errorf("Expected issuer ID %s, got %s", rootResp.IssuerID, issuer.IssuerID)
+	if issuer.ID() != rootResp.IssuerID {
+		t.Errorf("Expected issuer ID %s, got %s", rootResp.IssuerID, issuer.ID())
 	}
-	if issuer.IssuerName != "root-ca" {
-		t.Errorf("Expected issuer name 'root-ca', got '%s'", issuer.IssuerName)
+	if issuer.Name() != "root-ca" {
+		t.Errorf("Expected issuer name 'root-ca', got '%s'", issuer.Name())
 	}
 
 	// Step 3: List issuers
@@ -174,8 +174,8 @@ func TestIntegration_CAWorkflow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetIssuer after update failed: %v", err)
 	}
-	if updatedIssuer.IssuerName != "updated-root-ca" {
-		t.Errorf("Expected updated issuer name 'updated-root-ca', got '%s'", updatedIssuer.IssuerName)
+	if updatedIssuer.Name() != "updated-root-ca" {
+		t.Errorf("Expected updated issuer name 'updated-root-ca', got '%s'", updatedIssuer.Name())
 	}
 }
 
@@ -207,7 +207,7 @@ func TestIntegration_IntermediateCAWorkflow(t *testing.T) {
 
 	// Generate intermediate CSR
 	t.Log("Generating intermediate CSR...")
-	intermediateResp, err := client.GenerateIntermediateCA(ctx, &IntermediateCAOptions{
+	intermediateResp, err := client.GenerateIntermediateCA(ctx, &CAOptions{
 		Type:       "exported",
 		CommonName: "Test Intermediate CA",
 		TTL:        "43800h", // 5 years
@@ -314,21 +314,21 @@ func TestIntegration_ImportCA(t *testing.T) {
 		t.Fatalf("ImportCA failed: %v", err)
 	}
 
-	if importedIssuer.IssuerID == "" {
+	if importedIssuer.ID() == "" {
 		t.Error("Expected issuer ID, got empty string")
 	}
-	if importedIssuer.KeyID == "" {
+	if importedIssuer.KeyID() == "" {
 		t.Error("Expected key ID, got empty string")
 	}
 
 	// Verify the imported issuer
-	issuer, err := importClient.GetIssuer(ctx, importedIssuer.IssuerID)
+	issuer, err := importClient.GetIssuer(ctx, importedIssuer.ID())
 	if err != nil {
 		t.Fatalf("GetIssuer failed: %v", err)
 	}
-	if issuer.IssuerID != importedIssuer.IssuerID {
-		t.Errorf("Expected issuer ID %s, got %s", importedIssuer.IssuerID, issuer.IssuerID)
+	if issuer.ID() != importedIssuer.ID() {
+		t.Errorf("Expected issuer ID %s, got %s", importedIssuer.ID(), issuer.ID())
 	}
 
-	t.Logf("Successfully imported CA with issuer ID: %s", importedIssuer.IssuerID)
+	t.Logf("Successfully imported CA with issuer ID: %s", importedIssuer.ID())
 }

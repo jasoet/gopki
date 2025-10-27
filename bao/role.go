@@ -59,13 +59,6 @@ type RoleOptions struct {
 	AllowedUserIDs                []string `json:"allowed_user_ids,omitempty"`                   // Allowed user IDs
 }
 
-// Role represents a OpenBao PKI role configuration.
-// Deprecated: Use RoleClient instead for method chaining and convenience methods.
-type Role struct {
-	Name string
-	*RoleOptions
-}
-
 // RoleClient wraps a role and provides methods for managing it.
 type RoleClient struct {
 	client *Client
@@ -126,58 +119,122 @@ func (rc *RoleClient) Delete(ctx context.Context) error {
 	return nil
 }
 
-// Clone creates a copy of this role's options.
-// The returned options can be used to create a new role.
-//
-// Example:
-//
-// roleClient, _ := client.GetRole(ctx, "web-server")
-// newOpts := roleClient.Clone()
-// err := client.CreateRole(ctx, "web-server-staging", newOpts)
-func (rc *RoleClient) Clone() *RoleOptions {
-	if rc.opts == nil {
-		return &RoleOptions{}
-	}
+// ============================================================================
+// RoleOptionsBuilder - Builder Pattern for Role Configuration
+// ============================================================================
 
-	// Create a deep copy
-	clone := *rc.opts
-
-	// Copy slices
-	if len(rc.opts.AllowedDomains) > 0 {
-		clone.AllowedDomains = make([]string, len(rc.opts.AllowedDomains))
-		copy(clone.AllowedDomains, rc.opts.AllowedDomains)
-	}
-	if len(rc.opts.AllowedIPSANs) > 0 {
-		clone.AllowedIPSANs = make([]string, len(rc.opts.AllowedIPSANs))
-		copy(clone.AllowedIPSANs, rc.opts.AllowedIPSANs)
-	}
-	if len(rc.opts.AllowedURISANs) > 0 {
-		clone.AllowedURISANs = make([]string, len(rc.opts.AllowedURISANs))
-		copy(clone.AllowedURISANs, rc.opts.AllowedURISANs)
-	}
-	if len(rc.opts.KeyUsage) > 0 {
-		clone.KeyUsage = make([]string, len(rc.opts.KeyUsage))
-		copy(clone.KeyUsage, rc.opts.KeyUsage)
-	}
-	if len(rc.opts.ExtKeyUsage) > 0 {
-		clone.ExtKeyUsage = make([]string, len(rc.opts.ExtKeyUsage))
-		copy(clone.ExtKeyUsage, rc.opts.ExtKeyUsage)
-	}
-	if len(rc.opts.Organization) > 0 {
-		clone.Organization = make([]string, len(rc.opts.Organization))
-		copy(clone.Organization, rc.opts.Organization)
-	}
-
-	return &clone
+// RoleOptionsBuilder provides a fluent API for building RoleOptions.
+type RoleOptionsBuilder struct {
+	opts *RoleOptions
 }
 
-// ToRole converts RoleClient to deprecated Role struct for backward compatibility.
-// Deprecated: Use RoleClient methods directly.
-func (rc *RoleClient) ToRole() *Role {
-	return &Role{
-		Name:        rc.name,
-		RoleOptions: rc.opts,
+// NewRoleOptionsBuilder creates a new builder for role options.
+func NewRoleOptionsBuilder() *RoleOptionsBuilder {
+	return &RoleOptionsBuilder{
+		opts: &RoleOptions{},
 	}
+}
+
+// WithIssuerRef sets the issuer reference.
+func (b *RoleOptionsBuilder) WithIssuerRef(ref string) *RoleOptionsBuilder {
+	b.opts.IssuerRef = ref
+	return b
+}
+
+// WithTTL sets the time to live.
+func (b *RoleOptionsBuilder) WithTTL(ttl string) *RoleOptionsBuilder {
+	b.opts.TTL = ttl
+	return b
+}
+
+// WithMaxTTL sets the maximum TTL.
+func (b *RoleOptionsBuilder) WithMaxTTL(maxTTL string) *RoleOptionsBuilder {
+	b.opts.MaxTTL = maxTTL
+	return b
+}
+
+// WithAllowedDomains sets the allowed domains.
+func (b *RoleOptionsBuilder) WithAllowedDomains(domains ...string) *RoleOptionsBuilder {
+	b.opts.AllowedDomains = domains
+	return b
+}
+
+// WithServerAuth enables server authentication.
+func (b *RoleOptionsBuilder) WithServerAuth() *RoleOptionsBuilder {
+	b.opts.ServerFlag = true
+	return b
+}
+
+// WithClientAuth enables client authentication.
+func (b *RoleOptionsBuilder) WithClientAuth() *RoleOptionsBuilder {
+	b.opts.ClientFlag = true
+	return b
+}
+
+// WithCodeSigning enables code signing.
+func (b *RoleOptionsBuilder) WithCodeSigning() *RoleOptionsBuilder {
+	b.opts.CodeSigningFlag = true
+	return b
+}
+
+// WithEmailProtection enables email protection.
+func (b *RoleOptionsBuilder) WithEmailProtection() *RoleOptionsBuilder {
+	b.opts.EmailProtectionFlag = true
+	return b
+}
+
+// WithKeyType sets the key type and bits.
+func (b *RoleOptionsBuilder) WithKeyType(keyType string, bits int) *RoleOptionsBuilder {
+	b.opts.KeyType = keyType
+	b.opts.KeyBits = bits
+	return b
+}
+
+// EnableSubdomains enables subdomain support.
+func (b *RoleOptionsBuilder) EnableSubdomains() *RoleOptionsBuilder {
+	b.opts.AllowSubdomains = true
+	return b
+}
+
+// EnableWildcards enables wildcard certificate support.
+func (b *RoleOptionsBuilder) EnableWildcards() *RoleOptionsBuilder {
+	b.opts.AllowWildcardCertificates = true
+	return b
+}
+
+// EnableLocalhost enables localhost in certificates.
+func (b *RoleOptionsBuilder) EnableLocalhost() *RoleOptionsBuilder {
+	b.opts.AllowLocalhost = true
+	return b
+}
+
+// WithOrganization sets the organization.
+func (b *RoleOptionsBuilder) WithOrganization(org ...string) *RoleOptionsBuilder {
+	b.opts.Organization = org
+	return b
+}
+
+// WithCountry sets the country.
+func (b *RoleOptionsBuilder) WithCountry(country ...string) *RoleOptionsBuilder {
+	b.opts.Country = country
+	return b
+}
+
+// WithLocality sets the locality.
+func (b *RoleOptionsBuilder) WithLocality(locality ...string) *RoleOptionsBuilder {
+	b.opts.Locality = locality
+	return b
+}
+
+// WithProvince sets the province.
+func (b *RoleOptionsBuilder) WithProvince(province ...string) *RoleOptionsBuilder {
+	b.opts.Province = province
+	return b
+}
+
+// Build returns the built RoleOptions.
+func (b *RoleOptionsBuilder) Build() *RoleOptions {
+	return b.opts
 }
 
 // ============================================================================
@@ -190,9 +247,8 @@ func (rc *RoleClient) ToRole() *Role {
 //
 // roleClient.SetTTL(ctx, "1440h")
 func (rc *RoleClient) SetTTL(ctx context.Context, ttl string) error {
-	opts := rc.Clone()
-	opts.TTL = ttl
-	return rc.Update(ctx, opts)
+	rc.opts.TTL = ttl
+	return rc.Update(ctx, rc.opts)
 }
 
 // SetMaxTTL updates the maximum TTL for this role.
@@ -201,9 +257,8 @@ func (rc *RoleClient) SetTTL(ctx context.Context, ttl string) error {
 //
 // roleClient.SetMaxTTL(ctx, "8760h")
 func (rc *RoleClient) SetMaxTTL(ctx context.Context, maxTTL string) error {
-	opts := rc.Clone()
-	opts.MaxTTL = maxTTL
-	return rc.Update(ctx, opts)
+	rc.opts.MaxTTL = maxTTL
+	return rc.Update(ctx, rc.opts)
 }
 
 // AddAllowedDomain adds a domain to the allowed domains list.
@@ -212,15 +267,14 @@ func (rc *RoleClient) SetMaxTTL(ctx context.Context, maxTTL string) error {
 //
 // roleClient.AddAllowedDomain(ctx, "example.com")
 func (rc *RoleClient) AddAllowedDomain(ctx context.Context, domain string) error {
-	opts := rc.Clone()
 	// Check if domain already exists
-	for _, d := range opts.AllowedDomains {
+	for _, d := range rc.opts.AllowedDomains {
 		if d == domain {
 			return nil // Already exists
 		}
 	}
-	opts.AllowedDomains = append(opts.AllowedDomains, domain)
-	return rc.Update(ctx, opts)
+	rc.opts.AllowedDomains = append(rc.opts.AllowedDomains, domain)
+	return rc.Update(ctx, rc.opts)
 }
 
 // RemoveAllowedDomain removes a domain from the allowed domains list.
@@ -229,15 +283,14 @@ func (rc *RoleClient) AddAllowedDomain(ctx context.Context, domain string) error
 //
 // roleClient.RemoveAllowedDomain(ctx, "old.example.com")
 func (rc *RoleClient) RemoveAllowedDomain(ctx context.Context, domain string) error {
-	opts := rc.Clone()
-	filtered := make([]string, 0, len(opts.AllowedDomains))
-	for _, d := range opts.AllowedDomains {
+	filtered := make([]string, 0, len(rc.opts.AllowedDomains))
+	for _, d := range rc.opts.AllowedDomains {
 		if d != domain {
 			filtered = append(filtered, d)
 		}
 	}
-	opts.AllowedDomains = filtered
-	return rc.Update(ctx, opts)
+	rc.opts.AllowedDomains = filtered
+	return rc.Update(ctx, rc.opts)
 }
 
 // EnableServerAuth enables server authentication for this role.
@@ -246,9 +299,8 @@ func (rc *RoleClient) RemoveAllowedDomain(ctx context.Context, domain string) er
 //
 // roleClient.EnableServerAuth(ctx)
 func (rc *RoleClient) EnableServerAuth(ctx context.Context) error {
-	opts := rc.Clone()
-	opts.ServerFlag = true
-	return rc.Update(ctx, opts)
+	rc.opts.ServerFlag = true
+	return rc.Update(ctx, rc.opts)
 }
 
 // DisableServerAuth disables server authentication for this role.
@@ -257,9 +309,8 @@ func (rc *RoleClient) EnableServerAuth(ctx context.Context) error {
 //
 // roleClient.DisableServerAuth(ctx)
 func (rc *RoleClient) DisableServerAuth(ctx context.Context) error {
-	opts := rc.Clone()
-	opts.ServerFlag = false
-	return rc.Update(ctx, opts)
+	rc.opts.ServerFlag = false
+	return rc.Update(ctx, rc.opts)
 }
 
 // EnableClientAuth enables client authentication for this role.
@@ -268,9 +319,8 @@ func (rc *RoleClient) DisableServerAuth(ctx context.Context) error {
 //
 // roleClient.EnableClientAuth(ctx)
 func (rc *RoleClient) EnableClientAuth(ctx context.Context) error {
-	opts := rc.Clone()
-	opts.ClientFlag = true
-	return rc.Update(ctx, opts)
+	rc.opts.ClientFlag = true
+	return rc.Update(ctx, rc.opts)
 }
 
 // DisableClientAuth disables client authentication for this role.
@@ -279,9 +329,8 @@ func (rc *RoleClient) EnableClientAuth(ctx context.Context) error {
 //
 // roleClient.DisableClientAuth(ctx)
 func (rc *RoleClient) DisableClientAuth(ctx context.Context) error {
-	opts := rc.Clone()
-	opts.ClientFlag = false
-	return rc.Update(ctx, opts)
+	rc.opts.ClientFlag = false
+	return rc.Update(ctx, rc.opts)
 }
 
 // EnableCodeSigning enables code signing for this role.
@@ -290,9 +339,8 @@ func (rc *RoleClient) DisableClientAuth(ctx context.Context) error {
 //
 // roleClient.EnableCodeSigning(ctx)
 func (rc *RoleClient) EnableCodeSigning(ctx context.Context) error {
-	opts := rc.Clone()
-	opts.CodeSigningFlag = true
-	return rc.Update(ctx, opts)
+	rc.opts.CodeSigningFlag = true
+	return rc.Update(ctx, rc.opts)
 }
 
 // ============================================================================
@@ -687,64 +735,55 @@ func buildRoleRequestBody(opts *RoleOptions) map[string]interface{} {
 // Role Templates (Pre-configured roles for common use cases)
 // ============================================================================
 
-// NewWebServerRole creates a pre-configured role for web servers.
+// NewWebServerRole creates a pre-configured builder for web server roles.
 //
 // Example:
 //
-// opts := bao.NewWebServerRole("example.com")
+// opts := bao.NewWebServerRole("example.com").
+//     WithTTL("1440h").
+//     Build()
 // err := client.CreateRole(ctx, "web-server", opts)
-func NewWebServerRole(domain string) *RoleOptions {
-	return &RoleOptions{
-		TTL:              "720h",  // 30 days
-		MaxTTL:           "8760h", // 1 year
-		AllowedDomains:   []string{domain},
-		AllowSubdomains:  true,
-		AllowBareDomains: true,
-		ServerFlag:       true,
-		ClientFlag:       false,
-		KeyType:          "rsa",
-		KeyBits:          2048,
-		KeyUsage:         []string{"DigitalSignature", "KeyAgreement", "KeyEncipherment"},
-	}
+func NewWebServerRole(domain string) *RoleOptionsBuilder {
+	return NewRoleOptionsBuilder().
+		WithTTL("720h").
+		WithMaxTTL("8760h").
+		WithAllowedDomains(domain).
+		EnableSubdomains().
+		WithServerAuth().
+		WithKeyType("rsa", 2048)
 }
 
-// NewClientCertRole creates a pre-configured role for client certificates.
+// NewClientCertRole creates a pre-configured builder for client certificate roles.
 //
 // Example:
 //
-// opts := bao.NewClientCertRole("example.com")
+// opts := bao.NewClientCertRole("example.com").
+//     WithTTL("1440h").
+//     Build()
 // err := client.CreateRole(ctx, "client-cert", opts)
-func NewClientCertRole(domain string) *RoleOptions {
-	return &RoleOptions{
-		TTL:             "720h",  // 30 days
-		MaxTTL:          "8760h", // 1 year
-		AllowedDomains:  []string{domain},
-		AllowSubdomains: true,
-		ServerFlag:      false,
-		ClientFlag:      true,
-		KeyType:         "rsa",
-		KeyBits:         2048,
-		KeyUsage:        []string{"DigitalSignature"},
-	}
+func NewClientCertRole(domain string) *RoleOptionsBuilder {
+	return NewRoleOptionsBuilder().
+		WithTTL("720h").
+		WithMaxTTL("8760h").
+		WithAllowedDomains(domain).
+		EnableSubdomains().
+		WithClientAuth().
+		WithKeyType("rsa", 2048)
 }
 
-// NewCodeSigningRole creates a pre-configured role for code signing certificates.
+// NewCodeSigningRole creates a pre-configured builder for code signing roles.
 //
 // Example:
 //
-// opts := bao.NewCodeSigningRole("example.com")
+// opts := bao.NewCodeSigningRole("example.com").
+//     WithOrganization("Acme Corp").
+//     Build()
 // err := client.CreateRole(ctx, "code-signing", opts)
-func NewCodeSigningRole(domain string) *RoleOptions {
-	return &RoleOptions{
-		TTL:             "8760h",  // 1 year
-		MaxTTL:          "26280h", // 3 years
-		AllowedDomains:  []string{domain},
-		AllowSubdomains: false,
-		ServerFlag:      false,
-		ClientFlag:      false,
-		CodeSigningFlag: true,
-		KeyType:         "rsa",
-		KeyBits:         2048,
-		KeyUsage:        []string{"DigitalSignature"},
-	}
+func NewCodeSigningRole(domain string) *RoleOptionsBuilder {
+	return NewRoleOptionsBuilder().
+		WithTTL("8760h").
+		WithMaxTTL("26280h").
+		WithAllowedDomains(domain).
+		WithCodeSigning().
+		WithKeyType("rsa", 2048)
 }

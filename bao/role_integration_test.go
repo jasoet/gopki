@@ -109,12 +109,11 @@ func TestIntegration_RoleUpdate(t *testing.T) {
 			t.Fatalf("GetRole failed: %v", err)
 		}
 
-		// Update via RoleClient
-		newOpts := roleClient.Clone()
-		newOpts.TTL = "1440h"
-		newOpts.ClientFlag = true
+		// Update via RoleClient (direct modification)
+		roleClient.Options().TTL = "1440h"
+		roleClient.Options().ClientFlag = true
 
-		err = roleClient.Update(ctx, newOpts)
+		err = roleClient.Update(ctx, roleClient.Options())
 		if err != nil {
 			t.Fatalf("RoleClient.Update failed: %v", err)
 		}
@@ -440,7 +439,7 @@ func TestIntegration_RoleListAndDelete(t *testing.T) {
 	})
 }
 
-func TestIntegration_RoleClone(t *testing.T) {
+func TestIntegration_RoleBuilder(t *testing.T) {
 	ctx := context.Background()
 
 	container, client := setupTestContainer(t)
@@ -454,48 +453,36 @@ func TestIntegration_RoleClone(t *testing.T) {
 		t.Fatalf("Failed to enable PKI: %v", err)
 	}
 
-	t.Run("Clone role options", func(t *testing.T) {
-		opts := &RoleOptions{
-			TTL:             "720h",
-			MaxTTL:          "8760h",
-			AllowedDomains:  []string{"example.com", "test.com"},
-			AllowSubdomains: true,
-			ServerFlag:      true,
-			KeyType:         "rsa",
-			KeyBits:         2048,
-		}
+	t.Run("Build role with fluent API", func(t *testing.T) {
+		// Build role using builder pattern
+		opts := NewRoleOptionsBuilder().
+			WithTTL("720h").
+			WithMaxTTL("8760h").
+			WithAllowedDomains("example.com", "test.com").
+			EnableSubdomains().
+			WithServerAuth().
+			WithKeyType("rsa", 2048).
+			Build()
 
-		err := client.CreateRole(ctx, "clone-source", opts)
+		err := client.CreateRole(ctx, "builder-test", opts)
 		if err != nil {
 			t.Fatalf("CreateRole failed: %v", err)
 		}
 
-		roleClient, err := client.GetRole(ctx, "clone-source")
+		roleClient, err := client.GetRole(ctx, "builder-test")
 		if err != nil {
 			t.Fatalf("GetRole failed: %v", err)
 		}
 
-		// Clone and create new role
-		clonedOpts := roleClient.Clone()
-		clonedOpts.TTL = "1440h" // Modify TTL
-
-		err = client.CreateRole(ctx, "clone-target", clonedOpts)
-		if err != nil {
-			t.Fatalf("CreateRole with cloned opts failed: %v", err)
+		// Verify builder worked
+		if roleClient.Name() != "builder-test" {
+			t.Errorf("Expected role name 'builder-test', got '%s'", roleClient.Name())
 		}
-
-		// Verify cloned role
-		clonedRole, err := client.GetRole(ctx, "clone-target")
-		if err != nil {
-			t.Fatalf("GetRole for cloned role failed: %v", err)
+		if len(roleClient.Options().AllowedDomains) != 2 {
+			t.Errorf("Expected 2 allowed domains, got %d", len(roleClient.Options().AllowedDomains))
 		}
-
-		// Verify clone succeeded and key properties preserved
-		if clonedRole.Name() != "clone-target" {
-			t.Errorf("Expected role name 'clone-target', got '%s'", clonedRole.Name())
-		}
-		if len(clonedRole.Options().AllowedDomains) != 2 {
-			t.Errorf("Expected 2 allowed domains, got %d", len(clonedRole.Options().AllowedDomains))
+		if !roleClient.Options().ServerFlag {
+			t.Error("Expected ServerFlag to be true")
 		}
 	})
 }
@@ -515,7 +502,7 @@ func TestIntegration_RoleTemplates(t *testing.T) {
 	}
 
 	t.Run("NewWebServerRole template", func(t *testing.T) {
-		opts := NewWebServerRole("example.com")
+		opts := NewWebServerRole("example.com").Build()
 
 		err := client.CreateRole(ctx, "web-server-template", opts)
 		if err != nil {
@@ -538,7 +525,7 @@ func TestIntegration_RoleTemplates(t *testing.T) {
 	})
 
 	t.Run("NewClientCertRole template", func(t *testing.T) {
-		opts := NewClientCertRole("example.com")
+		opts := NewClientCertRole("example.com").Build()
 
 		err := client.CreateRole(ctx, "client-cert-template", opts)
 		if err != nil {
@@ -558,7 +545,7 @@ func TestIntegration_RoleTemplates(t *testing.T) {
 	})
 
 	t.Run("NewCodeSigningRole template", func(t *testing.T) {
-		opts := NewCodeSigningRole("example.com")
+		opts := NewCodeSigningRole("example.com").Build()
 
 		err := client.CreateRole(ctx, "code-signing-template", opts)
 		if err != nil {

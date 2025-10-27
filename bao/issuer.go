@@ -7,9 +7,13 @@ import (
 	"github.com/jasoet/gopki/cert"
 )
 
-// CAOptions contains parameters for generating a CA certificate.
+// ============================================================================
+// Types & Structs
+// ============================================================================
+
+// CAOptions contains parameters for generating a CA certificate (root or intermediate).
 type CAOptions struct {
-	Type                string   // "internal" (Vault generates key) or "exported" (returns CSR)
+	Type                string   // "internal" (OpenBao generates key) or "exported" (returns private key/CSR)
 	CommonName          string   // Required
 	Organization        []string // Optional
 	Country             []string // Optional
@@ -30,30 +34,7 @@ type CAOptions struct {
 	KeyName             string   // Name for the key
 	ManagedKeyName      string   // Name of managed key to use
 	ManagedKeyID        string   // ID of managed key to use
-}
-
-// IntermediateCAOptions contains parameters for generating an intermediate CA.
-type IntermediateCAOptions struct {
-	Type                string   // "internal" or "exported"
-	CommonName          string   // Required
-	Organization        []string // Optional
-	Country             []string // Optional
-	Locality            []string // Optional
-	Province            []string // Optional
-	StreetAddress       []string // Optional
-	PostalCode          []string // Optional
-	TTL                 string   // Time to live
-	KeyType             string   // "rsa", "ec", "ed25519"
-	KeyBits             int      // Key size
-	MaxPathLength       int      // Max depth of intermediate CAs
-	ExcludeCNFromSANs   bool     // Exclude CN from SANs
-	PermittedDNSDomains []string // Permitted DNS domains
-	URISANs             []string // URI SANs
-	IPSANs              []string // IP SANs
-	AltNames            []string // DNS SANs
-	IssuerName          string   // Name for the issuer
-	KeyName             string   // Name for the key
-	AddBasicConstraints bool     // Add basic constraints
+	AddBasicConstraints bool     // Add basic constraints (for intermediate CAs)
 }
 
 // IssuerConfig contains configuration for updating an issuer.
@@ -87,7 +68,231 @@ type GenerateCAResponse struct {
 	CSR            string            // CSR (only for "exported" intermediate)
 }
 
-// vaultGenerateCAResponse represents Vault's response from generate endpoints.
+// IssuerClient wraps an issuer and provides methods for managing it.
+type IssuerClient struct {
+	client *Client
+	info   *IssuerInfo
+}
+
+// ============================================================================
+// IssuerClient Methods
+// ============================================================================
+
+// ID returns the issuer ID.
+func (ic *IssuerClient) ID() string {
+	return ic.info.IssuerID
+}
+
+// Name returns the issuer name.
+func (ic *IssuerClient) Name() string {
+	return ic.info.IssuerName
+}
+
+// KeyID returns the key ID associated with this issuer.
+func (ic *IssuerClient) KeyID() string {
+	return ic.info.KeyID
+}
+
+// Certificate returns the issuer's certificate.
+func (ic *IssuerClient) Certificate() (*cert.Certificate, error) {
+	if ic.info.Certificate == "" {
+		return nil, fmt.Errorf("bao: no certificate available")
+	}
+	return vaultCertToGoPKI(ic.info.Certificate, "")
+}
+
+// Info returns the complete issuer information.
+func (ic *IssuerClient) Info() *IssuerInfo {
+	return ic.info
+}
+
+// Update updates this issuer's configuration.
+func (ic *IssuerClient) Update(ctx context.Context, config *IssuerConfig) error {
+	return ic.client.UpdateIssuer(ctx, ic.info.IssuerID, config)
+}
+
+// Delete deletes this issuer from OpenBao.
+func (ic *IssuerClient) Delete(ctx context.Context) error {
+	return ic.client.DeleteIssuer(ctx, ic.info.IssuerID)
+}
+
+// SetAsDefault sets this issuer as the default issuer.
+func (ic *IssuerClient) SetAsDefault(ctx context.Context) error {
+	return ic.client.SetDefaultIssuer(ctx, ic.info.IssuerID)
+}
+
+// UpdateName updates the issuer's name.
+func (ic *IssuerClient) UpdateName(ctx context.Context, name string) error {
+	config := &IssuerConfig{
+		IssuerName: name,
+	}
+	err := ic.Update(ctx, config)
+	if err == nil {
+		ic.info.IssuerName = name
+	}
+	return err
+}
+
+// UpdateUsage updates the issuer's usage.
+func (ic *IssuerClient) UpdateUsage(ctx context.Context, usage string) error {
+	config := &IssuerConfig{
+		Usage: usage,
+	}
+	return ic.Update(ctx, config)
+}
+
+// AddIssuingCertificateURL adds an issuing certificate URL.
+func (ic *IssuerClient) AddIssuingCertificateURL(ctx context.Context, url string) error {
+	urls := append(ic.info.IssuingCertificates, url)
+	config := &IssuerConfig{
+		IssuingCertificates: urls,
+	}
+	err := ic.Update(ctx, config)
+	if err == nil {
+		ic.info.IssuingCertificates = urls
+	}
+	return err
+}
+
+// AddCRLDistributionPoint adds a CRL distribution point URL.
+func (ic *IssuerClient) AddCRLDistributionPoint(ctx context.Context, url string) error {
+	urls := append(ic.info.CRLDistributionPoints, url)
+	config := &IssuerConfig{
+		CRLDistributionPoints: urls,
+	}
+	err := ic.Update(ctx, config)
+	if err == nil {
+		ic.info.CRLDistributionPoints = urls
+	}
+	return err
+}
+
+// AddOCSPServer adds an OCSP server URL.
+func (ic *IssuerClient) AddOCSPServer(ctx context.Context, url string) error {
+	urls := append(ic.info.OCSPServers, url)
+	config := &IssuerConfig{
+		OCSPServers: urls,
+	}
+	err := ic.Update(ctx, config)
+	if err == nil {
+		ic.info.OCSPServers = urls
+	}
+	return err
+}
+
+// ============================================================================
+// CAOptionsBuilder - Builder Pattern for CA Configuration
+// ============================================================================
+
+// CAOptionsBuilder provides a fluent API for building CAOptions.
+type CAOptionsBuilder struct {
+	opts *CAOptions
+}
+
+// NewRootCABuilder creates a new builder for root CA options.
+func NewRootCABuilder(commonName string) *CAOptionsBuilder {
+	return &CAOptionsBuilder{
+		opts: &CAOptions{
+			CommonName: commonName,
+			Type:       "internal",
+		},
+	}
+}
+
+// NewIntermediateCABuilder creates a new builder for intermediate CA options.
+func NewIntermediateCABuilder(commonName string) *CAOptionsBuilder {
+	return &CAOptionsBuilder{
+		opts: &CAOptions{
+			CommonName:          commonName,
+			Type:                "internal",
+			AddBasicConstraints: true,
+		},
+	}
+}
+
+// WithOrganization sets the organization.
+func (b *CAOptionsBuilder) WithOrganization(org ...string) *CAOptionsBuilder {
+	b.opts.Organization = org
+	return b
+}
+
+// WithCountry sets the country.
+func (b *CAOptionsBuilder) WithCountry(country ...string) *CAOptionsBuilder {
+	b.opts.Country = country
+	return b
+}
+
+// WithLocality sets the locality.
+func (b *CAOptionsBuilder) WithLocality(locality ...string) *CAOptionsBuilder {
+	b.opts.Locality = locality
+	return b
+}
+
+// WithProvince sets the province.
+func (b *CAOptionsBuilder) WithProvince(province ...string) *CAOptionsBuilder {
+	b.opts.Province = province
+	return b
+}
+
+// WithTTL sets the TTL.
+func (b *CAOptionsBuilder) WithTTL(ttl string) *CAOptionsBuilder {
+	b.opts.TTL = ttl
+	return b
+}
+
+// WithKeyType sets the key type and bits.
+func (b *CAOptionsBuilder) WithKeyType(keyType string, bits int) *CAOptionsBuilder {
+	b.opts.KeyType = keyType
+	b.opts.KeyBits = bits
+	return b
+}
+
+// WithMaxPathLength sets the maximum path length for certificate chains.
+func (b *CAOptionsBuilder) WithMaxPathLength(length int) *CAOptionsBuilder {
+	b.opts.MaxPathLength = length
+	return b
+}
+
+// WithIssuerName sets the issuer name.
+func (b *CAOptionsBuilder) WithIssuerName(name string) *CAOptionsBuilder {
+	b.opts.IssuerName = name
+	return b
+}
+
+// WithKeyName sets the key name.
+func (b *CAOptionsBuilder) WithKeyName(name string) *CAOptionsBuilder {
+	b.opts.KeyName = name
+	return b
+}
+
+// WithPermittedDNSDomains sets permitted DNS domains.
+func (b *CAOptionsBuilder) WithPermittedDNSDomains(domains ...string) *CAOptionsBuilder {
+	b.opts.PermittedDNSDomains = domains
+	return b
+}
+
+// WithAltNames sets alternative names.
+func (b *CAOptionsBuilder) WithAltNames(names ...string) *CAOptionsBuilder {
+	b.opts.AltNames = names
+	return b
+}
+
+// AsExported sets the type to "exported" (returns private key).
+func (b *CAOptionsBuilder) AsExported() *CAOptionsBuilder {
+	b.opts.Type = "exported"
+	return b
+}
+
+// Build returns the built CAOptions.
+func (b *CAOptionsBuilder) Build() *CAOptions {
+	return b.opts
+}
+
+// ============================================================================
+// Internal Types for API Responses
+// ============================================================================
+
+// vaultGenerateCAResponse represents OpenBao's response from generate endpoints.
 type vaultGenerateCAResponse struct {
 	Data struct {
 		Certificate    string   `json:"certificate"`
@@ -102,7 +307,7 @@ type vaultGenerateCAResponse struct {
 	} `json:"data"`
 }
 
-// vaultIssuerResponse represents Vault's response from issuer endpoints.
+// vaultIssuerResponse represents OpenBao's response from issuer endpoints.
 type vaultIssuerResponse struct {
 	Data struct {
 		IssuerID                     string   `json:"issuer_id"`
@@ -144,16 +349,16 @@ type vaultListResponse struct {
 //	})
 func (c *Client) GenerateRootCA(ctx context.Context, opts *CAOptions) (*GenerateCAResponse, error) {
 	if opts == nil {
-		return nil, fmt.Errorf("vault: CA options are required")
+		return nil, fmt.Errorf("bao: CA options are required")
 	}
 	if opts.CommonName == "" {
-		return nil, fmt.Errorf("vault: common name is required")
+		return nil, fmt.Errorf("bao: common name is required")
 	}
 	if opts.Type == "" {
 		opts.Type = "internal" // Default to internal
 	}
 	if opts.Type != "internal" && opts.Type != "exported" {
-		return nil, fmt.Errorf("vault: type must be 'internal' or 'exported', got '%s'", opts.Type)
+		return nil, fmt.Errorf("bao: type must be 'internal' or 'exported', got '%s'", opts.Type)
 	}
 
 	// Build request body
@@ -163,10 +368,10 @@ func (c *Client) GenerateRootCA(ctx context.Context, opts *CAOptions) (*Generate
 	path := fmt.Sprintf("%s/root/generate/%s", c.config.Mount, opts.Type)
 	secret, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("vault: generate root CA: %w", err)
+		return nil, fmt.Errorf("bao: generate root CA: %w", err)
 	}
 	if secret == nil || secret.Data == nil {
-		return nil, fmt.Errorf("vault: generate root CA: empty response")
+		return nil, fmt.Errorf("bao: generate root CA: empty response")
 	}
 
 	// Extract response data
@@ -191,7 +396,7 @@ func (c *Client) GenerateRootCA(ctx context.Context, opts *CAOptions) (*Generate
 	// Convert certificate
 	certificate, err := vaultCertToGoPKI(certificatePEM, issuingCAPEM)
 	if err != nil {
-		return nil, fmt.Errorf("vault: generate root CA: %w", err)
+		return nil, fmt.Errorf("bao: generate root CA: %w", err)
 	}
 
 	return &GenerateCAResponse{
@@ -214,39 +419,40 @@ func (c *Client) GenerateRootCA(ctx context.Context, opts *CAOptions) (*Generate
 //
 // Example:
 //
-//	intermediate, err := client.GenerateIntermediateCA(ctx, &vault.IntermediateCAOptions{
-//	    Type:         "internal",
-//	    CommonName:   "Example Intermediate CA",
-//	    Organization: []string{"Example Org"},
-//	    TTL:          "43800h", // 5 years
-//	    KeyType:      "rsa",
-//	    KeyBits:      2048,
+//	intermediate, err := client.GenerateIntermediateCA(ctx, &bao.CAOptions{
+//	    Type:                "internal",
+//	    CommonName:          "Example Intermediate CA",
+//	    Organization:        []string{"Example Org"},
+//	    TTL:                 "43800h", // 5 years
+//	    KeyType:             "rsa",
+//	    KeyBits:             2048,
+//	    AddBasicConstraints: true,
 //	})
-func (c *Client) GenerateIntermediateCA(ctx context.Context, opts *IntermediateCAOptions) (*GenerateCAResponse, error) {
+func (c *Client) GenerateIntermediateCA(ctx context.Context, opts *CAOptions) (*GenerateCAResponse, error) {
 	if opts == nil {
-		return nil, fmt.Errorf("vault: intermediate CA options are required")
+		return nil, fmt.Errorf("bao: intermediate CA options are required")
 	}
 	if opts.CommonName == "" {
-		return nil, fmt.Errorf("vault: common name is required")
+		return nil, fmt.Errorf("bao: common name is required")
 	}
 	if opts.Type == "" {
 		opts.Type = "internal" // Default to internal
 	}
 	if opts.Type != "internal" && opts.Type != "exported" {
-		return nil, fmt.Errorf("vault: type must be 'internal' or 'exported', got '%s'", opts.Type)
+		return nil, fmt.Errorf("bao: type must be 'internal' or 'exported', got '%s'", opts.Type)
 	}
 
 	// Build request body
-	reqBody := buildIntermediateCARequestBody(opts)
+	reqBody := buildCARequestBody(opts)
 
 	// Use SDK to generate intermediate CA
 	path := fmt.Sprintf("%s/intermediate/generate/%s", c.config.Mount, opts.Type)
 	secret, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("vault: generate intermediate CA: %w", err)
+		return nil, fmt.Errorf("bao: generate intermediate CA: %w", err)
 	}
 	if secret == nil || secret.Data == nil {
-		return nil, fmt.Errorf("vault: generate intermediate CA: empty response")
+		return nil, fmt.Errorf("bao: generate intermediate CA: empty response")
 	}
 
 	// Extract response data
@@ -289,7 +495,7 @@ func (c *Client) GenerateIntermediateCA(ctx context.Context, opts *IntermediateC
 	if certificatePEM != "" {
 		certificate, err := vaultCertToGoPKI(certificatePEM, issuingCAPEM)
 		if err != nil {
-			return nil, fmt.Errorf("vault: generate intermediate CA: %w", err)
+			return nil, fmt.Errorf("bao: generate intermediate CA: %w", err)
 		}
 		response.Certificate = certificate
 	}
@@ -307,7 +513,7 @@ func (c *Client) GenerateIntermediateCA(ctx context.Context, opts *IntermediateC
 //	})
 func (c *Client) SignIntermediateCSR(ctx context.Context, csr *cert.CertificateSigningRequest, opts *CAOptions) (*cert.Certificate, error) {
 	if csr == nil {
-		return nil, fmt.Errorf("vault: CSR is required")
+		return nil, fmt.Errorf("bao: CSR is required")
 	}
 	if opts == nil {
 		opts = &CAOptions{}
@@ -345,23 +551,23 @@ func (c *Client) SignIntermediateCSR(ctx context.Context, csr *cert.CertificateS
 	path := fmt.Sprintf("%s/root/sign-intermediate", c.config.Mount)
 	secret, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("vault: sign intermediate CSR: %w", err)
+		return nil, fmt.Errorf("bao: sign intermediate CSR: %w", err)
 	}
 	if secret == nil || secret.Data == nil {
-		return nil, fmt.Errorf("vault: sign intermediate CSR: empty response")
+		return nil, fmt.Errorf("bao: sign intermediate CSR: empty response")
 	}
 
 	// Extract certificate data
 	certificatePEM, ok := secret.Data["certificate"].(string)
 	if !ok {
-		return nil, fmt.Errorf("vault: sign intermediate CSR: invalid certificate data")
+		return nil, fmt.Errorf("bao: sign intermediate CSR: invalid certificate data")
 	}
 	issuingCAPEM, _ := secret.Data["issuing_ca"].(string)
 
 	// Convert certificate
 	certificate, err := vaultCertToGoPKI(certificatePEM, issuingCAPEM)
 	if err != nil {
-		return nil, fmt.Errorf("vault: sign intermediate CSR: %w", err)
+		return nil, fmt.Errorf("bao: sign intermediate CSR: %w", err)
 	}
 
 	return certificate, nil
@@ -375,9 +581,9 @@ func (c *Client) SignIntermediateCSR(ctx context.Context, csr *cert.CertificateS
 //	issuerInfo, err := client.ImportCA(ctx, &vault.CABundle{
 //	    PEMBundle: certificatePEM + privateKeyPEM,
 //	})
-func (c *Client) ImportCA(ctx context.Context, bundle *CABundle) (*IssuerInfo, error) {
+func (c *Client) ImportCA(ctx context.Context, bundle *CABundle) (*IssuerClient, error) {
 	if bundle == nil || bundle.PEMBundle == "" {
-		return nil, fmt.Errorf("vault: CA bundle is required")
+		return nil, fmt.Errorf("bao: CA bundle is required")
 	}
 
 	// Build request body
@@ -389,10 +595,10 @@ func (c *Client) ImportCA(ctx context.Context, bundle *CABundle) (*IssuerInfo, e
 	path := fmt.Sprintf("%s/config/ca", c.config.Mount)
 	secret, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("vault: import CA: %w", err)
+		return nil, fmt.Errorf("bao: import CA: %w", err)
 	}
 	if secret == nil || secret.Data == nil {
-		return nil, fmt.Errorf("vault: import CA: empty response")
+		return nil, fmt.Errorf("bao: import CA: empty response")
 	}
 
 	// Extract imported issuers
@@ -407,38 +613,39 @@ func (c *Client) ImportCA(ctx context.Context, bundle *CABundle) (*IssuerInfo, e
 
 	// Get the first imported issuer
 	if len(importedIssuers) == 0 {
-		return nil, fmt.Errorf("vault: no issuers imported")
+		return nil, fmt.Errorf("bao: no issuers imported")
 	}
 
 	issuerID := importedIssuers[0]
 
 	// Retrieve issuer details
-	issuerInfo, err := c.GetIssuer(ctx, issuerID)
+	issuerClient, err := c.GetIssuer(ctx, issuerID)
 	if err != nil {
-		return nil, fmt.Errorf("vault: import CA: %w", err)
+		return nil, fmt.Errorf("bao: import CA: %w", err)
 	}
 
-	return issuerInfo, nil
+	return issuerClient, nil
 }
 
-// GetIssuer retrieves issuer information by ID or name.
+// GetIssuer retrieves issuer information by ID or name and returns an IssuerClient.
 //
 // Example:
 //
-//	issuer, err := client.GetIssuer(ctx, "issuer-id-or-name")
-func (c *Client) GetIssuer(ctx context.Context, issuerRef string) (*IssuerInfo, error) {
+//	issuerClient, err := client.GetIssuer(ctx, "issuer-id-or-name")
+//	cert := issuerClient.Certificate()
+func (c *Client) GetIssuer(ctx context.Context, issuerRef string) (*IssuerClient, error) {
 	if issuerRef == "" {
-		return nil, fmt.Errorf("vault: issuer reference is required")
+		return nil, fmt.Errorf("bao: issuer reference is required")
 	}
 
 	// Use SDK to get issuer
 	path := fmt.Sprintf("%s/issuer/%s", c.config.Mount, issuerRef)
 	secret, err := c.client.Logical().ReadWithContext(ctx, path)
 	if err != nil {
-		return nil, fmt.Errorf("vault: get issuer: %w", err)
+		return nil, fmt.Errorf("bao: get issuer: %w", err)
 	}
 	if secret == nil || secret.Data == nil {
-		return nil, fmt.Errorf("vault: get issuer: not found")
+		return nil, fmt.Errorf("bao: get issuer: not found")
 	}
 
 	// Extract issuer data with type assertions
@@ -490,7 +697,7 @@ func (c *Client) GetIssuer(ctx context.Context, issuerRef string) (*IssuerInfo, 
 		}
 	}
 
-	return &IssuerInfo{
+	issuerInfo := &IssuerInfo{
 		IssuerID:                     issuerID,
 		IssuerName:                   issuerName,
 		KeyID:                        keyID,
@@ -504,6 +711,11 @@ func (c *Client) GetIssuer(ctx context.Context, issuerRef string) (*IssuerInfo, 
 		CRLDistributionPoints:        crlDistributionPoints,
 		OCSPServers:                  ocspServers,
 		EnableAIAURLTemplating:       enableAIAURLTemplating,
+	}
+
+	return &IssuerClient{
+		client: c,
+		info:   issuerInfo,
 	}, nil
 }
 
@@ -520,7 +732,7 @@ func (c *Client) ListIssuers(ctx context.Context) ([]string, error) {
 	path := fmt.Sprintf("%s/issuers", c.config.Mount)
 	secret, err := c.client.Logical().ListWithContext(ctx, path)
 	if err != nil {
-		return nil, fmt.Errorf("vault: list issuers: %w", err)
+		return nil, fmt.Errorf("bao: list issuers: %w", err)
 	}
 	if secret == nil || secret.Data == nil {
 		return []string{}, nil
@@ -554,10 +766,10 @@ func (c *Client) ListIssuers(ctx context.Context) ([]string, error) {
 //	})
 func (c *Client) UpdateIssuer(ctx context.Context, issuerRef string, config *IssuerConfig) error {
 	if issuerRef == "" {
-		return fmt.Errorf("vault: issuer reference is required")
+		return fmt.Errorf("bao: issuer reference is required")
 	}
 	if config == nil {
-		return fmt.Errorf("vault: issuer config is required")
+		return fmt.Errorf("bao: issuer config is required")
 	}
 
 	// Build request body
@@ -594,7 +806,7 @@ func (c *Client) UpdateIssuer(ctx context.Context, issuerRef string, config *Iss
 	path := fmt.Sprintf("%s/issuer/%s", c.config.Mount, issuerRef)
 	_, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
 	if err != nil {
-		return fmt.Errorf("vault: update issuer: %w", err)
+		return fmt.Errorf("bao: update issuer: %w", err)
 	}
 
 	return nil
@@ -608,14 +820,14 @@ func (c *Client) UpdateIssuer(ctx context.Context, issuerRef string, config *Iss
 //	err := client.DeleteIssuer(ctx, "issuer-id")
 func (c *Client) DeleteIssuer(ctx context.Context, issuerRef string) error {
 	if issuerRef == "" {
-		return fmt.Errorf("vault: issuer reference is required")
+		return fmt.Errorf("bao: issuer reference is required")
 	}
 
 	// Use SDK to delete issuer
 	path := fmt.Sprintf("%s/issuer/%s", c.config.Mount, issuerRef)
 	_, err := c.client.Logical().DeleteWithContext(ctx, path)
 	if err != nil {
-		return fmt.Errorf("vault: delete issuer: %w", err)
+		return fmt.Errorf("bao: delete issuer: %w", err)
 	}
 
 	return nil
@@ -628,7 +840,7 @@ func (c *Client) DeleteIssuer(ctx context.Context, issuerRef string) error {
 //	err := client.SetDefaultIssuer(ctx, "issuer-id")
 func (c *Client) SetDefaultIssuer(ctx context.Context, issuerRef string) error {
 	if issuerRef == "" {
-		return fmt.Errorf("vault: issuer reference is required")
+		return fmt.Errorf("bao: issuer reference is required")
 	}
 
 	// Build request body
@@ -640,7 +852,7 @@ func (c *Client) SetDefaultIssuer(ctx context.Context, issuerRef string) error {
 	path := fmt.Sprintf("%s/config/issuers", c.config.Mount)
 	_, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
 	if err != nil {
-		return fmt.Errorf("vault: set default issuer: %w", err)
+		return fmt.Errorf("bao: set default issuer: %w", err)
 	}
 
 	return nil
@@ -656,10 +868,10 @@ func (c *Client) GetDefaultIssuer(ctx context.Context) (string, error) {
 	path := fmt.Sprintf("%s/config/issuers", c.config.Mount)
 	secret, err := c.client.Logical().ReadWithContext(ctx, path)
 	if err != nil {
-		return "", fmt.Errorf("vault: get default issuer: %w", err)
+		return "", fmt.Errorf("bao: get default issuer: %w", err)
 	}
 	if secret == nil || secret.Data == nil {
-		return "", fmt.Errorf("vault: get default issuer: not configured")
+		return "", fmt.Errorf("bao: get default issuer: not configured")
 	}
 
 	// Extract default issuer
@@ -731,67 +943,6 @@ func buildCARequestBody(opts *CAOptions) map[string]interface{} {
 	}
 	if opts.ManagedKeyID != "" {
 		reqBody["managed_key_id"] = opts.ManagedKeyID
-	}
-
-	return reqBody
-}
-
-func buildIntermediateCARequestBody(opts *IntermediateCAOptions) map[string]interface{} {
-	reqBody := map[string]interface{}{
-		"common_name": opts.CommonName,
-	}
-
-	// Add optional fields
-	if len(opts.Organization) > 0 {
-		reqBody["organization"] = opts.Organization
-	}
-	if len(opts.Country) > 0 {
-		reqBody["country"] = opts.Country
-	}
-	if len(opts.Locality) > 0 {
-		reqBody["locality"] = opts.Locality
-	}
-	if len(opts.Province) > 0 {
-		reqBody["province"] = opts.Province
-	}
-	if len(opts.StreetAddress) > 0 {
-		reqBody["street_address"] = opts.StreetAddress
-	}
-	if len(opts.PostalCode) > 0 {
-		reqBody["postal_code"] = opts.PostalCode
-	}
-	if opts.TTL != "" {
-		reqBody["ttl"] = opts.TTL
-	}
-	if opts.KeyType != "" {
-		reqBody["key_type"] = opts.KeyType
-	}
-	if opts.KeyBits > 0 {
-		reqBody["key_bits"] = opts.KeyBits
-	}
-	if opts.MaxPathLength >= 0 {
-		reqBody["max_path_length"] = opts.MaxPathLength
-	}
-	if opts.ExcludeCNFromSANs {
-		reqBody["exclude_cn_from_sans"] = true
-	}
-	if len(opts.PermittedDNSDomains) > 0 {
-		reqBody["permitted_dns_domains"] = opts.PermittedDNSDomains
-	}
-	if len(opts.URISANs) > 0 {
-		reqBody["uri_sans"] = joinStrings(opts.URISANs)
-	}
-	if len(opts.IPSANs) > 0 {
-		reqBody["ip_sans"] = joinStrings(opts.IPSANs)
-	}
-	if len(opts.AltNames) > 0 {
-		reqBody["alt_names"] = joinStrings(opts.AltNames)
-	}
-	if opts.IssuerName != "" {
-		reqBody["issuer_name"] = opts.IssuerName
-	}
-	if opts.KeyName != "" {
-		reqBody["key_name"] = opts.KeyName
 	}
 	if opts.AddBasicConstraints {
 		reqBody["add_basic_constraints"] = true
