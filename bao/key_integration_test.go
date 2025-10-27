@@ -4,10 +4,12 @@ package bao
 
 import (
 	"context"
+	"crypto/x509/pkix"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/keypair/algo"
 )
 
@@ -462,4 +464,305 @@ func TestIntegration_TypeSafeFullWorkflow(t *testing.T) {
 			t.Error("Expected error when getting deleted key, got nil")
 		}
 	})
+}
+
+// ============================================================================
+// Integration Tests for KeyClient Certificate Convenience Methods (Phase 2C)
+// ============================================================================
+
+func TestIntegration_KeyClient_IssueCertificate(t *testing.T) {
+	ctx := context.Background()
+
+	container, client := setupTestContainer(t)
+	defer cleanupTestContainer(t, container)
+
+	// Wait for healthy
+	if err := container.WaitForHealthy(ctx, 30*time.Second); err != nil {
+		t.Fatalf("Container not healthy: %v", err)
+	}
+
+	// Enable PKI
+	if err := container.EnablePKI(ctx, "pki", ""); err != nil {
+		t.Fatalf("Failed to enable PKI: %v", err)
+	}
+
+	// Setup root CA and role
+	setupRootCAAndRoleForKeyTests(t, ctx, client)
+
+	t.Run("RSA KeyClient.IssueCertificate", func(t *testing.T) {
+		// Create RSA key
+		keyClient, err := client.CreateRSAKey(ctx, &GenerateKeyOptions{
+			KeyName: "cert-rsa-key",
+			KeyBits: 2048,
+		})
+		if err != nil {
+			t.Fatalf("Failed to create RSA key: %v", err)
+		}
+
+		// Issue certificate directly from KeyClient
+		certClient, err := keyClient.IssueCertificate(ctx, "test-role", &GenerateCertificateOptions{
+			CommonName: "keyclient-rsa.example.com",
+			AltNames:   []string{"www.keyclient-rsa.example.com"},
+			TTL:        "1h",
+		})
+		if err != nil {
+			t.Fatalf("KeyClient.IssueCertificate failed: %v", err)
+		}
+
+		// Verify certificate
+		cert := certClient.Certificate()
+		if cert == nil {
+			t.Fatal("Expected certificate, got nil")
+		}
+		if cert.Certificate.Subject.CommonName != "keyclient-rsa.example.com" {
+			t.Errorf("Expected CN 'keyclient-rsa.example.com', got '%s'", cert.Certificate.Subject.CommonName)
+		}
+
+		// Verify key pair NOT available (key stays in OpenBao)
+		if certClient.HasKeyPair() {
+			t.Error("Expected key pair to NOT be available (key in OpenBao)")
+		}
+	})
+
+	t.Run("ECDSA KeyClient.IssueCertificate", func(t *testing.T) {
+		keyClient, err := client.CreateECDSAKey(ctx, &GenerateKeyOptions{
+			KeyName: "cert-ec-key",
+			KeyBits: 256,
+		})
+		if err != nil {
+			t.Fatalf("Failed to create ECDSA key: %v", err)
+		}
+
+		certClient, err := keyClient.IssueCertificate(ctx, "test-role", &GenerateCertificateOptions{
+			CommonName: "keyclient-ecdsa.example.com",
+			TTL:        "1h",
+		})
+		if err != nil {
+			t.Fatalf("KeyClient.IssueCertificate failed: %v", err)
+		}
+
+		cert := certClient.Certificate()
+		if cert == nil {
+			t.Fatal("Expected certificate, got nil")
+		}
+
+		if certClient.HasKeyPair() {
+			t.Error("Expected key pair to NOT be available")
+		}
+	})
+
+	t.Run("Ed25519 KeyClient.IssueCertificate", func(t *testing.T) {
+		keyClient, err := client.CreateEd25519Key(ctx, &GenerateKeyOptions{
+			KeyName: "cert-ed25519-key",
+		})
+		if err != nil {
+			t.Fatalf("Failed to create Ed25519 key: %v", err)
+		}
+
+		certClient, err := keyClient.IssueCertificate(ctx, "test-role", &GenerateCertificateOptions{
+			CommonName: "keyclient-ed25519.example.com",
+			TTL:        "1h",
+		})
+		if err != nil {
+			t.Fatalf("KeyClient.IssueCertificate failed: %v", err)
+		}
+
+		cert := certClient.Certificate()
+		if cert == nil {
+			t.Fatal("Expected certificate, got nil")
+		}
+
+		if certClient.HasKeyPair() {
+			t.Error("Expected key pair to NOT be available")
+		}
+	})
+}
+
+func TestIntegration_KeyClient_SignCSR(t *testing.T) {
+	ctx := context.Background()
+
+	container, client := setupTestContainer(t)
+	defer cleanupTestContainer(t, container)
+
+	// Wait for healthy
+	if err := container.WaitForHealthy(ctx, 30*time.Second); err != nil {
+		t.Fatalf("Container not healthy: %v", err)
+	}
+
+	// Enable PKI
+	if err := container.EnablePKI(ctx, "pki", ""); err != nil {
+		t.Fatalf("Failed to enable PKI: %v", err)
+	}
+
+	// Setup root CA and role
+	setupRootCAAndRoleForKeyTests(t, ctx, client)
+
+	t.Run("RSA KeyClient.SignCSR", func(t *testing.T) {
+		// Create signing key in OpenBao
+		keyClient, err := client.CreateRSAKey(ctx, &GenerateKeyOptions{
+			KeyName: "signing-rsa-key",
+			KeyBits: 2048,
+		})
+		if err != nil {
+			t.Fatalf("Failed to create RSA key: %v", err)
+		}
+
+		// Create local key pair and CSR
+		localKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+		if err != nil {
+			t.Fatalf("Failed to generate local key: %v", err)
+		}
+
+		csr, err := cert.CreateCSR(localKeyPair, cert.CSRRequest{
+			Subject: pkix.Name{
+				CommonName: "keyclient-signcsr-rsa.example.com",
+			},
+			DNSNames: []string{"keyclient-signcsr-rsa.example.com", "www.keyclient-signcsr-rsa.example.com"},
+		})
+		if err != nil {
+			t.Fatalf("Failed to create CSR: %v", err)
+		}
+
+		// Sign CSR using KeyClient convenience method
+		certificate, err := keyClient.SignCSR(ctx, "test-role", csr, &SignCertificateOptions{
+			TTL: "1h",
+		})
+		if err != nil {
+			t.Fatalf("KeyClient.SignCSR failed: %v", err)
+		}
+
+		if certificate == nil {
+			t.Fatal("Expected certificate, got nil")
+		}
+		if certificate.Certificate.Subject.CommonName != "keyclient-signcsr-rsa.example.com" {
+			t.Errorf("Expected CN 'keyclient-signcsr-rsa.example.com', got '%s'", certificate.Certificate.Subject.CommonName)
+		}
+	})
+
+	t.Run("ECDSA KeyClient.SignCSR", func(t *testing.T) {
+		keyClient, err := client.CreateECDSAKey(ctx, &GenerateKeyOptions{
+			KeyName: "signing-ec-key",
+			KeyBits: 256,
+		})
+		if err != nil {
+			t.Fatalf("Failed to create ECDSA key: %v", err)
+		}
+
+		localKeyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
+		if err != nil {
+			t.Fatalf("Failed to generate local key: %v", err)
+		}
+
+		csr, err := cert.CreateCSR(localKeyPair, cert.CSRRequest{
+			Subject: pkix.Name{
+				CommonName: "keyclient-signcsr-ecdsa.example.com",
+			},
+		})
+		if err != nil {
+			t.Fatalf("Failed to create CSR: %v", err)
+		}
+
+		certificate, err := keyClient.SignCSR(ctx, "test-role", csr, &SignCertificateOptions{
+			TTL: "1h",
+		})
+		if err != nil {
+			t.Fatalf("KeyClient.SignCSR failed: %v", err)
+		}
+
+		if certificate == nil {
+			t.Fatal("Expected certificate, got nil")
+		}
+	})
+}
+
+func TestIntegration_KeyClient_SignVerbatim(t *testing.T) {
+	ctx := context.Background()
+
+	container, client := setupTestContainer(t)
+	defer cleanupTestContainer(t, container)
+
+	// Wait for healthy
+	if err := container.WaitForHealthy(ctx, 30*time.Second); err != nil {
+		t.Fatalf("Container not healthy: %v", err)
+	}
+
+	// Enable PKI
+	if err := container.EnablePKI(ctx, "pki", ""); err != nil {
+		t.Fatalf("Failed to enable PKI: %v", err)
+	}
+
+	// Setup root CA and role
+	setupRootCAAndRoleForKeyTests(t, ctx, client)
+
+	t.Run("RSA KeyClient.SignVerbatim", func(t *testing.T) {
+		// Create signing key in OpenBao
+		keyClient, err := client.CreateRSAKey(ctx, &GenerateKeyOptions{
+			KeyName: "verbatim-rsa-key",
+			KeyBits: 2048,
+		})
+		if err != nil {
+			t.Fatalf("Failed to create RSA key: %v", err)
+		}
+
+		// Create local key pair and CSR
+		localKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+		if err != nil {
+			t.Fatalf("Failed to generate local key: %v", err)
+		}
+
+		csr, err := cert.CreateCSR(localKeyPair, cert.CSRRequest{
+			Subject: pkix.Name{
+				CommonName: "keyclient-verbatim.example.com",
+			},
+		})
+		if err != nil {
+			t.Fatalf("Failed to create CSR: %v", err)
+		}
+
+		// Sign CSR verbatim using KeyClient convenience method
+		certificate, err := keyClient.SignVerbatim(ctx, csr, &SignVerbatimOptions{
+			TTL: "1h",
+		})
+		if err != nil {
+			t.Fatalf("KeyClient.SignVerbatim failed: %v", err)
+		}
+
+		if certificate == nil {
+			t.Fatal("Expected certificate, got nil")
+		}
+		if certificate.Certificate.Subject.CommonName != "keyclient-verbatim.example.com" {
+			t.Errorf("Expected CN 'keyclient-verbatim.example.com', got '%s'", certificate.Certificate.Subject.CommonName)
+		}
+	})
+}
+
+// setupRootCAAndRoleForKeyTests sets up a root CA and test role for key integration tests
+func setupRootCAAndRoleForKeyTests(t *testing.T, ctx context.Context, client *Client) {
+	t.Helper()
+
+	// Generate root CA
+	rootData := map[string]interface{}{
+		"common_name": "Test Root CA",
+		"ttl":         "87600h", // 10 years
+	}
+
+	_, err := client.client.Logical().WriteWithContext(ctx, "pki/root/generate/internal", rootData)
+	if err != nil {
+		t.Fatalf("Failed to generate root CA: %v", err)
+	}
+
+	// Create test role
+	roleData := map[string]interface{}{
+		"allowed_domains":    []string{"example.com"},
+		"allow_subdomains":   true,
+		"allow_bare_domains": true,
+		"allow_localhost":    true,
+		"max_ttl":            "720h",
+		"key_type":           "any",
+	}
+
+	_, err = client.client.Logical().WriteWithContext(ctx, "pki/roles/test-role", roleData)
+	if err != nil {
+		t.Fatalf("Failed to create role: %v", err)
+	}
 }
