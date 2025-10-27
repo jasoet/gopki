@@ -202,6 +202,9 @@ func (c *Client) ListCertificates(ctx context.Context) ([]string, error) {
 }
 
 // GetCertificate retrieves a certificate from OpenBao by serial number.
+// Returns only the certificate without type-safe wrapper.
+//
+// For type-safe operations, use GetRSACertificate(), GetECDSACertificate(), or GetEd25519Certificate().
 //
 // Example:
 //
@@ -231,6 +234,91 @@ func (c *Client) GetCertificate(ctx context.Context, serial string) (*cert.Certi
 	}
 
 	return certificate, nil
+}
+
+// GetRSACertificate retrieves an RSA certificate from OpenBao and returns a type-safe CertificateClient.
+// The returned CertificateClient does not have a cached key pair (HasKeyPair() will be false).
+//
+// Note: This validates the certificate is RSA type at retrieval time.
+//
+// Example:
+//
+//	certClient, err := client.GetRSACertificate(ctx, "39:dd:2e:90:b7:23:1f:8d")
+//	cert := certClient.Certificate()
+//	err := certClient.Revoke(ctx)  // ✓ Works
+//	err := certClient.RevokeWithKey(ctx)  // ✗ Fails - no key pair cached
+func (c *Client) GetRSACertificate(ctx context.Context, serial string) (*CertificateClient[*algo.RSAKeyPair], error) {
+	return getCertificateTyped[*algo.RSAKeyPair](ctx, c, serial, "RSA")
+}
+
+// GetECDSACertificate retrieves an ECDSA certificate from OpenBao and returns a type-safe CertificateClient.
+// The returned CertificateClient does not have a cached key pair (HasKeyPair() will be false).
+//
+// Note: This validates the certificate is ECDSA type at retrieval time.
+//
+// Example:
+//
+//	certClient, err := client.GetECDSACertificate(ctx, "39:dd:2e:90:b7:23:1f:8d")
+//	cert := certClient.Certificate()
+//	err := certClient.Revoke(ctx)  // ✓ Works
+func (c *Client) GetECDSACertificate(ctx context.Context, serial string) (*CertificateClient[*algo.ECDSAKeyPair], error) {
+	return getCertificateTyped[*algo.ECDSAKeyPair](ctx, c, serial, "ECDSA")
+}
+
+// GetEd25519Certificate retrieves an Ed25519 certificate from OpenBao and returns a type-safe CertificateClient.
+// The returned CertificateClient does not have a cached key pair (HasKeyPair() will be false).
+//
+// Note: This validates the certificate is Ed25519 type at retrieval time.
+//
+// Example:
+//
+//	certClient, err := client.GetEd25519Certificate(ctx, "39:dd:2e:90:b7:23:1f:8d")
+//	cert := certClient.Certificate()
+//	err := certClient.Revoke(ctx)  // ✓ Works
+func (c *Client) GetEd25519Certificate(ctx context.Context, serial string) (*CertificateClient[*algo.Ed25519KeyPair], error) {
+	return getCertificateTyped[*algo.Ed25519KeyPair](ctx, c, serial, "Ed25519")
+}
+
+// getCertificateTyped is the internal implementation for type-safe certificate retrieval.
+func getCertificateTyped[K keypair.KeyPair](ctx context.Context, client *Client, serial string, expectedAlgo string) (*CertificateClient[K], error) {
+	if serial == "" {
+		return nil, fmt.Errorf("bao: serial number is required")
+	}
+
+	path := fmt.Sprintf("%s/cert/%s", client.config.Mount, serial)
+	secret, err := client.client.Logical().ReadWithContext(ctx, path)
+	if err != nil {
+		return nil, fmt.Errorf("bao: get certificate: %w", err)
+	}
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("bao: get certificate: not found")
+	}
+
+	certificatePEM, ok := secret.Data["certificate"].(string)
+	if !ok {
+		return nil, fmt.Errorf("bao: get certificate: invalid certificate data")
+	}
+
+	certificate, err := vaultCertToGoPKI(certificatePEM, "")
+	if err != nil {
+		return nil, fmt.Errorf("bao: get certificate: %w", err)
+	}
+
+	// Validate certificate algorithm matches expected type
+	actualAlgo := certificate.Certificate.PublicKeyAlgorithm.String()
+	if actualAlgo != expectedAlgo {
+		return nil, fmt.Errorf("bao: certificate type mismatch: expected %s, got %s", expectedAlgo, actualAlgo)
+	}
+
+	// Extract certificate info from response
+	certInfo := extractCertificateInfo(secret.Data)
+
+	return &CertificateClient[K]{
+		client:      client,
+		certificate: certificate,
+		certInfo:    certInfo,
+		// keyPair is nil - not available from retrieval
+	}, nil
 }
 
 // RevokeCertificate revokes a certificate by serial number.
