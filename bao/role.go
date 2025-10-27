@@ -6,6 +6,10 @@ import (
 	"fmt"
 )
 
+// ============================================================================
+// Types & Structs
+// ============================================================================
+
 // RoleOptions contains parameters for creating or updating a role.
 type RoleOptions struct {
 	IssuerRef                     string   `json:"issuer_ref,omitempty"`                         // Issuer to use for this role
@@ -55,310 +59,317 @@ type RoleOptions struct {
 	AllowedUserIDs                []string `json:"allowed_user_ids,omitempty"`                   // Allowed user IDs
 }
 
-// Role represents a Vault PKI role configuration.
+// Role represents a OpenBao PKI role configuration.
+// Deprecated: Use RoleClient instead for method chaining and convenience methods.
 type Role struct {
 	Name string
 	*RoleOptions
 }
 
-// vaultRoleResponse represents Vault's response from role endpoints.
-type vaultRoleResponse struct {
-	Data RoleOptions `json:"data"`
+// RoleClient wraps a role and provides methods for managing it.
+type RoleClient struct {
+	client *Client
+	name   string
+	opts   *RoleOptions
 }
 
-// CreateRole creates or updates a role in Vault.
+// ============================================================================
+// RoleClient Methods
+// ============================================================================
+
+// Name returns the role name.
+func (rc *RoleClient) Name() string {
+	return rc.name
+}
+
+// Options returns the role options.
+func (rc *RoleClient) Options() *RoleOptions {
+	return rc.opts
+}
+
+// Update updates this role with new options.
+//
+// Example:
+//
+// opts := roleClient.Options()
+// opts.TTL = "1440h"
+// err := roleClient.Update(ctx, opts)
+func (rc *RoleClient) Update(ctx context.Context, opts *RoleOptions) error {
+	if opts == nil {
+		return fmt.Errorf("bao: role options are required")
+	}
+
+	reqBody := buildRoleRequestBody(opts)
+	path := fmt.Sprintf("%s/roles/%s", rc.client.config.Mount, rc.name)
+	_, err := rc.client.client.Logical().WriteWithContext(ctx, path, reqBody)
+	if err != nil {
+		return fmt.Errorf("bao: update role: %w", err)
+	}
+
+	// Update cached options
+	rc.opts = opts
+	return nil
+}
+
+// Delete deletes this role from OpenBao.
+//
+// Example:
+//
+// roleClient, _ := client.GetRole(ctx, "web-server")
+// err := roleClient.Delete(ctx)
+func (rc *RoleClient) Delete(ctx context.Context) error {
+	path := fmt.Sprintf("%s/roles/%s", rc.client.config.Mount, rc.name)
+	_, err := rc.client.client.Logical().DeleteWithContext(ctx, path)
+	if err != nil {
+		return fmt.Errorf("bao: delete role: %w", err)
+	}
+	return nil
+}
+
+// Clone creates a copy of this role's options.
+// The returned options can be used to create a new role.
+//
+// Example:
+//
+// roleClient, _ := client.GetRole(ctx, "web-server")
+// newOpts := roleClient.Clone()
+// err := client.CreateRole(ctx, "web-server-staging", newOpts)
+func (rc *RoleClient) Clone() *RoleOptions {
+	if rc.opts == nil {
+		return &RoleOptions{}
+	}
+
+	// Create a deep copy
+	clone := *rc.opts
+
+	// Copy slices
+	if len(rc.opts.AllowedDomains) > 0 {
+		clone.AllowedDomains = make([]string, len(rc.opts.AllowedDomains))
+		copy(clone.AllowedDomains, rc.opts.AllowedDomains)
+	}
+	if len(rc.opts.AllowedIPSANs) > 0 {
+		clone.AllowedIPSANs = make([]string, len(rc.opts.AllowedIPSANs))
+		copy(clone.AllowedIPSANs, rc.opts.AllowedIPSANs)
+	}
+	if len(rc.opts.AllowedURISANs) > 0 {
+		clone.AllowedURISANs = make([]string, len(rc.opts.AllowedURISANs))
+		copy(clone.AllowedURISANs, rc.opts.AllowedURISANs)
+	}
+	if len(rc.opts.KeyUsage) > 0 {
+		clone.KeyUsage = make([]string, len(rc.opts.KeyUsage))
+		copy(clone.KeyUsage, rc.opts.KeyUsage)
+	}
+	if len(rc.opts.ExtKeyUsage) > 0 {
+		clone.ExtKeyUsage = make([]string, len(rc.opts.ExtKeyUsage))
+		copy(clone.ExtKeyUsage, rc.opts.ExtKeyUsage)
+	}
+	if len(rc.opts.Organization) > 0 {
+		clone.Organization = make([]string, len(rc.opts.Organization))
+		copy(clone.Organization, rc.opts.Organization)
+	}
+
+	return &clone
+}
+
+// ToRole converts RoleClient to deprecated Role struct for backward compatibility.
+// Deprecated: Use RoleClient methods directly.
+func (rc *RoleClient) ToRole() *Role {
+	return &Role{
+		Name:        rc.name,
+		RoleOptions: rc.opts,
+	}
+}
+
+// ============================================================================
+// RoleClient Convenience Methods
+// ============================================================================
+
+// SetTTL updates the TTL for this role.
+//
+// Example:
+//
+// roleClient.SetTTL(ctx, "1440h")
+func (rc *RoleClient) SetTTL(ctx context.Context, ttl string) error {
+	opts := rc.Clone()
+	opts.TTL = ttl
+	return rc.Update(ctx, opts)
+}
+
+// SetMaxTTL updates the maximum TTL for this role.
+//
+// Example:
+//
+// roleClient.SetMaxTTL(ctx, "8760h")
+func (rc *RoleClient) SetMaxTTL(ctx context.Context, maxTTL string) error {
+	opts := rc.Clone()
+	opts.MaxTTL = maxTTL
+	return rc.Update(ctx, opts)
+}
+
+// AddAllowedDomain adds a domain to the allowed domains list.
+//
+// Example:
+//
+// roleClient.AddAllowedDomain(ctx, "example.com")
+func (rc *RoleClient) AddAllowedDomain(ctx context.Context, domain string) error {
+	opts := rc.Clone()
+	// Check if domain already exists
+	for _, d := range opts.AllowedDomains {
+		if d == domain {
+			return nil // Already exists
+		}
+	}
+	opts.AllowedDomains = append(opts.AllowedDomains, domain)
+	return rc.Update(ctx, opts)
+}
+
+// RemoveAllowedDomain removes a domain from the allowed domains list.
+//
+// Example:
+//
+// roleClient.RemoveAllowedDomain(ctx, "old.example.com")
+func (rc *RoleClient) RemoveAllowedDomain(ctx context.Context, domain string) error {
+	opts := rc.Clone()
+	filtered := make([]string, 0, len(opts.AllowedDomains))
+	for _, d := range opts.AllowedDomains {
+		if d != domain {
+			filtered = append(filtered, d)
+		}
+	}
+	opts.AllowedDomains = filtered
+	return rc.Update(ctx, opts)
+}
+
+// EnableServerAuth enables server authentication for this role.
+//
+// Example:
+//
+// roleClient.EnableServerAuth(ctx)
+func (rc *RoleClient) EnableServerAuth(ctx context.Context) error {
+	opts := rc.Clone()
+	opts.ServerFlag = true
+	return rc.Update(ctx, opts)
+}
+
+// DisableServerAuth disables server authentication for this role.
+//
+// Example:
+//
+// roleClient.DisableServerAuth(ctx)
+func (rc *RoleClient) DisableServerAuth(ctx context.Context) error {
+	opts := rc.Clone()
+	opts.ServerFlag = false
+	return rc.Update(ctx, opts)
+}
+
+// EnableClientAuth enables client authentication for this role.
+//
+// Example:
+//
+// roleClient.EnableClientAuth(ctx)
+func (rc *RoleClient) EnableClientAuth(ctx context.Context) error {
+	opts := rc.Clone()
+	opts.ClientFlag = true
+	return rc.Update(ctx, opts)
+}
+
+// DisableClientAuth disables client authentication for this role.
+//
+// Example:
+//
+// roleClient.DisableClientAuth(ctx)
+func (rc *RoleClient) DisableClientAuth(ctx context.Context) error {
+	opts := rc.Clone()
+	opts.ClientFlag = false
+	return rc.Update(ctx, opts)
+}
+
+// EnableCodeSigning enables code signing for this role.
+//
+// Example:
+//
+// roleClient.EnableCodeSigning(ctx)
+func (rc *RoleClient) EnableCodeSigning(ctx context.Context) error {
+	opts := rc.Clone()
+	opts.CodeSigningFlag = true
+	return rc.Update(ctx, opts)
+}
+
+// ============================================================================
+// Client Methods - CRUD Operations
+// ============================================================================
+
+// CreateRole creates or updates a role in OpenBao.
 // Roles define policies for certificate issuance.
 //
 // Example:
 //
-//	err := client.CreateRole(ctx, "web-server", &vault.RoleOptions{
-//	    TTL:              "720h",
-//	    MaxTTL:           "8760h",
-//	    AllowedDomains:   []string{"example.com"},
-//	    AllowSubdomains:  true,
-//	    ServerFlag:       true,
-//	    ClientFlag:       false,
-//	    KeyType:          "rsa",
-//	    KeyBits:          2048,
+//	err := client.CreateRole(ctx, "web-server", &bao.RoleOptions{
+//	   TTL:              "720h",
+//	   MaxTTL:           "8760h",
+//	   AllowedDomains:   []string{"example.com"},
+//	   AllowSubdomains:  true,
+//	   ServerFlag:       true,
+//	   KeyType:          "rsa",
+//	   KeyBits:          2048,
 //	})
 func (c *Client) CreateRole(ctx context.Context, name string, opts *RoleOptions) error {
 	if name == "" {
-		return fmt.Errorf("vault: role name is required")
+		return fmt.Errorf("bao: role name is required")
 	}
 	if opts == nil {
-		return fmt.Errorf("vault: role options are required")
+		return fmt.Errorf("bao: role options are required")
 	}
 
-	// Build request body
 	reqBody := buildRoleRequestBody(opts)
-
-	// Use SDK to create role
 	path := fmt.Sprintf("%s/roles/%s", c.config.Mount, name)
 	_, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
 	if err != nil {
-		return fmt.Errorf("vault: create role: %w", err)
+		return fmt.Errorf("bao: create role: %w", err)
 	}
 
 	return nil
 }
 
-// GetRole retrieves role configuration by name.
+// UpdateRole explicitly updates an existing role in OpenBao.
+// This is semantically clearer than CreateRole for update operations.
 //
 // Example:
 //
-//	role, err := client.GetRole(ctx, "web-server")
-func (c *Client) GetRole(ctx context.Context, name string) (*Role, error) {
+// opts.TTL = "1440h"
+// err := client.UpdateRole(ctx, "web-server", opts)
+func (c *Client) UpdateRole(ctx context.Context, name string, opts *RoleOptions) error {
+	return c.CreateRole(ctx, name, opts)
+}
+
+// GetRole retrieves role configuration by name and returns a RoleClient.
+//
+// Example:
+//
+// roleClient, err := client.GetRole(ctx, "web-server")
+// ttl := roleClient.Options().TTL
+// err = roleClient.SetTTL(ctx, "1440h")
+func (c *Client) GetRole(ctx context.Context, name string) (*RoleClient, error) {
 	if name == "" {
-		return nil, fmt.Errorf("vault: role name is required")
+		return nil, fmt.Errorf("bao: role name is required")
 	}
 
-	// Use SDK to get role
 	path := fmt.Sprintf("%s/roles/%s", c.config.Mount, name)
 	secret, err := c.client.Logical().ReadWithContext(ctx, path)
 	if err != nil {
-		return nil, fmt.Errorf("vault: get role: %w", err)
+		return nil, fmt.Errorf("bao: get role: %w", err)
 	}
 	if secret == nil || secret.Data == nil {
-		return nil, fmt.Errorf("vault: get role: not found")
+		return nil, fmt.Errorf("bao: get role: not found")
 	}
 
-	// Extract role data into RoleOptions
-	roleOpts := &RoleOptions{}
+	// Parse role options using helper function
+	roleOpts := parseRoleOptions(secret.Data)
 
-	// Extract string fields
-	if v, ok := secret.Data["issuer_ref"].(string); ok {
-		roleOpts.IssuerRef = v
-	}
-	if v, ok := secret.Data["ttl"].(string); ok {
-		roleOpts.TTL = v
-	}
-	if v, ok := secret.Data["max_ttl"].(string); ok {
-		roleOpts.MaxTTL = v
-	}
-	if v, ok := secret.Data["key_type"].(string); ok {
-		roleOpts.KeyType = v
-	}
-	if v, ok := secret.Data["not_before_duration"].(string); ok {
-		roleOpts.NotBeforeDuration = v
-	}
-
-	// Extract boolean fields
-	if v, ok := secret.Data["allow_localhost"].(bool); ok {
-		roleOpts.AllowLocalhost = v
-	}
-	if v, ok := secret.Data["allowed_domains_template"].(bool); ok {
-		roleOpts.AllowedDomainsTemplate = v
-	}
-	if v, ok := secret.Data["allow_bare_domains"].(bool); ok {
-		roleOpts.AllowBareDomains = v
-	}
-	if v, ok := secret.Data["allow_subdomains"].(bool); ok {
-		roleOpts.AllowSubdomains = v
-	}
-	if v, ok := secret.Data["allow_glob_domains"].(bool); ok {
-		roleOpts.AllowGlobDomains = v
-	}
-	if v, ok := secret.Data["allow_wildcard_certificates"].(bool); ok {
-		roleOpts.AllowWildcardCertificates = v
-	}
-	if v, ok := secret.Data["allow_any_name"].(bool); ok {
-		roleOpts.AllowAnyName = v
-	}
-	if v, ok := secret.Data["enforce_hostnames"].(bool); ok {
-		roleOpts.EnforceHostnames = v
-	}
-	if v, ok := secret.Data["allow_ip_sans"].(bool); ok {
-		roleOpts.AllowIPSANs = v
-	}
-	if v, ok := secret.Data["server_flag"].(bool); ok {
-		roleOpts.ServerFlag = v
-	}
-	if v, ok := secret.Data["client_flag"].(bool); ok {
-		roleOpts.ClientFlag = v
-	}
-	if v, ok := secret.Data["code_signing_flag"].(bool); ok {
-		roleOpts.CodeSigningFlag = v
-	}
-	if v, ok := secret.Data["email_protection_flag"].(bool); ok {
-		roleOpts.EmailProtectionFlag = v
-	}
-	if v, ok := secret.Data["use_pss"].(bool); ok {
-		roleOpts.UsePSS = v
-	}
-	if v, ok := secret.Data["use_csr_common_name"].(bool); ok {
-		roleOpts.UseCSRCommonName = v
-	}
-	if v, ok := secret.Data["use_csr_sans"].(bool); ok {
-		roleOpts.UseCSRSANs = v
-	}
-	if v, ok := secret.Data["generate_lease"].(bool); ok {
-		roleOpts.GenerateLease = v
-	}
-	if v, ok := secret.Data["no_store"].(bool); ok {
-		roleOpts.NoStore = v
-	}
-	if v, ok := secret.Data["require_cn"].(bool); ok {
-		roleOpts.RequireCN = v
-	}
-	if v, ok := secret.Data["basic_constraints_valid_for_non_ca"].(bool); ok {
-		roleOpts.BasicConstraintsValidForNonCA = v
-	}
-
-	// Extract int fields - handle json.Number, float64, int, and int64
-	if v, ok := secret.Data["key_bits"].(float64); ok {
-		roleOpts.KeyBits = int(v)
-	} else if v, ok := secret.Data["key_bits"].(int); ok {
-		roleOpts.KeyBits = v
-	} else if v, ok := secret.Data["key_bits"].(int64); ok {
-		roleOpts.KeyBits = int(v)
-	} else if v, ok := secret.Data["key_bits"].(json.Number); ok {
-		if intVal, err := v.Int64(); err == nil {
-			roleOpts.KeyBits = int(intVal)
-		}
-	}
-	if v, ok := secret.Data["signature_bits"].(float64); ok {
-		roleOpts.SignatureBits = int(v)
-	} else if v, ok := secret.Data["signature_bits"].(int); ok {
-		roleOpts.SignatureBits = v
-	} else if v, ok := secret.Data["signature_bits"].(int64); ok {
-		roleOpts.SignatureBits = int(v)
-	} else if v, ok := secret.Data["signature_bits"].(json.Number); ok {
-		if intVal, err := v.Int64(); err == nil {
-			roleOpts.SignatureBits = int(intVal)
-		}
-	}
-
-	// Extract array fields
-	if v, ok := secret.Data["allowed_domains"].([]interface{}); ok {
-		for _, item := range v {
-			if str, ok := item.(string); ok {
-				roleOpts.AllowedDomains = append(roleOpts.AllowedDomains, str)
-			}
-		}
-	}
-	if v, ok := secret.Data["allowed_ip_sans"].([]interface{}); ok {
-		for _, item := range v {
-			if str, ok := item.(string); ok {
-				roleOpts.AllowedIPSANs = append(roleOpts.AllowedIPSANs, str)
-			}
-		}
-	}
-	if v, ok := secret.Data["allowed_uri_sans"].([]interface{}); ok {
-		for _, item := range v {
-			if str, ok := item.(string); ok {
-				roleOpts.AllowedURISANs = append(roleOpts.AllowedURISANs, str)
-			}
-		}
-	}
-	if v, ok := secret.Data["allowed_other_sans"].([]interface{}); ok {
-		for _, item := range v {
-			if str, ok := item.(string); ok {
-				roleOpts.AllowedOtherSANs = append(roleOpts.AllowedOtherSANs, str)
-			}
-		}
-	}
-	if v, ok := secret.Data["allowed_serial_numbers"].([]interface{}); ok {
-		for _, item := range v {
-			if str, ok := item.(string); ok {
-				roleOpts.AllowedSerialNumbers = append(roleOpts.AllowedSerialNumbers, str)
-			}
-		}
-	}
-	if v, ok := secret.Data["key_usage"].([]interface{}); ok {
-		for _, item := range v {
-			if str, ok := item.(string); ok {
-				roleOpts.KeyUsage = append(roleOpts.KeyUsage, str)
-			}
-		}
-	}
-	if v, ok := secret.Data["ext_key_usage"].([]interface{}); ok {
-		for _, item := range v {
-			if str, ok := item.(string); ok {
-				roleOpts.ExtKeyUsage = append(roleOpts.ExtKeyUsage, str)
-			}
-		}
-	}
-	if v, ok := secret.Data["ext_key_usage_oids"].([]interface{}); ok {
-		for _, item := range v {
-			if str, ok := item.(string); ok {
-				roleOpts.ExtKeyUsageOIDs = append(roleOpts.ExtKeyUsageOIDs, str)
-			}
-		}
-	}
-	if v, ok := secret.Data["ou"].([]interface{}); ok {
-		for _, item := range v {
-			if str, ok := item.(string); ok {
-				roleOpts.OrganizationUnit = append(roleOpts.OrganizationUnit, str)
-			}
-		}
-	}
-	if v, ok := secret.Data["organization"].([]interface{}); ok {
-		for _, item := range v {
-			if str, ok := item.(string); ok {
-				roleOpts.Organization = append(roleOpts.Organization, str)
-			}
-		}
-	}
-	if v, ok := secret.Data["country"].([]interface{}); ok {
-		for _, item := range v {
-			if str, ok := item.(string); ok {
-				roleOpts.Country = append(roleOpts.Country, str)
-			}
-		}
-	}
-	if v, ok := secret.Data["locality"].([]interface{}); ok {
-		for _, item := range v {
-			if str, ok := item.(string); ok {
-				roleOpts.Locality = append(roleOpts.Locality, str)
-			}
-		}
-	}
-	if v, ok := secret.Data["province"].([]interface{}); ok {
-		for _, item := range v {
-			if str, ok := item.(string); ok {
-				roleOpts.Province = append(roleOpts.Province, str)
-			}
-		}
-	}
-	if v, ok := secret.Data["street_address"].([]interface{}); ok {
-		for _, item := range v {
-			if str, ok := item.(string); ok {
-				roleOpts.StreetAddress = append(roleOpts.StreetAddress, str)
-			}
-		}
-	}
-	if v, ok := secret.Data["postal_code"].([]interface{}); ok {
-		for _, item := range v {
-			if str, ok := item.(string); ok {
-				roleOpts.PostalCode = append(roleOpts.PostalCode, str)
-			}
-		}
-	}
-	if v, ok := secret.Data["policy_identifiers"].([]interface{}); ok {
-		for _, item := range v {
-			if str, ok := item.(string); ok {
-				roleOpts.PolicyIdentifiers = append(roleOpts.PolicyIdentifiers, str)
-			}
-		}
-	}
-	if v, ok := secret.Data["cn_validations"].([]interface{}); ok {
-		for _, item := range v {
-			if str, ok := item.(string); ok {
-				roleOpts.CNValidations = append(roleOpts.CNValidations, str)
-			}
-		}
-	}
-	if v, ok := secret.Data["allowed_user_ids"].([]interface{}); ok {
-		for _, item := range v {
-			if str, ok := item.(string); ok {
-				roleOpts.AllowedUserIDs = append(roleOpts.AllowedUserIDs, str)
-			}
-		}
-	}
-
-	return &Role{
-		Name:        name,
-		RoleOptions: roleOpts,
+	return &RoleClient{
+		client: c,
+		name:   name,
+		opts:   roleOpts,
 	}, nil
 }
 
@@ -366,28 +377,26 @@ func (c *Client) GetRole(ctx context.Context, name string) (*Role, error) {
 //
 // Example:
 //
-//	roles, err := client.ListRoles(ctx)
+// roles, err := client.ListRoles(ctx)
+//
 //	for _, roleName := range roles {
-//	    fmt.Println(roleName)
+//	   fmt.Println(roleName)
 //	}
 func (c *Client) ListRoles(ctx context.Context) ([]string, error) {
-	// Use SDK to list roles
 	path := fmt.Sprintf("%s/roles", c.config.Mount)
 	secret, err := c.client.Logical().ListWithContext(ctx, path)
 	if err != nil {
-		return nil, fmt.Errorf("vault: list roles: %w", err)
+		return nil, fmt.Errorf("bao: list roles: %w", err)
 	}
 	if secret == nil || secret.Data == nil {
 		return []string{}, nil
 	}
 
-	// Extract keys from response
 	keys, ok := secret.Data["keys"].([]interface{})
 	if !ok {
 		return []string{}, nil
 	}
 
-	// Convert to string slice
 	result := make([]string, 0, len(keys))
 	for _, key := range keys {
 		if keyStr, ok := key.(string); ok {
@@ -398,31 +407,143 @@ func (c *Client) ListRoles(ctx context.Context) ([]string, error) {
 	return result, nil
 }
 
-// DeleteRole deletes a role from Vault.
+// DeleteRole deletes a role from OpenBao.
 //
 // Example:
 //
-//	err := client.DeleteRole(ctx, "web-server")
+// err := client.DeleteRole(ctx, "web-server")
 func (c *Client) DeleteRole(ctx context.Context, name string) error {
 	if name == "" {
-		return fmt.Errorf("vault: role name is required")
+		return fmt.Errorf("bao: role name is required")
 	}
 
-	// Use SDK to delete role
 	path := fmt.Sprintf("%s/roles/%s", c.config.Mount, name)
 	_, err := c.client.Logical().DeleteWithContext(ctx, path)
 	if err != nil {
-		return fmt.Errorf("vault: delete role: %w", err)
+		return fmt.Errorf("bao: delete role: %w", err)
 	}
 
 	return nil
 }
 
-// Helper function to build role request body
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+// parseRoleOptions extracts role options from OpenBao response data.
+func parseRoleOptions(data map[string]interface{}) *RoleOptions {
+	opts := &RoleOptions{}
+
+	// Extract string fields
+	opts.IssuerRef = extractStringField(data, "issuer_ref")
+	opts.TTL = extractStringField(data, "ttl")
+	opts.MaxTTL = extractStringField(data, "max_ttl")
+	opts.KeyType = extractStringField(data, "key_type")
+	opts.NotBeforeDuration = extractStringField(data, "not_before_duration")
+
+	// Extract boolean fields
+	opts.AllowLocalhost = extractBoolField(data, "allow_localhost")
+	opts.AllowedDomainsTemplate = extractBoolField(data, "allowed_domains_template")
+	opts.AllowBareDomains = extractBoolField(data, "allow_bare_domains")
+	opts.AllowSubdomains = extractBoolField(data, "allow_subdomains")
+	opts.AllowGlobDomains = extractBoolField(data, "allow_glob_domains")
+	opts.AllowWildcardCertificates = extractBoolField(data, "allow_wildcard_certificates")
+	opts.AllowAnyName = extractBoolField(data, "allow_any_name")
+	opts.EnforceHostnames = extractBoolField(data, "enforce_hostnames")
+	opts.AllowIPSANs = extractBoolField(data, "allow_ip_sans")
+	opts.ServerFlag = extractBoolField(data, "server_flag")
+	opts.ClientFlag = extractBoolField(data, "client_flag")
+	opts.CodeSigningFlag = extractBoolField(data, "code_signing_flag")
+	opts.EmailProtectionFlag = extractBoolField(data, "email_protection_flag")
+	opts.UsePSS = extractBoolField(data, "use_pss")
+	opts.UseCSRCommonName = extractBoolField(data, "use_csr_common_name")
+	opts.UseCSRSANs = extractBoolField(data, "use_csr_sans")
+	opts.GenerateLease = extractBoolField(data, "generate_lease")
+	opts.NoStore = extractBoolField(data, "no_store")
+	opts.RequireCN = extractBoolField(data, "require_cn")
+	opts.BasicConstraintsValidForNonCA = extractBoolField(data, "basic_constraints_valid_for_non_ca")
+
+	// Extract int fields
+	opts.KeyBits = extractIntField(data, "key_bits")
+	opts.SignatureBits = extractIntField(data, "signature_bits")
+
+	// Extract array fields
+	opts.AllowedDomains = extractStringSliceField(data, "allowed_domains")
+	opts.AllowedIPSANs = extractStringSliceField(data, "allowed_ip_sans")
+	opts.AllowedURISANs = extractStringSliceField(data, "allowed_uri_sans")
+	opts.AllowedOtherSANs = extractStringSliceField(data, "allowed_other_sans")
+	opts.AllowedSerialNumbers = extractStringSliceField(data, "allowed_serial_numbers")
+	opts.KeyUsage = extractStringSliceField(data, "key_usage")
+	opts.ExtKeyUsage = extractStringSliceField(data, "ext_key_usage")
+	opts.ExtKeyUsageOIDs = extractStringSliceField(data, "ext_key_usage_oids")
+	opts.OrganizationUnit = extractStringSliceField(data, "ou")
+	opts.Organization = extractStringSliceField(data, "organization")
+	opts.Country = extractStringSliceField(data, "country")
+	opts.Locality = extractStringSliceField(data, "locality")
+	opts.Province = extractStringSliceField(data, "province")
+	opts.StreetAddress = extractStringSliceField(data, "street_address")
+	opts.PostalCode = extractStringSliceField(data, "postal_code")
+	opts.PolicyIdentifiers = extractStringSliceField(data, "policy_identifiers")
+	opts.CNValidations = extractStringSliceField(data, "cn_validations")
+	opts.AllowedUserIDs = extractStringSliceField(data, "allowed_user_ids")
+
+	return opts
+}
+
+// extractStringField extracts a string field from response data.
+func extractStringField(data map[string]interface{}, key string) string {
+	if v, ok := data[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+// extractBoolField extracts a boolean field from response data.
+func extractBoolField(data map[string]interface{}, key string) bool {
+	if v, ok := data[key].(bool); ok {
+		return v
+	}
+	return false
+}
+
+// extractIntField extracts an integer field from response data.
+// Handles json.Number, float64, int, and int64.
+func extractIntField(data map[string]interface{}, key string) int {
+	if v, ok := data[key].(float64); ok {
+		return int(v)
+	}
+	if v, ok := data[key].(int); ok {
+		return v
+	}
+	if v, ok := data[key].(int64); ok {
+		return int(v)
+	}
+	if v, ok := data[key].(json.Number); ok {
+		if intVal, err := v.Int64(); err == nil {
+			return int(intVal)
+		}
+	}
+	return 0
+}
+
+// extractStringSliceField extracts a string slice field from response data.
+func extractStringSliceField(data map[string]interface{}, key string) []string {
+	if v, ok := data[key].([]interface{}); ok {
+		result := make([]string, 0, len(v))
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				result = append(result, str)
+			}
+		}
+		return result
+	}
+	return nil
+}
+
+// buildRoleRequestBody constructs the request body for role creation/update.
 func buildRoleRequestBody(opts *RoleOptions) map[string]interface{} {
 	reqBody := make(map[string]interface{})
 
-	// Add all non-zero fields
 	if opts.IssuerRef != "" {
 		reqBody["issuer_ref"] = opts.IssuerRef
 	}
@@ -560,4 +681,70 @@ func buildRoleRequestBody(opts *RoleOptions) map[string]interface{} {
 	}
 
 	return reqBody
+}
+
+// ============================================================================
+// Role Templates (Pre-configured roles for common use cases)
+// ============================================================================
+
+// NewWebServerRole creates a pre-configured role for web servers.
+//
+// Example:
+//
+// opts := bao.NewWebServerRole("example.com")
+// err := client.CreateRole(ctx, "web-server", opts)
+func NewWebServerRole(domain string) *RoleOptions {
+	return &RoleOptions{
+		TTL:              "720h",  // 30 days
+		MaxTTL:           "8760h", // 1 year
+		AllowedDomains:   []string{domain},
+		AllowSubdomains:  true,
+		AllowBareDomains: true,
+		ServerFlag:       true,
+		ClientFlag:       false,
+		KeyType:          "rsa",
+		KeyBits:          2048,
+		KeyUsage:         []string{"DigitalSignature", "KeyAgreement", "KeyEncipherment"},
+	}
+}
+
+// NewClientCertRole creates a pre-configured role for client certificates.
+//
+// Example:
+//
+// opts := bao.NewClientCertRole("example.com")
+// err := client.CreateRole(ctx, "client-cert", opts)
+func NewClientCertRole(domain string) *RoleOptions {
+	return &RoleOptions{
+		TTL:             "720h",  // 30 days
+		MaxTTL:          "8760h", // 1 year
+		AllowedDomains:  []string{domain},
+		AllowSubdomains: true,
+		ServerFlag:      false,
+		ClientFlag:      true,
+		KeyType:         "rsa",
+		KeyBits:         2048,
+		KeyUsage:        []string{"DigitalSignature"},
+	}
+}
+
+// NewCodeSigningRole creates a pre-configured role for code signing certificates.
+//
+// Example:
+//
+// opts := bao.NewCodeSigningRole("example.com")
+// err := client.CreateRole(ctx, "code-signing", opts)
+func NewCodeSigningRole(domain string) *RoleOptions {
+	return &RoleOptions{
+		TTL:             "8760h",  // 1 year
+		MaxTTL:          "26280h", // 3 years
+		AllowedDomains:  []string{domain},
+		AllowSubdomains: false,
+		ServerFlag:      false,
+		ClientFlag:      false,
+		CodeSigningFlag: true,
+		KeyType:         "rsa",
+		KeyBits:         2048,
+		KeyUsage:        []string{"DigitalSignature"},
+	}
 }
