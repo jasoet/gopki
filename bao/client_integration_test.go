@@ -168,19 +168,9 @@ func TestIntegration_ClientPing(t *testing.T) {
 func TestIntegration_ClientValidateConnection(t *testing.T) {
 	ctx := context.Background()
 
-	// Setup container
+	// Setup container (PKI already enabled by setupTestContainer)
 	container, client := setupTestContainer(t)
 	defer cleanupTestContainer(t, container)
-
-	// Wait for healthy
-	if err := container.WaitForHealthy(ctx, 30*time.Second); err != nil {
-		t.Fatalf("Container not healthy: %v", err)
-	}
-
-	// Enable PKI
-	if err := container.EnablePKI(ctx, "pki", ""); err != nil {
-		t.Fatalf("Failed to enable PKI: %v", err)
-	}
 
 	t.Run("ValidateConnection should pass with PKI enabled", func(t *testing.T) {
 		err := client.ValidateConnection(ctx)

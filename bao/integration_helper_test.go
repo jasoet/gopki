@@ -23,6 +23,20 @@ func setupTestContainer(t *testing.T) (*testcontainer.Container, *Client) {
 		t.Fatalf("Failed to start OpenBao container: %v", err)
 	}
 
+	// Wait for container to be healthy
+	err = container.WaitForHealthy(ctx, 30*time.Second)
+	if err != nil {
+		container.Terminate(ctx)
+		t.Fatalf("Container not healthy: %v", err)
+	}
+
+	// Enable PKI secrets engine
+	err = container.EnablePKI(ctx, "pki", "87600h")
+	if err != nil {
+		container.Terminate(ctx)
+		t.Fatalf("Failed to enable PKI: %v", err)
+	}
+
 	// Create client
 	client, err := NewClient(&Config{
 		Address: container.Address,
