@@ -1,9 +1,9 @@
 # Vault PKI Integration
 
-**Status:** ✅ Phase 1 Complete
+**Status:** ✅ Phase 1 & 2 Complete
 **Compatibility:** OpenBao and HashiCorp Vault
 **Go Version:** 1.24.5+
-**Test Coverage:** 82.4% (90+ test cases)
+**Test Coverage:** 62.1% (130+ test cases)
 
 ---
 
@@ -12,9 +12,19 @@
 The `vault` module provides seamless integration between GoPKI's type-safe cryptographic operations and Vault/OpenBao PKI secrets engine for centralized certificate authority management.
 
 **Key Features:**
+
+**Phase 1 - Certificate Operations:**
 - 🔐 Certificate issuance with local key generation (private keys never leave your system)
 - ✍️ CSR signing workflow for maximum security
 - 📋 Certificate management (retrieve, list, revoke)
+
+**Phase 2 - CA & Key Management:**
+- 🏛️ Full CA lifecycle (root CA, intermediate CA, import)
+- 🔑 Key management (generate, import, export, list)
+- 📜 Role-based certificate policies
+- 🔄 Issuer configuration and management
+
+**Core Features:**
 - ✅ Type-safe generics (RSA, ECDSA, Ed25519)
 - 🌐 Context-aware network operations with timeout/cancellation
 - 🔒 TLS support with security best practices
@@ -214,6 +224,236 @@ err := client.RevokeCertificate(ctx, "39:dd:2e:90:b7:23:1f:8d")
 if err != nil {
     log.Fatal(err)
 }
+```
+
+###  CA Operations (Phase 2)
+
+#### Generate Root CA
+
+```go
+// Generate internal root CA (key stays in Vault)
+rootCA, err := client.GenerateRootCA(ctx, &vault.CAOptions{
+    Type:          "internal",
+    CommonName:    "My Root CA",
+    Organization:  []string{"My Company"},
+    Country:       []string{"US"},
+    KeyType:       "rsa",
+    KeyBits:       4096,
+    TTL:           "87600h", // 10 years
+    MaxPathLength: 2,
+})
+
+// Generate exported root CA (key returned to you)
+rootCA, err := client.GenerateRootCA(ctx, &vault.CAOptions{
+    Type:       "exported",
+    CommonName: "My Root CA",
+    KeyType:    "ec",
+    KeyBits:    256,
+    TTL:        "87600h",
+})
+```
+
+#### Generate Intermediate CA
+
+```go
+// Generate internal intermediate CA
+intermediateCA, err := client.GenerateIntermediateCA(ctx, &vault.IntermediateCAOptions{
+    Type:          "internal",
+    CommonName:    "My Intermediate CA",
+    Organization:  []string{"My Company"},
+    KeyType:       "rsa",
+    KeyBits:       2048,
+    MaxPathLength: 1,
+})
+
+// Export CSR for external signing
+intermediateCertificate CSR response contains the CSR PEM data
+```
+
+#### Sign Intermediate CSR
+
+```go
+// Sign an intermediate CSR to create an intermediate CA
+signedCert, err := client.SignIntermediateCSR(ctx, csr, &vault.CAOptions{
+    CommonName: "My Intermediate CA",
+    TTL:        "43800h", // 5 years
+})
+```
+
+#### Import CA Certificate
+
+```go
+// Import existing CA certificate and key
+issuerInfo, err := client.ImportCA(ctx, &vault.CABundle{
+    PEMBundle: certificatePEM + "\n" + privateKeyPEM,
+})
+
+log.Printf("Imported issuer: %s", issuerInfo.IssuerID)
+```
+
+#### Manage Issuers
+
+```go
+// Get issuer information
+issuer, err := client.GetIssuer(ctx, "issuer-id-or-name")
+
+// List all issuers
+issuers, err := client.ListIssuers(ctx)
+for _, issuerID := range issuers {
+    fmt.Println(issuerID)
+}
+
+// Update issuer configuration
+err = client.UpdateIssuer(ctx, "issuer-id", &vault.IssuerConfig{
+    IssuerName:       "production-ca",
+    Usage:            "issuing-certificates,crl-signing",
+    IssuingCertificates: []string{"http://ca.example.com/ca.crt"},
+})
+
+// Set default issuer
+err = client.SetDefaultIssuer(ctx, "issuer-id")
+
+// Get default issuer
+defaultIssuerID, err := client.GetDefaultIssuer(ctx)
+
+// Delete issuer
+err = client.DeleteIssuer(ctx, "issuer-id")
+```
+
+### Key Management (Phase 2)
+
+#### Generate Key in Vault
+
+```go
+// Generate RSA key
+keyInfo, err := client.GenerateKey(ctx, &vault.GenerateKeyOptions{
+    KeyName: "my-rsa-key",
+    KeyType: "rsa",
+    KeyBits: 2048,
+})
+
+// Generate ECDSA key
+keyInfo, err := client.GenerateKey(ctx, &vault.GenerateKeyOptions{
+    KeyName: "my-ec-key",
+    KeyType: "ec",
+    KeyBits: 256,
+})
+
+// Generate Ed25519 key
+keyInfo, err := client.GenerateKey(ctx, &vault.GenerateKeyOptions{
+    KeyName: "my-ed25519-key",
+    KeyType: "ed25519",
+})
+
+log.Printf("Generated key: %s (ID: %s)", keyInfo.KeyName, keyInfo.KeyID)
+```
+
+#### Import GoPKI Key Pair to Vault
+
+```go
+// Generate key pair locally with GoPKI
+rsaKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Import to Vault
+keyInfo, err := client.ImportKey(ctx, rsaKeyPair, &vault.ImportKeyOptions{
+    KeyName: "imported-rsa-key",
+})
+
+log.Printf("Imported key: %s (Type: %s, Bits: %d)",
+    keyInfo.KeyName, keyInfo.KeyType, keyInfo.KeyBits)
+
+// Works with ECDSA and Ed25519 too
+ecdsaKeyPair, _ := algo.GenerateECDSAKeyPair(algo.P256)
+keyInfo, err = client.ImportKey(ctx, ecdsaKeyPair, &vault.ImportKeyOptions{
+    KeyName: "imported-ec-key",
+})
+```
+
+#### Manage Keys
+
+```go
+// List all keys
+keys, err := client.ListKeys(ctx)
+for _, keyID := range keys {
+    fmt.Println(keyID)
+}
+
+// Get key information
+keyInfo, err := client.GetKey(ctx, "key-id-or-name")
+fmt.Printf("Key: %s (%s %d-bit)\n", keyInfo.KeyName, keyInfo.KeyType, keyInfo.KeyBits)
+
+// Update key name
+err = client.UpdateKeyName(ctx, "old-key-id", "new-key-name")
+
+// Export key (if exportable)
+keyPair, err := client.ExportKey(ctx, "key-id")
+// Returns *algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair
+
+// Delete key
+err = client.DeleteKey(ctx, "key-id")
+```
+
+### Role Management (Phase 2)
+
+#### Create Role
+
+```go
+// Create role for web server certificates
+err := client.CreateRole(ctx, "web-server", &vault.RoleOptions{
+    IssuerRef:       "default",
+    TTL:             "720h",  // 30 days
+    MaxTTL:          "8760h", // 1 year
+    AllowedDomains:  []string{"example.com"},
+    AllowSubdomains: true,
+    ServerFlag:      true,
+    ClientFlag:      false,
+    KeyType:         "rsa",
+    KeyBits:         2048,
+})
+
+// Create role for client certificates
+err = client.CreateRole(ctx, "client-cert", &vault.RoleOptions{
+    TTL:        "720h",
+    MaxTTL:     "8760h",
+    ServerFlag: false,
+    ClientFlag: true,
+    KeyType:    "ec",
+    KeyBits:    256,
+})
+
+// Create role with IP SANs
+err = client.CreateRole(ctx, "server-with-ip", &vault.RoleOptions{
+    AllowedDomains:  []string{"internal.example.com"},
+    AllowIPSANs:     true,
+    AllowedIPSANs:   []string{"10.0.0.0/8", "192.168.0.0/16"},
+    ServerFlag:      true,
+})
+
+// Create role with URI SANs (for SPIFFE)
+err = client.CreateRole(ctx, "spiffe-role", &vault.RoleOptions{
+    AllowedURISANs: []string{"spiffe://example.com/*"},
+    ServerFlag:     true,
+})
+```
+
+#### Manage Roles
+
+```go
+// Get role configuration
+role, err := client.GetRole(ctx, "web-server")
+fmt.Printf("Role: %s (TTL: %s)\n", role.Name, role.TTL)
+
+// List all roles
+roles, err := client.ListRoles(ctx)
+for _, roleName := range roles {
+    fmt.Println(roleName)
+}
+
+// Delete role
+err = client.DeleteRole(ctx, "old-role")
 ```
 
 ---
@@ -740,12 +980,42 @@ envelope, _ := encryption.EncryptEnvelope(data, []cert.Certificate{rsaCert})
 - [x] HTTP mock testing (no external dependencies)
 - [x] Documentation and examples
 
-### 📅 Phase 2: CA and Key Management (Planned)
+## Phase 2 Status: ✅ Complete
 
-- CA operations (root, intermediate, import)
-- Key import/export operations
-- Role management
-- Issuer configuration
+### ✅ Completed Features
+
+**CA Operations (11 functions):**
+- [x] GenerateRootCA (internal and exported)
+- [x] GenerateIntermediateCA (internal and CSR export)
+- [x] SignIntermediateCSR
+- [x] ImportCA
+- [x] GetIssuer
+- [x] ListIssuers
+- [x] UpdateIssuer
+- [x] DeleteIssuer
+- [x] SetDefaultIssuer
+- [x] GetDefaultIssuer
+
+**Key Management (7 functions):**
+- [x] GenerateKey (RSA, ECDSA, Ed25519)
+- [x] ImportKey (GoPKI key pair integration)
+- [x] ExportKey (if exportable)
+- [x] ListKeys
+- [x] GetKey
+- [x] UpdateKeyName
+- [x] DeleteKey
+
+**Role Management (4 functions):**
+- [x] CreateRole (50+ configuration options)
+- [x] GetRole
+- [x] ListRoles
+- [x] DeleteRole
+
+**Testing:**
+- [x] Comprehensive test suite (130+ test cases)
+- [x] HTTP mock testing for all operations
+- [x] 62.1% test coverage
+- [x] Test coverage for issuer, key, and role operations
 
 ### 📅 Phase 3: Advanced Features (Planned)
 
@@ -834,7 +1104,8 @@ Same as GoPKI project.
 ---
 
 **Last Updated:** 2025-10-27
-**Phase:** 1 (Foundation) - ✅ Complete
-**Next Milestone:** Phase 2 - CA and Key Management
-**Test Coverage:** 82.4% (24 test functions, 90+ test cases)
-**Lines of Code:** ~1,500 (including tests)
+**Phase:** 1 & 2 Complete - ✅ Foundation + CA/Key/Role Management
+**Next Milestone:** Phase 3 - Advanced Features (rotation, auto-renewal)
+**Test Coverage:** 62.1% (40+ test functions, 130+ test cases)
+**Lines of Code:** ~3,600 (including tests)
+**Total Functions:** 30 (5 client + 5 cert + 11 CA + 7 key + 4 role - 2 helper)
