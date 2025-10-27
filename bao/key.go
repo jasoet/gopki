@@ -218,6 +218,42 @@ func (kc *KeyClient[K]) SignVerbatim(ctx context.Context, csr *cert.CertificateS
 	return kc.client.SignVerbatimWithKeyRef(ctx, csr, keyRef, opts)
 }
 
+// GetIssuers returns all issuers that use this key.
+// This enables navigation from KeyClient to IssuerClient.
+//
+// Example:
+//
+//	keyClient, _ := client.GetRSAKey(ctx, "my-key")
+//	issuers, err := keyClient.GetIssuers(ctx)
+//	for _, issuer := range issuers {
+//	    fmt.Printf("Issuer: %s (ID: %s)\n", issuer.Name(), issuer.ID())
+//	}
+func (kc *KeyClient[K]) GetIssuers(ctx context.Context) ([]*IssuerClient, error) {
+	if kc.keyInfo == nil || kc.keyInfo.KeyID == "" {
+		return nil, fmt.Errorf("bao: key info not available")
+	}
+
+	// List all issuers
+	issuerRefs, err := kc.client.ListIssuers(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("bao: list issuers: %w", err)
+	}
+
+	// Filter issuers that use this key
+	var result []*IssuerClient
+	for _, issuerRef := range issuerRefs {
+		issuer, err := kc.client.GetIssuer(ctx, issuerRef)
+		if err != nil {
+			continue // Skip issuers we can't access
+		}
+		if issuer.KeyID() == kc.keyInfo.KeyID {
+			result = append(result, issuer)
+		}
+	}
+
+	return result, nil
+}
+
 // ============================================================================
 // Client Methods - Type-agnostic operations
 // ============================================================================

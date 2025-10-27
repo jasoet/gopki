@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jasoet/gopki/cert"
+	"github.com/jasoet/gopki/keypair/algo"
 )
 
 // ============================================================================
@@ -178,6 +179,152 @@ func (ic *IssuerClient) AddOCSPServer(ctx context.Context, url string) error {
 		ic.info.OCSPServers = urls
 	}
 	return err
+}
+
+// CreateRole creates a new role configured to use this issuer.
+// This is a convenience method that links IssuerClient with RoleClient.
+//
+// The role's IssuerRef is automatically set to this issuer's ID.
+//
+// Example:
+//
+//	issuer, _ := client.GetIssuer(ctx, "my-ca")
+//	role, err := issuer.CreateRole(ctx, "web-server", &RoleOptions{
+//	    AllowedDomains: []string{"example.com"},
+//	    AllowSubdomains: true,
+//	    TTL: "720h",
+//	})
+func (ic *IssuerClient) CreateRole(ctx context.Context, name string, opts *RoleOptions) (*RoleClient, error) {
+	if opts == nil {
+		opts = &RoleOptions{}
+	}
+
+	// Set issuer ref to this issuer's ID
+	opts.IssuerRef = ic.ID()
+
+	// Create the role
+	err := ic.client.CreateRole(ctx, name, opts)
+	if err != nil {
+		return nil, fmt.Errorf("bao: create role for issuer: %w", err)
+	}
+
+	// Return role client
+	return ic.client.GetRole(ctx, name)
+}
+
+// IssueRSACertificate issues an RSA certificate using this issuer.
+// A temporary role may be created if no default role exists for this issuer.
+//
+// Example:
+//
+//	issuer, _ := client.GetIssuer(ctx, "my-ca")
+//	certClient, err := issuer.IssueRSACertificate(ctx, "my-rsa-key", &GenerateCertificateOptions{
+//	    CommonName: "app.example.com",
+//	    TTL:        "720h",
+//	})
+func (ic *IssuerClient) IssueRSACertificate(ctx context.Context, keyRef string, opts *GenerateCertificateOptions) (*CertificateClient[*algo.RSAKeyPair], error) {
+	// Get or create a default role for this issuer
+	roleName, err := ic.getOrCreateDefaultRole(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("bao: get default role for issuer: %w", err)
+	}
+
+	return ic.client.IssueRSACertificateWithKeyRef(ctx, roleName, keyRef, opts)
+}
+
+// IssueECDSACertificate issues an ECDSA certificate using this issuer.
+// A temporary role may be created if no default role exists for this issuer.
+//
+// Example:
+//
+//	issuer, _ := client.GetIssuer(ctx, "my-ca")
+//	certClient, err := issuer.IssueECDSACertificate(ctx, "my-ec-key", &GenerateCertificateOptions{
+//	    CommonName: "app.example.com",
+//	    TTL:        "720h",
+//	})
+func (ic *IssuerClient) IssueECDSACertificate(ctx context.Context, keyRef string, opts *GenerateCertificateOptions) (*CertificateClient[*algo.ECDSAKeyPair], error) {
+	// Get or create a default role for this issuer
+	roleName, err := ic.getOrCreateDefaultRole(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("bao: get default role for issuer: %w", err)
+	}
+
+	return ic.client.IssueECDSACertificateWithKeyRef(ctx, roleName, keyRef, opts)
+}
+
+// IssueEd25519Certificate issues an Ed25519 certificate using this issuer.
+// A temporary role may be created if no default role exists for this issuer.
+//
+// Example:
+//
+//	issuer, _ := client.GetIssuer(ctx, "my-ca")
+//	certClient, err := issuer.IssueEd25519Certificate(ctx, "my-ed25519-key", &GenerateCertificateOptions{
+//	    CommonName: "app.example.com",
+//	    TTL:        "720h",
+//	})
+func (ic *IssuerClient) IssueEd25519Certificate(ctx context.Context, keyRef string, opts *GenerateCertificateOptions) (*CertificateClient[*algo.Ed25519KeyPair], error) {
+	// Get or create a default role for this issuer
+	roleName, err := ic.getOrCreateDefaultRole(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("bao: get default role for issuer: %w", err)
+	}
+
+	return ic.client.IssueEd25519CertificateWithKeyRef(ctx, roleName, keyRef, opts)
+}
+
+// SignCSR signs a CSR using this issuer.
+// A temporary role may be created if no default role exists for this issuer.
+//
+// Example:
+//
+//	issuer, _ := client.GetIssuer(ctx, "my-ca")
+//	csr, _ := cert.CreateCSR(keyPair, cert.CSRRequest{...})
+//	certificate, err := issuer.SignCSR(ctx, csr, &SignCertificateOptions{
+//	    TTL: "8760h",
+//	})
+func (ic *IssuerClient) SignCSR(ctx context.Context, csr *cert.CertificateSigningRequest, opts *SignCertificateOptions) (*cert.Certificate, error) {
+	// Get or create a default role for this issuer
+	roleName, err := ic.getOrCreateDefaultRole(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("bao: get default role for issuer: %w", err)
+	}
+
+	return ic.client.SignCSR(ctx, roleName, csr, opts)
+}
+
+// getOrCreateDefaultRole gets or creates a default role for this issuer.
+// It looks for a role named "issuer-<issuer-name>-default" or creates one if it doesn't exist.
+func (ic *IssuerClient) getOrCreateDefaultRole(ctx context.Context) (string, error) {
+	roleName := fmt.Sprintf("issuer-%s-default", ic.Name())
+
+	// Try to get existing role
+	role, err := ic.client.GetRole(ctx, roleName)
+	if err == nil && role != nil {
+		return roleName, nil
+	}
+
+	// Create default role
+	// Note: KeyType is not set, allowing OpenBao to accept key_type from the request
+	defaultOpts := &RoleOptions{
+		IssuerRef:           ic.ID(),
+		TTL:                 "8760h",
+		MaxTTL:              "8760h",
+		AllowAnyName:        true,
+		AllowIPSANs:         true,
+		AllowSubdomains:     true,
+		AllowBareDomains:    true,
+		ServerFlag:          true,
+		ClientFlag:          true,
+		CodeSigningFlag:     true,
+		EmailProtectionFlag: true,
+	}
+
+	err = ic.client.CreateRole(ctx, roleName, defaultOpts)
+	if err != nil {
+		return "", fmt.Errorf("bao: create default role for issuer: %w", err)
+	}
+
+	return roleName, nil
 }
 
 // ============================================================================

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"github.com/jasoet/gopki/keypair/algo"
 )
 
 // ============================================================================
@@ -117,6 +119,73 @@ func (rc *RoleClient) Delete(ctx context.Context) error {
 		return fmt.Errorf("bao: delete role: %w", err)
 	}
 	return nil
+}
+
+// GetIssuer returns the issuer referenced by this role.
+// This enables navigation from RoleClient to IssuerClient.
+//
+// Returns an error if:
+//   - Role has no IssuerRef configured
+//   - Issuer cannot be found
+//
+// Example:
+//
+//	roleClient, _ := client.GetRole(ctx, "web-server")
+//	issuer, err := roleClient.GetIssuer(ctx)
+//	fmt.Printf("Role uses issuer: %s\n", issuer.Name())
+func (rc *RoleClient) GetIssuer(ctx context.Context) (*IssuerClient, error) {
+	if rc.opts == nil || rc.opts.IssuerRef == "" {
+		return nil, fmt.Errorf("bao: role has no issuer reference")
+	}
+
+	issuer, err := rc.client.GetIssuer(ctx, rc.opts.IssuerRef)
+	if err != nil {
+		return nil, fmt.Errorf("bao: get issuer for role: %w", err)
+	}
+
+	return issuer, nil
+}
+
+// IssueRSACertificate issues an RSA certificate using this role.
+// This is a convenience method that links RoleClient with certificate issuance.
+//
+// Example:
+//
+//	roleClient, _ := client.GetRole(ctx, "web-server")
+//	certClient, err := roleClient.IssueRSACertificate(ctx, "my-rsa-key", &GenerateCertificateOptions{
+//	    CommonName: "app.example.com",
+//	    TTL:        "720h",
+//	})
+func (rc *RoleClient) IssueRSACertificate(ctx context.Context, keyRef string, opts *GenerateCertificateOptions) (*CertificateClient[*algo.RSAKeyPair], error) {
+	return rc.client.IssueRSACertificateWithKeyRef(ctx, rc.name, keyRef, opts)
+}
+
+// IssueECDSACertificate issues an ECDSA certificate using this role.
+// This is a convenience method that links RoleClient with certificate issuance.
+//
+// Example:
+//
+//	roleClient, _ := client.GetRole(ctx, "web-server")
+//	certClient, err := roleClient.IssueECDSACertificate(ctx, "my-ec-key", &GenerateCertificateOptions{
+//	    CommonName: "app.example.com",
+//	    TTL:        "720h",
+//	})
+func (rc *RoleClient) IssueECDSACertificate(ctx context.Context, keyRef string, opts *GenerateCertificateOptions) (*CertificateClient[*algo.ECDSAKeyPair], error) {
+	return rc.client.IssueECDSACertificateWithKeyRef(ctx, rc.name, keyRef, opts)
+}
+
+// IssueEd25519Certificate issues an Ed25519 certificate using this role.
+// This is a convenience method that links RoleClient with certificate issuance.
+//
+// Example:
+//
+//	roleClient, _ := client.GetRole(ctx, "web-server")
+//	certClient, err := roleClient.IssueEd25519Certificate(ctx, "my-ed25519-key", &GenerateCertificateOptions{
+//	    CommonName: "app.example.com",
+//	    TTL:        "720h",
+//	})
+func (rc *RoleClient) IssueEd25519Certificate(ctx context.Context, keyRef string, opts *GenerateCertificateOptions) (*CertificateClient[*algo.Ed25519KeyPair], error) {
+	return rc.client.IssueEd25519CertificateWithKeyRef(ctx, rc.name, keyRef, opts)
 }
 
 // ============================================================================
@@ -740,8 +809,10 @@ func buildRoleRequestBody(opts *RoleOptions) map[string]interface{} {
 // Example:
 //
 // opts := bao.NewWebServerRole("example.com").
-//     WithTTL("1440h").
-//     Build()
+//
+//	WithTTL("1440h").
+//	Build()
+//
 // err := client.CreateRole(ctx, "web-server", opts)
 func NewWebServerRole(domain string) *RoleOptionsBuilder {
 	return NewRoleOptionsBuilder().
@@ -758,8 +829,10 @@ func NewWebServerRole(domain string) *RoleOptionsBuilder {
 // Example:
 //
 // opts := bao.NewClientCertRole("example.com").
-//     WithTTL("1440h").
-//     Build()
+//
+//	WithTTL("1440h").
+//	Build()
+//
 // err := client.CreateRole(ctx, "client-cert", opts)
 func NewClientCertRole(domain string) *RoleOptionsBuilder {
 	return NewRoleOptionsBuilder().
@@ -776,8 +849,10 @@ func NewClientCertRole(domain string) *RoleOptionsBuilder {
 // Example:
 //
 // opts := bao.NewCodeSigningRole("example.com").
-//     WithOrganization("Acme Corp").
-//     Build()
+//
+//	WithOrganization("Acme Corp").
+//	Build()
+//
 // err := client.CreateRole(ctx, "code-signing", opts)
 func NewCodeSigningRole(domain string) *RoleOptionsBuilder {
 	return NewRoleOptionsBuilder().

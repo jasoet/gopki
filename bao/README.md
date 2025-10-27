@@ -12,13 +12,13 @@
 
 - [Overview](#overview)
 - [Key Features](#key-features)
-- [Architecture](#architecture)
+- [Architecture & Relationships](#architecture--relationships)
 - [Quick Start](#quick-start)
 - [Core Concepts](#core-concepts)
 - [API Reference](#api-reference)
+- [Relationship-Based APIs](#relationship-based-apis)
 - [Complete Examples](#complete-examples)
 - [Testing](#testing)
-- [Best Practices](#best-practices)
 
 ---
 
@@ -32,6 +32,7 @@ The `bao` package provides seamless integration between GoPKI's type-safe crypto
 - **Generate Keys**: RSA, ECDSA, and Ed25519 with type-safe operations
 - **Issue Certificates**: Multiple workflows for different security requirements
 - **Configure Policies**: Role-based certificate issuance policies
+- **Navigate Relationships**: Fluent APIs between Keys, Issuers, Roles, and Certificates
 - **Complete Lifecycle**: From CA setup to certificate revocation
 
 ---
@@ -51,7 +52,7 @@ The `bao` package provides seamless integration between GoPKI's type-safe crypto
 
 ### Developer Experience
 - 🎯 Builder patterns for complex configurations
-- 🎯 Fluent APIs for readable code
+- 🎯 Fluent APIs for readable code with relationship navigation
 - 🎯 Comprehensive error handling
 - 🎯 Integration test suite with testcontainers
 
@@ -63,43 +64,58 @@ The `bao` package provides seamless integration between GoPKI's type-safe crypto
 
 ---
 
-## Architecture
+## Architecture & Relationships
 
 ### Module Relationships
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         OpenBao/Vault                           │
-│                         PKI Secrets Engine                       │
-└────────┬────────────────┬────────────────┬──────────────────────┘
-         │                │                │
-         ↓                ↓                ↓
-    IssuerClient     KeyClient[K]    RoleClient
-    (CA Mgmt)        (Keys)           (Policies)
-         │                │                │
-         │                └────────┬───────┘
-         │                         │
-         └─────────────┬───────────┘
-                       ↓
-             CertificateClient[K]
-             (Certificates)
+                     ┌──────────────────────────────────────────┐
+                     │      OpenBao/Vault PKI Engine            │
+                     └──────────────────────────────────────────┘
+                                      │
+              ┌───────────────────────┼───────────────────────┐
+              │                       │                       │
+              ↓                       ↓                       ↓
+     ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+     │  KeyClient[K]   │◄───┤ IssuerClient    │───►│  RoleClient     │
+     │  (Keys)         │    │ (CA Management) │    │  (Policies)     │
+     └────────┬────────┘    └────────┬────────┘    └────────┬────────┘
+              │                      │                       │
+              │        GetIssuers()  │  CreateRole()         │
+              │                      │                       │
+              │                      │  IssueXXXCertificate()│
+              │                      ↓                       │
+              │             ┌─────────────────────┐          │
+              │             │                     │          │
+              └────────────►│ CertificateClient[K]│◄─────────┘
+                            │   (Certificates)    │
+                            └─────────────────────┘
+                    IssueCertificate()    IssueXXXCertificate()
+                    
+                    
+Relationship Flow:
+──────────────────
+
+Forward Navigation (Creation Flow):
+  Key → GetIssuers() → IssuerClient
+  IssuerClient → CreateRole() → RoleClient
+  IssuerClient → IssueXXXCertificate() → CertificateClient
+  RoleClient → IssueXXXCertificate() → CertificateClient
+  KeyClient → IssueCertificate() → CertificateClient
+
+Reverse Navigation (Discovery Flow):
+  RoleClient → GetIssuer() → IssuerClient
+  IssuerClient → KeyID() → KeyClient (via GetXXXKey)
 ```
 
 ### Component Overview
 
-| Component | Purpose | Key Operations |
-|-----------|---------|----------------|
-| **IssuerClient** | CA certificate management | Generate root/intermediate CA, import CA, configure issuers |
-| **KeyClient[K]** | Cryptographic key operations | Generate, create, import keys; issue certificates |
-| **CertificateClient[K]** | End-entity certificates | Issue, retrieve, revoke certificates |
-| **RoleClient** | Certificate policies | Define issuance rules, constraints, TTL |
-
-### Workflow Patterns
-
-1. **Complete CA Setup**: IssuerClient → RoleClient → KeyClient → CertificateClient
-2. **Local Key Certificate**: Local KeyPair → CertificateClient (CSR workflow)
-3. **OpenBao-Managed Key**: KeyClient → CertificateClient
-4. **Key Rotation**: KeyClient (rotate) → CertificateClient (reissue)
+| Component | Purpose | Key Operations | Relationships |
+|-----------|---------|----------------|---------------|
+| **KeyClient[K]** | Cryptographic key operations | Generate, create, import keys | → Issuers, → Certificates |
+| **IssuerClient** | CA certificate management | Generate CA, import CA, configure | ← Keys, → Roles, → Certificates |
+| **RoleClient** | Certificate policies | Define issuance rules, constraints | ← Issuer, → Certificates |
+| **CertificateClient[K]** | End-entity certificates | Issue, retrieve, revoke | ← Key, ← Issuer, ← Role |
 
 ---
 
@@ -108,556 +124,620 @@ The `bao` package provides seamless integration between GoPKI's type-safe crypto
 ### Installation
 
 ```bash
-go get github.com/jasoet/gopki
+go get github.com/jasoet/gopki/bao
 ```
 
-### Basic Example
+### Basic Usage
 
 ```go
-package main
-
 import (
     "context"
-    "log"
-    "time"
-
+    "github.com/hashicorp/vault/api"
     "github.com/jasoet/gopki/bao"
-    "github.com/jasoet/gopki/keypair/algo"
 )
 
-func main() {
-    // 1. Create client
-    client, err := bao.NewClient(&bao.Config{
-        Address: "http://localhost:8200",
-        Token:   "root-token",
-        Mount:   "pki",
-        Timeout: 30 * time.Second,
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
+// 1. Create client
+vaultClient, _ := api.NewClient(&api.Config{
+    Address: "http://localhost:8200",
+})
+vaultClient.SetToken("root-token")
 
-    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-    defer cancel()
+client := bao.NewClient(vaultClient, &bao.Config{
+    Mount: "pki",
+})
 
-    // 2. Setup CA
-    _, err = client.GenerateRootCA(ctx, bao.NewRootCABuilder("My Root CA").
-        WithOrganization("My Company").
-        WithKeyType("rsa", 4096).
-        WithTTL("87600h").
-        Build())
-    if err != nil {
-        log.Fatal(err)
-    }
+// 2. Generate Root CA
+ctx := context.Background()
+caResp, _ := client.GenerateRootCA(ctx, bao.NewRootCABuilder("My Root CA").
+    WithOrganization("My Org").
+    WithKeyType("rsa", 4096).
+    WithTTL("87600h"). // 10 years
+    Build())
 
-    // 3. Create role
-    err = client.CreateRole(ctx, "web-server", bao.NewWebServerRole("example.com").
-        WithTTL("720h").
-        EnableSubdomains().
-        Build())
-    if err != nil {
-        log.Fatal(err)
-    }
+// 3. Create role
+issuer, _ := client.GetIssuer(ctx, caResp.IssuerID)
+role, _ := issuer.CreateRole(ctx, "web-server", &bao.RoleOptions{
+    AllowedDomains:  []string{"example.com"},
+    AllowSubdomains: true,
+    TTL:             "720h", // 30 days
+    ServerFlag:      true,
+})
 
-    // 4. Generate key and issue certificate
-    keyClient, err := client.GenerateRSAKey(ctx, &bao.GenerateKeyOptions{
-        KeyName: "web-key",
-        KeyBits: 2048,
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
+// 4. Generate key and issue certificate
+keyClient, _ := client.GenerateRSAKey(ctx, &bao.GenerateKeyOptions{
+    KeyName: "web-key",
+    KeyBits: 2048,
+})
 
-    certClient, err := keyClient.IssueCertificate(ctx, "web-server", &bao.GenerateCertificateOptions{
+certClient, _ := role.IssueRSACertificate(ctx, keyClient.KeyInfo().KeyID, 
+    &bao.GenerateCertificateOptions{
         CommonName: "app.example.com",
         AltNames:   []string{"www.app.example.com"},
         TTL:        "720h",
     })
-    if err != nil {
-        log.Fatal(err)
-    }
 
-    log.Printf("✓ Certificate issued: %s", certClient.CertificateInfo().SerialNumber)
-}
+fmt.Println("Certificate Serial:", certClient.CertificateInfo().SerialNumber)
 ```
 
 ---
 
 ## Core Concepts
 
-### 1. Issuer (CA Management)
+### 1. Keys (KeyClient[K])
 
-The `IssuerClient` manages Certificate Authorities - both root and intermediate CAs.
+Keys are the foundation of PKI operations. OpenBao supports three key generation strategies:
 
-**Key Methods:**
-- `GenerateRootCA()` - Create a self-signed root CA
-- `GenerateIntermediateCA()` - Create an intermediate CA
-- `SignIntermediateCSR()` - Sign intermediate CA CSR
-- `ImportCA()` - Import existing CA
-- `UpdateIssuer()` - Configure issuer settings
-- `SetAsDefault()` - Set as default issuer
-
-**Builder Pattern:**
 ```go
-rootCA, err := client.GenerateRootCA(ctx, 
-    bao.NewRootCABuilder("Production Root CA").
-        WithOrganization("Acme Corp").
-        WithCountry("US").
-        WithKeyType("rsa", 4096).
-        WithTTL("87600h").  // 10 years
-        WithMaxPathLength(2).
-        Build())
-```
-
-### 2. Key (Cryptographic Keys)
-
-The `KeyClient[K]` provides type-safe key operations with generic constraints.
-
-**Key Types:**
-- `KeyClient[*algo.RSAKeyPair]` - RSA keys
-- `KeyClient[*algo.ECDSAKeyPair]` - ECDSA keys
-- `KeyClient[*algo.Ed25519KeyPair]` - Ed25519 keys
-
-**Two Approaches:**
-
-1. **Generate (Exported)** - Private key returned to you:
-```go
+// Strategy 1: Generate key externally (you have the private key)
 keyClient, _ := client.GenerateRSAKey(ctx, &bao.GenerateKeyOptions{
     KeyName: "my-key",
     KeyBits: 2048,
 })
-keyPair, _ := keyClient.KeyPair()  // ✓ Available
-```
+keyPair, _ := keyClient.KeyPair() // ✓ Available
 
-2. **Create (Internal)** - Private key stays in OpenBao:
-```go
+// Strategy 2: Create key internally (OpenBao keeps the private key)
 keyClient, _ := client.CreateRSAKey(ctx, &bao.GenerateKeyOptions{
-    KeyName: "managed-key",
-    KeyBits: 2048,
+    KeyName: "secure-key",
+    KeyBits: 4096,
 })
-// keyPair NOT available - key managed internally
-```
+keyPair, _ := keyClient.KeyPair() // ✗ Not available (managed by OpenBao)
 
-**Integration with Certificates:**
-```go
-// KeyClient can directly issue certificates
-certClient, _ := keyClient.IssueCertificate(ctx, "role", &bao.GenerateCertificateOptions{
-    CommonName: "service.example.com",
-    TTL:        "720h",
-})
-```
-
-### 3. Certificate (End-Entity Certificates)
-
-The `CertificateClient[K]` handles end-entity certificate operations.
-
-**Three Issuance Patterns:**
-
-1. **Generate** - OpenBao generates both key and certificate:
-```go
-certClient, _ := client.GenerateRSACertificate(ctx, "role", &bao.GenerateCertificateOptions{
-    CommonName: "api.example.com",
-    TTL:        "720h",
-})
-keyPair, _ := certClient.KeyPair()  // ✓ Private key returned
-```
-
-2. **Issue** - Use local key (most secure):
-```go
+// Strategy 3: Import existing key
 localKey, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
-certClient, _ := client.IssueRSACertificate(ctx, "role", localKey, &bao.GenerateCertificateOptions{
-    CommonName: "secure.example.com",
-    TTL:        "720h",
+keyClient, _ := client.ImportRSAKey(ctx, localKey, &bao.ImportKeyOptions{
+    KeyName: "imported-key",
 })
-// Private key never leaves local system!
+keyPair, _ := keyClient.KeyPair() // ✓ Available
 ```
 
-3. **IssueWithKeyRef** - Use OpenBao-managed key:
+**Key Operations:**
+- `keyClient.IssueCertificate()` - Issue certificate using this key
+- `keyClient.SignCSR()` - Sign a CSR with this key
+- `keyClient.SignVerbatim()` - Sign CSR bypassing role constraints
+- `keyClient.GetIssuers()` - Get all issuers using this key
+- `keyClient.Delete()` - Delete the key
+- `keyClient.UpdateName()` - Rename the key
+
+### 2. Issuers (IssuerClient)
+
+Issuers represent Certificate Authorities (root or intermediate):
+
 ```go
-keyClient, _ := client.GetRSAKey(ctx, "existing-key-id")
-certClient, _ := client.IssueRSACertificateWithKeyRef(ctx, "role", keyClient.KeyInfo().KeyID, &bao.GenerateCertificateOptions{
-    CommonName: "managed.example.com",
-    TTL:        "720h",
+// Generate Root CA
+rootCA, _ := client.GenerateRootCA(ctx, bao.NewRootCABuilder("Root CA").
+    WithOrganization("My Org").
+    WithCountry("US").
+    WithKeyType("rsa", 4096).
+    WithTTL("87600h").
+    WithMaxPathLength(2).
+    Build())
+
+// Generate Intermediate CA
+intermediateResp, _ := client.GenerateIntermediateCA(ctx, 
+    bao.NewIntermediateCABuilder("Intermediate CA").
+        WithKeyType("rsa", 2048).
+        AsExported().
+        Build())
+
+// Sign intermediate with root
+csrData, _ := cert.ParseCSRFromPEM([]byte(intermediateResp.CSR))
+intermediateCert, _ := client.SignIntermediateCSR(ctx, csrData, &bao.CAOptions{
+    CommonName:    "Intermediate CA",
+    TTL:           "43800h",
+    MaxPathLength: 1,
+})
+
+// Import existing CA
+issuer, _ := client.ImportCA(ctx, &bao.CABundle{
+    PEMBundle: caBundle,
 })
 ```
 
-### 4. Role (Certificate Policies)
+**Issuer Operations:**
+- `issuer.CreateRole()` - Create role for this issuer
+- `issuer.IssueRSACertificate()` - Issue RSA certificate using this issuer
+- `issuer.IssueECDSACertificate()` - Issue ECDSA certificate
+- `issuer.IssueEd25519Certificate()` - Issue Ed25519 certificate
+- `issuer.SignCSR()` - Sign a CSR with this issuer
+- `issuer.Update()` - Update issuer configuration
+- `issuer.Delete()` - Delete the issuer
+- `issuer.SetAsDefault()` - Make this the default issuer
 
-The `RoleClient` defines certificate issuance policies and constraints.
+### 3. Roles (RoleClient)
 
-**Builder Pattern:**
+Roles define policies for certificate issuance:
+
 ```go
-// Web server role
-roleOpts := bao.NewWebServerRole("example.com").
+// Create web server role
+role, _ := issuer.CreateRole(ctx, "web-server", &bao.RoleOptions{
+    AllowedDomains:  []string{"example.com"},
+    AllowSubdomains: true,
+    AllowWildcardCertificates: true,
+    TTL:             "720h",
+    MaxTTL:          "8760h",
+    ServerFlag:      true,
+    KeyType:         "rsa",
+    KeyBits:         2048,
+})
+
+// Or use builders
+clientRole := bao.NewClientCertRole("internal.example.com").
     WithTTL("720h").
-    WithMaxTTL("8760h").
-    EnableSubdomains().
-    EnableWildcards().
+    EnableCodeSigning().
     Build()
 
-// Client certificate role
-roleOpts := bao.NewClientCertRole("client.example.com").
-    WithTTL("720h").
-    Build()
-
-// Custom role
-roleOpts := bao.NewRoleOptionsBuilder().
-    WithIssuerRef("my-issuer").
-    WithTTL("720h").
-    WithAllowedDomains("internal.example.com").
-    WithKeyType("rsa", 2048).
-    WithServerAuth().
-    EnableSubdomains().
-    Build()
+client.CreateRole(ctx, "client-cert", clientRole)
 ```
 
-**Convenience Methods:**
+**Role Operations:**
+- `role.GetIssuer()` - Get the issuer for this role
+- `role.IssueRSACertificate()` - Issue RSA certificate using this role
+- `role.IssueECDSACertificate()` - Issue ECDSA certificate
+- `role.IssueEd25519Certificate()` - Issue Ed25519 certificate
+- `role.Update()` - Update role configuration
+- `role.Delete()` - Delete the role
+- `role.SetTTL()` - Update TTL
+- `role.AddAllowedDomain()` - Add allowed domain
+
+### 4. Certificates (CertificateClient[K])
+
+Certificates are the end product of the PKI workflow:
+
 ```go
-roleClient, _ := client.GetRole(ctx, "web-server")
-_ = roleClient.SetTTL(ctx, "1440h")
-_ = roleClient.AddAllowedDomain(ctx, "newdomain.com")
-_ = roleClient.EnableServerAuth(ctx)
+// Issue certificate (OpenBao generates key)
+certClient, _ := client.GenerateRSACertificate(ctx, "web-server", 
+    &bao.GenerateCertificateOptions{
+        CommonName: "app.example.com",
+        AltNames:   []string{"www.app.example.com"},
+        TTL:        "720h",
+    })
+
+// Issue certificate (use local key)
+localKey, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
+certClient, _ := client.IssueRSACertificate(ctx, "web-server", localKey, 
+    &bao.GenerateCertificateOptions{
+        CommonName: "app.example.com",
+        TTL:        "720h",
+    })
+
+// Issue certificate (use OpenBao-managed key)
+keyClient, _ := client.CreateRSAKey(ctx, &bao.GenerateKeyOptions{...})
+certClient, _ := keyClient.IssueCertificate(ctx, "web-server", 
+    &bao.GenerateCertificateOptions{
+        CommonName: "app.example.com",
+        TTL:        "720h",
+    })
 ```
+
+**Certificate Operations:**
+- `certClient.Certificate()` - Get the certificate
+- `certClient.CertificateInfo()` - Get metadata
+- `certClient.KeyPair()` - Get associated key pair (if available)
+- `certClient.Revoke()` - Revoke the certificate
 
 ---
 
 ## API Reference
 
-### Client Configuration
+### Client Methods
+
+#### Key Operations
 
 ```go
-type Config struct {
-    Address   string        // OpenBao/Vault address (required)
-    Token     string        // Authentication token (required)
-    Mount     string        // PKI mount path (default: "pki")
-    Timeout   time.Duration // Request timeout (default: 30s)
-}
+// Type-agnostic operations
+ListKeys(ctx) ([]string, error)
+GetKey(ctx, keyRef) (*KeyInfo, error)
+DeleteKey(ctx, keyRef) error
+UpdateKeyName(ctx, keyRef, newName) error
 
-client, err := bao.NewClient(&bao.Config{
-    Address: "http://localhost:8200",
-    Token:   "root-token",
-    Mount:   "pki",
-    Timeout: 30 * time.Second,
+// RSA operations
+GenerateRSAKey(ctx, opts) (*KeyClient[*algo.RSAKeyPair], error)
+CreateRSAKey(ctx, opts) (*KeyClient[*algo.RSAKeyPair], error)
+ImportRSAKey(ctx, kp, opts) (*KeyClient[*algo.RSAKeyPair], error)
+GetRSAKey(ctx, keyRef) (*KeyClient[*algo.RSAKeyPair], error)
+
+// ECDSA operations
+GenerateECDSAKey(ctx, opts) (*KeyClient[*algo.ECDSAKeyPair], error)
+CreateECDSAKey(ctx, opts) (*KeyClient[*algo.ECDSAKeyPair], error)
+ImportECDSAKey(ctx, kp, opts) (*KeyClient[*algo.ECDSAKeyPair], error)
+GetECDSAKey(ctx, keyRef) (*KeyClient[*algo.ECDSAKeyPair], error)
+
+// Ed25519 operations
+GenerateEd25519Key(ctx, opts) (*KeyClient[*algo.Ed25519KeyPair], error)
+CreateEd25519Key(ctx, opts) (*KeyClient[*algo.Ed25519KeyPair], error)
+ImportEd25519Key(ctx, kp, opts) (*KeyClient[*algo.Ed25519KeyPair], error)
+GetEd25519Key(ctx, keyRef) (*KeyClient[*algo.Ed25519KeyPair], error)
+```
+
+#### Issuer Operations
+
+```go
+GenerateRootCA(ctx, opts) (*GenerateCAResponse, error)
+GenerateIntermediateCA(ctx, opts) (*GenerateCAResponse, error)
+SignIntermediateCSR(ctx, csr, opts) (*cert.Certificate, error)
+ImportCA(ctx, bundle) (*IssuerClient, error)
+GetIssuer(ctx, issuerRef) (*IssuerClient, error)
+ListIssuers(ctx) ([]string, error)
+DeleteIssuer(ctx, issuerRef) error
+SetDefaultIssuer(ctx, issuerRef) error
+GetDefaultIssuer(ctx) (string, error)
+```
+
+#### Role Operations
+
+```go
+CreateRole(ctx, name, opts) error
+UpdateRole(ctx, name, opts) error
+GetRole(ctx, name) (*RoleClient, error)
+ListRoles(ctx) ([]string, error)
+DeleteRole(ctx, name) error
+```
+
+#### Certificate Operations
+
+```go
+// Generate (OpenBao creates key)
+GenerateRSACertificate(ctx, role, opts) (*CertificateClient[*algo.RSAKeyPair], error)
+GenerateECDSACertificate(ctx, role, opts) (*CertificateClient[*algo.ECDSAKeyPair], error)
+GenerateEd25519Certificate(ctx, role, opts) (*CertificateClient[*algo.Ed25519KeyPair], error)
+
+// Issue (use local key)
+IssueRSACertificate(ctx, role, keyPair, opts) (*CertificateClient[*algo.RSAKeyPair], error)
+IssueECDSACertificate(ctx, role, keyPair, opts) (*CertificateClient[*algo.ECDSAKeyPair], error)
+IssueEd25519Certificate(ctx, role, keyPair, opts) (*CertificateClient[*algo.Ed25519KeyPair], error)
+
+// Issue with key reference (use OpenBao-managed key)
+IssueRSACertificateWithKeyRef(ctx, role, keyRef, opts) (*CertificateClient[*algo.RSAKeyPair], error)
+IssueECDSACertificateWithKeyRef(ctx, role, keyRef, opts) (*CertificateClient[*algo.ECDSAKeyPair], error)
+IssueEd25519CertificateWithKeyRef(ctx, role, keyRef, opts) (*CertificateClient[*algo.Ed25519KeyPair], error)
+
+// CSR operations
+SignCSR(ctx, role, csr, opts) (*cert.Certificate, error)
+SignVerbatim(ctx, csr, opts) (*cert.Certificate, error)
+SignSelfIssued(ctx, certificate, opts) (*cert.Certificate, error)
+SignCSRWithKeyRef(ctx, role, csr, keyRef, opts) (*cert.Certificate, error)
+SignVerbatimWithKeyRef(ctx, csr, keyRef, opts) (*cert.Certificate, error)
+
+// Retrieval
+ListCertificates(ctx) ([]string, error)
+GetCertificate(ctx, serial) (*cert.Certificate, error)
+GetRSACertificate(ctx, serial) (*CertificateClient[*algo.RSAKeyPair], error)
+GetECDSACertificate(ctx, serial) (*CertificateClient[*algo.ECDSAKeyPair], error)
+GetEd25519Certificate(ctx, serial) (*CertificateClient[*algo.Ed25519KeyPair], error)
+```
+
+---
+
+## Relationship-Based APIs
+
+### Overview
+
+The relationship-based APIs enable fluent navigation between PKI components, making complex workflows intuitive and type-safe.
+
+### KeyClient[K] → IssuerClient
+
+**Navigate from key to all issuers using that key:**
+
+```go
+// Get all issuers that use this key
+issuers, err := keyClient.GetIssuers(ctx)
+for _, issuer := range issuers {
+    fmt.Printf("Issuer: %s uses key: %s\n", issuer.Name(), keyClient.KeyInfo().KeyName)
+}
+```
+
+**Use case:** Key rotation - find all CAs using a key before rotating it.
+
+### IssuerClient → RoleClient
+
+**Create roles directly from issuer:**
+
+```go
+// Create role pre-configured with this issuer
+role, err := issuer.CreateRole(ctx, "web-server", &bao.RoleOptions{
+    AllowedDomains:  []string{"example.com"},
+    AllowSubdomains: true,
+    TTL:             "720h",
+    ServerFlag:      true,
+})
+// Role automatically has IssuerRef = issuer.ID()
+```
+
+**Use case:** Quickly set up roles for specific CAs.
+
+### IssuerClient → CertificateClient[K]
+
+**Issue certificates directly from issuer (bypassing explicit role):**
+
+```go
+// Issue RSA certificate using issuer's default role
+certClient, err := issuer.IssueRSACertificate(ctx, keyRef, &bao.GenerateCertificateOptions{
+    CommonName: "app.example.com",
+    TTL:        "720h",
+})
+
+// Issue ECDSA certificate
+ecCertClient, err := issuer.IssueECDSACertificate(ctx, keyRef, &bao.GenerateCertificateOptions{
+    CommonName: "api.example.com",
+    TTL:        "720h",
+})
+
+// Issue Ed25519 certificate
+edCertClient, err := issuer.IssueEd25519Certificate(ctx, keyRef, &bao.GenerateCertificateOptions{
+    CommonName: "service.example.com",
+    TTL:        "720h",
+})
+
+// Sign CSR directly with issuer
+certificate, err := issuer.SignCSR(ctx, csr, &bao.SignCertificateOptions{
+    TTL: "8760h",
 })
 ```
 
-### Issuer Operations
+**Use case:** Quick certificate issuance without managing roles explicitly.
 
-| Method | Description | Returns |
-|--------|-------------|---------|
-| `GenerateRootCA(ctx, opts)` | Generate root CA | `*GenerateCAResponse` |
-| `GenerateIntermediateCA(ctx, opts)` | Generate intermediate CA | `*GenerateCAResponse` |
-| `SignIntermediateCSR(ctx, csr, opts)` | Sign intermediate CSR | `*cert.Certificate` |
-| `ImportCA(ctx, bundle)` | Import existing CA | `*IssuerClient` |
-| `GetIssuer(ctx, ref)` | Get issuer by ID/name | `*IssuerClient` |
-| `ListIssuers(ctx)` | List all issuers | `[]string` |
-| `SetDefaultIssuer(ctx, ref)` | Set default issuer | `error` |
+### RoleClient → IssuerClient
 
-**IssuerClient Methods:**
-- `ID()` - Get issuer ID
-- `Name()` - Get issuer name
-- `KeyID()` - Get associated key ID
-- `Certificate()` - Get issuer certificate
-- `Update(ctx, config)` - Update configuration
-- `Delete(ctx)` - Delete issuer
-- `SetAsDefault(ctx)` - Set as default
+**Navigate from role to its issuer:**
 
-### Key Operations
+```go
+// Discover which issuer a role uses
+issuer, err := role.GetIssuer(ctx)
+fmt.Printf("Role '%s' uses issuer: %s\n", role.Name(), issuer.Name())
+```
 
-| Method | Description | Returns |
-|--------|-------------|---------|
-| `GenerateRSAKey(ctx, opts)` | Generate RSA key (exported) | `*KeyClient[*algo.RSAKeyPair]` |
-| `CreateRSAKey(ctx, opts)` | Create RSA key (internal) | `*KeyClient[*algo.RSAKeyPair]` |
-| `ImportRSAKey(ctx, kp, opts)` | Import RSA key | `*KeyClient[*algo.RSAKeyPair]` |
-| `GetRSAKey(ctx, ref)` | Get RSA key by ID/name | `*KeyClient[*algo.RSAKeyPair]` |
-| `ListKeys(ctx)` | List all keys | `[]string` |
+**Use case:** Role auditing and dependency tracking.
 
-Similar methods exist for ECDSA (`GenerateECDSAKey`, etc.) and Ed25519 (`GenerateEd25519Key`, etc.).
+### RoleClient → CertificateClient[K]
 
-**KeyClient[K] Methods:**
-- `KeyInfo()` - Get key metadata
-- `KeyPair()` - Get cached key pair (if available)
-- `HasKeyPair()` - Check if key pair cached
-- `Delete(ctx)` - Delete key
-- `UpdateName(ctx, name)` - Update key name
-- `IssueCertificate(ctx, role, opts)` - Issue certificate with this key
-- `SignCSR(ctx, role, csr, opts)` - Sign CSR with this key
-- `SignVerbatim(ctx, csr, opts)` - Sign CSR verbatim
+**Issue certificates directly from role:**
 
-### Certificate Operations
+```go
+// Issue RSA certificate using this role
+certClient, err := role.IssueRSACertificate(ctx, keyRef, &bao.GenerateCertificateOptions{
+    CommonName: "app.example.com",
+    TTL:        "720h",
+})
 
-| Method | Description | Returns |
-|--------|-------------|---------|
-| `GenerateRSACertificate(ctx, role, opts)` | Generate certificate (OpenBao key) | `*CertificateClient[*algo.RSAKeyPair]` |
-| `IssueRSACertificate(ctx, role, kp, opts)` | Issue certificate (local key) | `*CertificateClient[*algo.RSAKeyPair]` |
-| `IssueRSACertificateWithKeyRef(ctx, role, keyRef, opts)` | Issue certificate (OpenBao-managed key) | `*CertificateClient[*algo.RSAKeyPair]` |
-| `SignCSR(ctx, role, csr, opts)` | Sign CSR | `*cert.Certificate` |
-| `GetCertificate(ctx, serial)` | Get certificate by serial | `*cert.Certificate` |
-| `ListCertificates(ctx)` | List all certificates | `[]string` |
-| `RevokeCertificate(ctx, serial)` | Revoke certificate | `error` |
+// Issue ECDSA certificate
+ecCertClient, err := role.IssueECDSACertificate(ctx, keyRef, &bao.GenerateCertificateOptions{
+    CommonName: "api.example.com",
+    TTL:        "720h",
+})
 
-Similar methods exist for ECDSA and Ed25519.
+// Issue Ed25519 certificate
+edCertClient, err := role.IssueEd25519Certificate(ctx, keyRef, &bao.GenerateCertificateOptions{
+    CommonName: "service.example.com",
+    TTL:        "720h",
+})
+```
 
-**CertificateClient[K] Methods:**
-- `Certificate()` - Get certificate
-- `CertificateInfo()` - Get metadata
-- `KeyPair()` - Get cached key pair (if available)
-- `HasKeyPair()` - Check if key pair cached
-- `Revoke(ctx)` - Revoke this certificate
-- `RevokeWithKey(ctx)` - Revoke using private key
+**Use case:** Certificate issuance with role-specific constraints.
 
-### Role Operations
+### KeyClient[K] → CertificateClient[K]
 
-| Method | Description | Returns |
-|--------|-------------|---------|
-| `CreateRole(ctx, name, opts)` | Create or update role | `error` |
-| `GetRole(ctx, name)` | Get role by name | `*RoleClient` |
-| `ListRoles(ctx)` | List all roles | `[]string` |
-| `DeleteRole(ctx, name)` | Delete role | `error` |
+**Issue certificates using a specific key:**
 
-**RoleClient Methods:**
-- `Name()` - Get role name
-- `Options()` - Get role options
-- `Update(ctx, opts)` - Update role
-- `Delete(ctx)` - Delete role
-- `SetTTL(ctx, ttl)` - Update TTL
-- `SetMaxTTL(ctx, maxTTL)` - Update max TTL
-- `AddAllowedDomain(ctx, domain)` - Add allowed domain
-- `RemoveAllowedDomain(ctx, domain)` - Remove allowed domain
-- `EnableServerAuth(ctx)` - Enable server authentication
-- `EnableClientAuth(ctx)` - Enable client authentication
+```go
+// Key-centric workflow
+keyClient, _ := client.GetRSAKey(ctx, "my-key")
+certClient, err := keyClient.IssueCertificate(ctx, "web-server", &bao.GenerateCertificateOptions{
+    CommonName: "app.example.com",
+    TTL:        "720h",
+})
+```
+
+**Use case:** Certificate issuance with specific key requirements.
+
+### Complete Fluent Workflow Example
+
+```go
+// Create CA and get its key
+caResp, _ := client.GenerateRootCA(ctx, &bao.CAOptions{
+    Type:       "internal",
+    CommonName: "My CA",
+    KeyName:    "ca-key",
+    TTL:        "87600h",
+    KeyType:    "rsa",
+    KeyBits:    4096,
+})
+
+// Get key → Navigate to issuers
+keyClient, _ := client.GetRSAKey(ctx, caResp.KeyID)
+issuers, _ := keyClient.GetIssuers(ctx)
+issuer := issuers[0]
+
+// Issuer → Create role
+role, _ := issuer.CreateRole(ctx, "web-server", &bao.RoleOptions{
+    AllowedDomains:  []string{"example.com"},
+    AllowSubdomains: true,
+    TTL:             "720h",
+    ServerFlag:      true,
+})
+
+// Role → Issue certificate
+certClient, _ := role.IssueRSACertificate(ctx, keyClient.KeyInfo().KeyID, 
+    &bao.GenerateCertificateOptions{
+        CommonName: "app.example.com",
+        TTL:        "720h",
+    })
+
+// Reverse navigation: Role → Issuer
+retrievedIssuer, _ := role.GetIssuer(ctx)
+fmt.Printf("Certificate issued by: %s\n", retrievedIssuer.Name())
+```
 
 ---
 
 ## Complete Examples
 
-### Example 1: Complete CA Setup with Certificate Issuance
+### Example 1: Root CA with Certificate Issuance
 
 ```go
-func setupProductionCA() error {
-    client, _ := bao.NewClient(&bao.Config{
-        Address: "https://vault.example.com",
-        Token:   os.Getenv("VAULT_TOKEN"),
-        Mount:   "pki",
-    })
+ctx := context.Background()
 
-    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-    defer cancel()
-
-    // 1. Generate root CA
-    rootCA, err := client.GenerateRootCA(ctx, 
-        bao.NewRootCABuilder("Production Root CA").
-            WithOrganization("Acme Corporation").
-            WithCountry("US").
-            WithKeyType("rsa", 4096).
-            WithTTL("87600h").  // 10 years
-            WithIssuerName("prod-root").
-            Build())
-    if err != nil {
-        return fmt.Errorf("root CA: %w", err)
-    }
-
-    // 2. Create role for web servers
-    err = client.CreateRole(ctx, "web-server", 
-        bao.NewWebServerRole("example.com").
-            WithTTL("720h").    // 30 days
-            WithMaxTTL("8760h"). // 1 year
-            EnableSubdomains().
-            EnableWildcards().
-            WithOrganization("Acme Corporation").
-            Build())
-    if err != nil {
-        return fmt.Errorf("role: %w", err)
-    }
-
-    // 3. Generate key and issue certificate
-    keyClient, err := client.GenerateRSAKey(ctx, &bao.GenerateKeyOptions{
-        KeyName: "web-frontend-key",
-        KeyBits: 2048,
-    })
-    if err != nil {
-        return fmt.Errorf("key: %w", err)
-    }
-
-    certClient, err := keyClient.IssueCertificate(ctx, "web-server", &bao.GenerateCertificateOptions{
-        CommonName: "app.example.com",
-        AltNames:   []string{"www.app.example.com", "api.app.example.com"},
-        TTL:        "720h",
-    })
-    if err != nil {
-        return fmt.Errorf("certificate: %w", err)
-    }
-
-    log.Printf("✓ Certificate issued: %s", certClient.CertificateInfo().SerialNumber)
-    return nil
+// 1. Create Root CA
+caResp, err := client.GenerateRootCA(ctx, bao.NewRootCABuilder("My Root CA").
+    WithOrganization("My Organization").
+    WithCountry("US").
+    WithKeyType("rsa", 4096).
+    WithTTL("87600h").
+    Build())
+if err != nil {
+    log.Fatal(err)
 }
-```
 
-### Example 2: Secure Certificate Issuance (Local Key)
+// 2. Get issuer and create role
+issuer, _ := client.GetIssuer(ctx, caResp.IssuerID)
+role, _ := issuer.CreateRole(ctx, "web-server", &bao.RoleOptions{
+    AllowedDomains:  []string{"example.com"},
+    AllowSubdomains: true,
+    TTL:             "720h",
+    ServerFlag:      true,
+})
 
-```go
-func issueSecureCertificate() error {
-    client, _ := bao.NewClient(&bao.Config{
-        Address: "https://vault.example.com",
-        Token:   os.Getenv("VAULT_TOKEN"),
-        Mount:   "pki",
-    })
+// 3. Generate key and issue certificate
+keyClient, _ := client.GenerateRSAKey(ctx, &bao.GenerateKeyOptions{
+    KeyName: "web-key",
+    KeyBits: 2048,
+})
 
-    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-    defer cancel()
-
-    // 1. Generate key locally (private key never leaves!)
-    keyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
-    if err != nil {
-        return fmt.Errorf("generate key: %w", err)
-    }
-
-    // 2. Issue certificate using local key
-    certClient, err := client.IssueRSACertificate(ctx, "web-server", keyPair, &bao.GenerateCertificateOptions{
-        CommonName: "secure.example.com",
-        AltNames:   []string{"www.secure.example.com"},
-        TTL:        "720h",
-    })
-    if err != nil {
-        return fmt.Errorf("issue certificate: %w", err)
-    }
-
-    // 3. Save certificate and private key
-    certificate := certClient.Certificate()
-    err = os.WriteFile("certificate.pem", certificate.PEMData, 0644)
-    if err != nil {
-        return fmt.Errorf("save certificate: %w", err)
-    }
-
-    privateKeyPEM, err := keyPair.PrivateKeyToPEM()
-    if err != nil {
-        return fmt.Errorf("private key PEM: %w", err)
-    }
-    err = os.WriteFile("private_key.pem", privateKeyPEM, 0600)
-    if err != nil {
-        return fmt.Errorf("save private key: %w", err)
-    }
-
-    log.Printf("✓ Certificate and key saved securely")
-    return nil
-}
-```
-
-### Example 3: Key Rotation
-
-```go
-func rotateKey() error {
-    client, _ := bao.NewClient(&bao.Config{
-        Address: "https://vault.example.com",
-        Token:   os.Getenv("VAULT_TOKEN"),
-        Mount:   "pki",
-    })
-
-    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-    defer cancel()
-
-    // 1. Generate new key
-    newKey, err := client.GenerateRSAKey(ctx, &bao.GenerateKeyOptions{
-        KeyName: "web-key-v2",
-        KeyBits: 2048,
-    })
-    if err != nil {
-        return fmt.Errorf("new key: %w", err)
-    }
-
-    // 2. Issue certificate with new key
-    newCert, err := newKey.IssueCertificate(ctx, "web-server", &bao.GenerateCertificateOptions{
+certClient, _ := role.IssueRSACertificate(ctx, keyClient.KeyInfo().KeyID,
+    &bao.GenerateCertificateOptions{
         CommonName: "app.example.com",
         AltNames:   []string{"www.app.example.com"},
         TTL:        "720h",
     })
-    if err != nil {
-        return fmt.Errorf("new certificate: %w", err)
-    }
 
-    // 3. Retrieve and revoke old certificate
-    oldCert, err := client.GetCertificate(ctx, "old-cert-serial")
-    if err == nil {
-        _ = client.RevokeCertificate(ctx, oldCert.Certificate.SerialNumber.String())
-    }
-
-    // 4. Delete old key
-    oldKey, err := client.GetRSAKey(ctx, "web-key-v1")
-    if err == nil {
-        _ = oldKey.Delete(ctx)
-    }
-
-    log.Printf("✓ Key rotation complete: %s", newCert.CertificateInfo().SerialNumber)
-    return nil
-}
+fmt.Println("Certificate Serial:", certClient.CertificateInfo().SerialNumber)
 ```
 
-### Example 4: Multi-Issuer Management
+### Example 2: Local Key with CSR Workflow
 
 ```go
-func setupMultiIssuer() error {
-    client, _ := bao.NewClient(&bao.Config{
-        Address: "https://vault.example.com",
-        Token:   os.Getenv("VAULT_TOKEN"),
-        Mount:   "pki",
-    })
+// 1. Setup CA and role
+caResp, _ := client.GenerateRootCA(ctx, bao.NewRootCABuilder("My CA").
+    WithKeyType("rsa", 4096).
+    WithTTL("87600h").
+    Build())
 
-    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-    defer cancel()
+issuer, _ := client.GetIssuer(ctx, caResp.IssuerID)
+role, _ := issuer.CreateRole(ctx, "secure-client", &bao.RoleOptions{
+    AllowAnyName: true,
+    ClientFlag:   true,
+    TTL:          "720h",
+})
 
-    // 1. Generate production root CA
-    prodCA, err := client.GenerateRootCA(ctx, 
-        bao.NewRootCABuilder("Production Root CA").
-            WithOrganization("Acme Corp").
-            WithKeyType("rsa", 4096).
-            WithIssuerName("prod-root").
-            WithTTL("87600h").
-            Build())
-    if err != nil {
-        return fmt.Errorf("prod CA: %w", err)
-    }
+// 2. Generate key locally (never sent to OpenBao)
+localKey, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
 
-    // 2. Generate development root CA
-    devCA, err := client.GenerateRootCA(ctx, 
-        bao.NewRootCABuilder("Development Root CA").
-            WithOrganization("Acme Corp - Dev").
-            WithKeyType("rsa", 2048).
-            WithIssuerName("dev-root").
-            WithTTL("43800h").
-            Build())
-    if err != nil {
-        return fmt.Errorf("dev CA: %w", err)
-    }
+// 3. Create CSR
+csr, _ := cert.CreateCSR(localKey, cert.CSRRequest{
+    Subject: pkix.Name{
+        CommonName:   "client.example.com",
+        Organization: []string{"My Org"},
+        Country:      []string{"US"},
+    },
+})
 
-    // 3. Set production as default
-    err = client.SetDefaultIssuer(ctx, prodCA.IssuerID)
-    if err != nil {
-        return fmt.Errorf("set default: %w", err)
-    }
+// 4. Sign CSR with issuer
+signedCert, _ := issuer.SignCSR(ctx, csr, &bao.SignCertificateOptions{
+    TTL: "720h",
+})
 
-    // 4. Create role tied to dev issuer
-    roleOpts := bao.NewWebServerRole("dev.example.com").Build()
-    roleOpts.IssuerRef = devCA.IssuerID
-    err = client.CreateRole(ctx, "dev-web", roleOpts)
-    if err != nil {
-        return fmt.Errorf("dev role: %w", err)
-    }
+// Private key stays local, only certificate from OpenBao
+fmt.Println("Certificate:", signedCert.Certificate.Subject.CommonName)
+```
 
-    // 5. Issue certificate from dev issuer
-    cert, err := client.GenerateRSACertificate(ctx, "dev-web", &bao.GenerateCertificateOptions{
-        CommonName: "api.dev.example.com",
+### Example 3: Key Rotation Workflow
+
+```go
+// 1. Find all issuers using old key
+oldKey, _ := client.GetRSAKey(ctx, "old-key-id")
+issuers, _ := oldKey.GetIssuers(ctx)
+
+// 2. Generate new key
+newKey, _ := client.GenerateRSAKey(ctx, &bao.GenerateKeyOptions{
+    KeyName: "new-key",
+    KeyBits: 4096,
+})
+
+// 3. For each issuer, update or create new issuer with new key
+for _, issuer := range issuers {
+    fmt.Printf("Issuer '%s' uses old key\n", issuer.Name())
+    // Generate new issuer or update configuration
+}
+
+// 4. After migration, delete old key
+oldKey.Delete(ctx)
+```
+
+### Example 4: Multi-Issuer Environment
+
+```go
+// Production issuer
+prodCA, _ := client.GenerateRootCA(ctx, bao.NewRootCABuilder("Production CA").
+    WithKeyType("rsa", 4096).
+    WithIssuerName("prod-ca").
+    WithTTL("87600h").
+    Build())
+
+// Development issuer
+devCA, _ := client.GenerateRootCA(ctx, bao.NewRootCABuilder("Development CA").
+    WithKeyType("rsa", 2048).
+    WithIssuerName("dev-ca").
+    WithTTL("8760h").
+    Build())
+
+// Get issuer clients
+prodIssuer, _ := client.GetIssuer(ctx, prodCA.IssuerID)
+devIssuer, _ := client.GetIssuer(ctx, devCA.IssuerID)
+
+// Create environment-specific roles
+prodRole, _ := prodIssuer.CreateRole(ctx, "prod-web", &bao.RoleOptions{
+    AllowedDomains: []string{"example.com"},
+    TTL:            "720h",
+    ServerFlag:     true,
+})
+
+devRole, _ := devIssuer.CreateRole(ctx, "dev-web", &bao.RoleOptions{
+    AllowedDomains: []string{"dev.example.com"},
+    TTL:            "168h", // 7 days
+    ServerFlag:     true,
+})
+
+// Issue certificates from different environments
+prodCert, _ := prodRole.IssueRSACertificate(ctx, "prod-key", 
+    &bao.GenerateCertificateOptions{
+        CommonName: "api.example.com",
         TTL:        "720h",
     })
-    if err != nil {
-        return fmt.Errorf("dev cert: %w", err)
-    }
 
-    log.Printf("✓ Multi-issuer setup complete")
-    log.Printf("  Production CA: %s", prodCA.IssuerID)
-    log.Printf("  Development CA: %s", devCA.IssuerID)
-    log.Printf("  Dev Certificate: %s", cert.CertificateInfo().SerialNumber)
-    return nil
-}
+devCert, _ := devRole.IssueRSACertificate(ctx, "dev-key",
+    &bao.GenerateCertificateOptions{
+        CommonName: "api.dev.example.com",
+        TTL:        "168h",
+    })
 ```
 
 ---
@@ -667,263 +747,154 @@ func setupMultiIssuer() error {
 ### Unit Tests
 
 ```bash
-# Run unit tests
-go test ./bao/...
-
-# With coverage
-go test -coverprofile=coverage.out ./bao/...
-go tool cover -html=coverage.out
+go test ./bao
 ```
 
 ### Integration Tests
 
-Integration tests use testcontainers to spin up OpenBao instances:
+Integration tests use testcontainers to spin up OpenBao:
 
 ```bash
-# Run integration tests
-go test -tags=integration ./bao/...
-
-# Run specific integration test
-go test -tags=integration -run TestCompleteCAWorkflow ./bao/...
+go test -v -tags=integration ./bao
 ```
 
-**Cross-Module Integration Tests:**
-- `TestCompleteCAWorkflow` - Complete workflow from CA to certificate
-- `TestKeyRotationWorkflow` - Key rotation with certificate re-issuance
-- `TestMultiIssuerWorkflow` - Multiple issuers and default management
-- `TestRoleBasedCertificateManagement` - Role-based policies
-- `TestCertificateChainValidation` - Certificate chain validation
-- `TestLocalKeyWithOpenBaoSigning` - Local key with OpenBao signing
+**Test Coverage:**
+- Key generation and management (all types)
+- CA generation (root and intermediate)
+- Role creation and configuration
+- Certificate issuance (multiple workflows)
+- Relationship navigation (all directions)
+- Certificate revocation
+- Error handling
 
-### Test Coverage
+### Test Container Helper
 
-- **Overall**: 80%+
-- **Unit Tests**: 150+ test cases
-- **Integration Tests**: 40+ test cases
-- **Cross-Module Tests**: 6 comprehensive workflows
+The package provides a test container helper:
+
+```go
+//go:build integration
+
+import "github.com/jasoet/gopki/bao/testcontainer"
+
+// Setup OpenBao container
+container, err := testcontainer.StartOpenBao(ctx, &testcontainer.Options{
+    Version: "2.4.3",
+    Token:   "test-token",
+})
+defer testcontainer.StopOpenBao(ctx, container)
+
+// Get client
+client := testcontainer.GetClient(container)
+```
 
 ---
 
 ## Best Practices
 
-### 1. Always Use Context with Timeout
+### Security
+
+1. **Keep private keys local when possible**
+   ```go
+   // Use CSR workflow for sensitive keys
+   localKey, _ := algo.GenerateRSAKeyPair(algo.KeySize4096)
+   csr, _ := cert.CreateCSR(localKey, csrReq)
+   signedCert, _ := issuer.SignCSR(ctx, csr, opts)
+   // Private key never sent to OpenBao
+   ```
+
+2. **Use appropriate key sizes**
+   ```go
+   // Production: RSA 4096 or ECDSA P-384
+   keyClient, _ := client.GenerateRSAKey(ctx, &bao.GenerateKeyOptions{
+       KeyBits: 4096,
+   })
+   ```
+
+3. **Set reasonable TTLs**
+   ```go
+   // Different TTLs for different use cases
+   serverRole := &bao.RoleOptions{
+       TTL:    "720h",  // 30 days for servers
+       MaxTTL: "8760h", // 1 year max
+   }
+   clientRole := &bao.RoleOptions{
+       TTL:    "168h",  // 7 days for clients
+       MaxTTL: "720h",  // 30 days max
+   }
+   ```
+
+### Error Handling
 
 ```go
-// ✓ Good
-ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-defer cancel()
-cert, err := client.GenerateRSACertificate(ctx, "role", opts)
-
-// ✗ Bad
-cert, err := client.GenerateRSACertificate(context.Background(), "role", opts)
-```
-
-### 2. Private Keys Should Stay Local When Possible
-
-```go
-// ✓ Most Secure: Local key
-keyPair, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
-cert, _ := client.IssueRSACertificate(ctx, "role", keyPair, opts)
-
-// ✓ Secure: OpenBao-managed key (never exported)
-keyClient, _ := client.CreateRSAKey(ctx, keyOpts)
-cert, _ := keyClient.IssueCertificate(ctx, "role", opts)
-
-// ⚠️ Less Secure: Exported key
-keyClient, _ := client.GenerateRSAKey(ctx, keyOpts)
-keyPair, _ := keyClient.KeyPair()  // Private key exposed
-```
-
-### 3. Use Builder Patterns for Complex Configurations
-
-```go
-// ✓ Good: Readable and maintainable
-opts := bao.NewWebServerRole("example.com").
-    WithTTL("720h").
-    WithMaxTTL("8760h").
-    EnableSubdomains().
-    EnableWildcards().
-    WithKeyType("rsa", 2048).
-    Build()
-
-// ✗ Bad: Hard to read
-opts := &bao.RoleOptions{
-    AllowedDomains:            []string{"example.com"},
-    TTL:                       "720h",
-    MaxTTL:                    "8760h",
-    AllowSubdomains:           true,
-    AllowWildcardCertificates: true,
-    KeyType:                   "rsa",
-    KeyBits:                   2048,
-}
-```
-
-### 4. Proper Error Handling
-
-```go
-// ✓ Good: Check and handle errors
-cert, err := client.GenerateRSACertificate(ctx, "role", opts)
+// Always check errors
+certClient, err := role.IssueRSACertificate(ctx, keyRef, opts)
 if err != nil {
-    log.Printf("Failed to generate certificate: %v", err)
-    return fmt.Errorf("certificate generation: %w", err)
+    if strings.Contains(err.Error(), "key name already in use") {
+        // Handle duplicate key name
+    } else if strings.Contains(err.Error(), "role not found") {
+        // Handle missing role
+    }
+    return fmt.Errorf("certificate issuance failed: %w", err)
 }
-
-// ✗ Bad: Ignore errors
-cert, _ := client.GenerateRSACertificate(ctx, "role", opts)
 ```
 
-### 5. Cleanup Resources
+### Resource Cleanup
 
 ```go
-// ✓ Good: Cleanup with defer
-keyClient, _ := client.GenerateRSAKey(ctx, opts)
-defer keyClient.Delete(ctx)
-
-// ✓ Good: Cleanup on error
-roleClient, err := client.GetRole(ctx, "test-role")
+// Use defer for cleanup
+keyClient, err := client.GenerateRSAKey(ctx, opts)
 if err != nil {
     return err
 }
-defer client.DeleteRole(ctx, roleClient.Name())
+defer keyClient.Delete(ctx)
+
+// Cleanup roles after testing
+role, _ := issuer.CreateRole(ctx, "test-role", opts)
+defer client.DeleteRole(ctx, "test-role")
 ```
 
-### 6. Use Type-Safe Methods
+### Context Timeouts
 
 ```go
-// ✓ Good: Type-safe
-rsaKey, _ := client.GenerateRSAKey(ctx, opts)
-cert, _ := client.IssueRSACertificate(ctx, "role", keyPair, opts)
+// Set appropriate timeouts
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer cancel()
 
-// ✗ Bad: Generic (loses type safety)
-key, _ := client.GenerateKey(ctx, "rsa", opts)  // No such method
-```
-
----
-
-## Troubleshooting
-
-### Common Issues
-
-#### 1. "path is already in use"
-**Problem:** PKI secrets engine already enabled
-**Solution:** Check existing mounts or use different mount path
-
-#### 2. "role key type 'any' not allowed"
-**Problem:** Role doesn't allow flexible key types
-**Solution:** Specify `KeyType` and `KeyBits` in role or certificate options
-
-#### 3. "common name not allowed by this role"
-**Problem:** CommonName doesn't match role's allowed domains
-**Solution:** Add domain to `AllowedDomains` or set `AllowAnyName: true`
-
-#### 4. "private key not available"
-**Problem:** Trying to get KeyPair() from CreateXXXKey()
-**Solution:** Use GenerateXXXKey() if you need the private key
-
-### Debug Tips
-
-1. **Enable verbose logging**:
-```go
-client.SetLogLevel("debug")  // If implemented
-```
-
-2. **Check role configuration**:
-```go
-role, _ := client.GetRole(ctx, "role-name")
-fmt.Printf("%+v\n", role.Options())
-```
-
-3. **Verify issuer**:
-```go
-issuer, _ := client.GetIssuer(ctx, "issuer-ref")
-fmt.Printf("Issuer: %s (Key: %s)\n", issuer.ID(), issuer.KeyID())
-```
-
----
-
-## Security Considerations
-
-### 1. Token Management
-- Use time-limited tokens
-- Rotate tokens regularly
-- Use AppRole or other auth methods in production
-
-### 2. TLS Configuration
-```go
-tlsConfig := &tls.Config{
-    MinVersion: tls.VersionTLS12,
+certClient, err := role.IssueRSACertificate(ctx, keyRef, opts)
+if err != nil {
+    return fmt.Errorf("operation timeout: %w", err)
 }
-
-client, _ := bao.NewClient(&bao.Config{
-    Address:   "https://vault.example.com",
-    Token:     token,
-    TLSConfig: tlsConfig,
-})
 ```
 
-### 3. Key Management
-- Prefer `CreateXXXKey()` over `GenerateXXXKey()` when key export isn't needed
-- Use local key generation (`IssueXXXCertificate` with keypair) for maximum security
-- Implement key rotation policies
+### Relationship Navigation
 
-### 4. Certificate Lifecycle
-- Set appropriate TTL values
-- Implement certificate renewal before expiration
-- Monitor certificate expiration
-- Have revocation procedures in place
+```go
+// Use relationship APIs for cleaner code
+issuer, _ := client.GetIssuer(ctx, issuerID)
+role, _ := issuer.CreateRole(ctx, "web", opts)
+cert, _ := role.IssueRSACertificate(ctx, keyRef, certOpts)
 
----
-
-## Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass
-5. Submit a pull request
-
-### Development Setup
-
-```bash
-# Install dependencies
-go mod download
-
-# Run tests
-go test ./bao/...
-
-# Run integration tests
-go test -tags=integration ./bao/...
-
-# Run linter
-golangci-lint run ./bao/...
+// Instead of:
+client.CreateRole(ctx, "web", &bao.RoleOptions{IssuerRef: issuerID, ...})
+role, _ := client.GetRole(ctx, "web")
+cert, _ := client.IssueRSACertificateWithKeyRef(ctx, "web", keyRef, certOpts)
 ```
 
 ---
 
 ## License
 
-Same as GoPKI project.
+Part of the GoPKI project. See main repository for license information.
 
 ---
 
-## Changelog
+## Related Documentation
 
-### v1.0.0 (2025-10-27)
-- ✨ Initial release with full PKI integration
-- ✨ Type-safe APIs for RSA, ECDSA, Ed25519
-- ✨ Complete CA lifecycle management
-- ✨ Key management operations
-- ✨ Certificate issuance workflows
-- ✨ Role-based policies
-- ✨ Comprehensive test suite (80%+ coverage)
-- ✨ Integration tests with testcontainers
-- ✨ Cross-module integration tests
+- [Main GoPKI README](../README.md)
+- [Architecture Overview](../docs/ARCHITECTURE.md)
+- [Algorithm Guide](../docs/ALGORITHMS.md)
+- [Examples](../examples/)
 
 ---
 
-**For questions, issues, or feature requests, please open an issue on GitHub.**
-
-**Documentation Version:** 1.0.0  
-**Last Updated:** 2025-10-27
+**Need help?** Check the integration tests for comprehensive usage examples!
