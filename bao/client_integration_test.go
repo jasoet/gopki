@@ -11,12 +11,9 @@ import (
 func TestIntegration_ClientHealth(t *testing.T) {
 	ctx := context.Background()
 
-	// Setup Vault container
-	vaultContainer := SetupVaultContainer(ctx, t)
-	defer vaultContainer.Cleanup(ctx, t)
-
-	// Create client
-	client := vaultContainer.CreateTestClient(t)
+	// Setup container
+	container, client := setupTestContainer(t)
+	defer cleanupTestContainer(t, container)
 
 	// Test Health
 	t.Run("Health check should pass", func(t *testing.T) {
@@ -30,18 +27,19 @@ func TestIntegration_ClientHealth(t *testing.T) {
 func TestIntegration_ClientValidateConnection(t *testing.T) {
 	ctx := context.Background()
 
-	// Setup Vault container
-	vaultContainer := SetupVaultContainer(ctx, t)
-	defer vaultContainer.Cleanup(ctx, t)
+	// Setup container
+	container, client := setupTestContainer(t)
+	defer cleanupTestContainer(t, container)
 
-	// Create client
-	client := vaultContainer.CreateTestClient(t)
-
-	// Wait for Vault to be ready
-	vaultContainer.WaitForVaultReady(ctx, t, client)
+	// Wait for healthy
+	if err := container.WaitForHealthy(ctx, 30*time.Second); err != nil {
+		t.Fatalf("Container not healthy: %v", err)
+	}
 
 	// Enable PKI
-	vaultContainer.EnablePKI(ctx, t, client)
+	if err := container.EnablePKI(ctx, "pki", ""); err != nil {
+		t.Fatalf("Failed to enable PKI: %v", err)
+	}
 
 	// Test ValidateConnection
 	t.Run("ValidateConnection should pass", func(t *testing.T) {
@@ -55,14 +53,14 @@ func TestIntegration_ClientValidateConnection(t *testing.T) {
 func TestIntegration_ClientTimeout(t *testing.T) {
 	ctx := context.Background()
 
-	// Setup Vault container
-	vaultContainer := SetupVaultContainer(ctx, t)
-	defer vaultContainer.Cleanup(ctx, t)
+	// Setup container
+	container, _ := setupTestContainer(t)
+	defer cleanupTestContainer(t, container)
 
 	// Create client with very short timeout
 	client, err := NewClient(&Config{
-		Address: vaultContainer.Address,
-		Token:   vaultContainer.Token,
+		Address: container.Address,
+		Token:   container.Token,
 		Mount:   "pki",
 		Timeout: 1 * time.Nanosecond, // Extremely short timeout
 	})
