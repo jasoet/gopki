@@ -4,11 +4,110 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
 
 	"github.com/openbao/openbao/api/v2"
 )
 
-// Health checks the health status of the Vault server.
+// Client represents a Vault/OpenBao PKI client.
+type Client struct {
+	config     *Config
+	client     *api.Client  // OpenBao SDK client
+	httpClient *http.Client // Kept for backward compatibility
+	baseURL    *url.URL     // Kept for backward compatibility
+}
+
+// NewClient creates a new Vault/OpenBao client using the OpenBao SDK.
+// The client validates the configuration and establishes connection settings.
+//
+// Example:
+//
+//	client, err := bao.NewClient(&bao.Config{
+//	    Address: "https://vault.example.com",
+//	    Token:   os.Getenv("BAO_TOKEN"),
+//	    Mount:   "pki",
+//	})
+func NewClient(config *Config) (*Client, error) {
+	if config == nil {
+		return nil, fmt.Errorf("bao: config is required")
+	}
+
+	// Validate configuration
+	if err := config.Validate(); err != nil {
+		return nil, err
+	}
+
+	// Create OpenBao SDK config
+	apiConfig := api.DefaultConfig()
+	apiConfig.Address = config.Address
+
+	// Configure TLS if provided
+	if config.TLSConfig != nil {
+		tlsConfig := &api.TLSConfig{
+			CACert:        "",
+			CAPath:        "",
+			ClientCert:    "",
+			ClientKey:     "",
+			TLSServerName: "",
+			Insecure:      config.TLSConfig.InsecureSkipVerify,
+		}
+		if err := apiConfig.ConfigureTLS(tlsConfig); err != nil {
+			return nil, fmt.Errorf("bao: configure TLS: %w", err)
+		}
+	}
+
+	// Set timeout
+	if config.Timeout > 0 {
+		apiConfig.Timeout = config.Timeout
+	}
+
+	// Create HTTP client if provided (for custom transport)
+	if config.HTTPClient != nil {
+		apiConfig.HttpClient = config.HTTPClient
+	}
+
+	// Create OpenBao SDK client
+	client, err := api.NewClient(apiConfig)
+	if err != nil {
+		return nil, fmt.Errorf("bao: create SDK client: %w", err)
+	}
+
+	// Set authentication token
+	client.SetToken(config.Token)
+
+	// Set namespace if provided
+	if config.Namespace != "" {
+		client.SetNamespace(config.Namespace)
+	}
+
+	// Parse base URL (kept for backward compatibility)
+	baseURL, err := url.Parse(config.Address)
+	if err != nil {
+		return nil, fmt.Errorf("bao: parse address: %w", err)
+	}
+
+	return &Client{
+		config:     config,
+		client:     client,
+		httpClient: apiConfig.HttpClient,
+		baseURL:    baseURL,
+	}, nil
+}
+
+// Config returns the client configuration.
+func (c *Client) Config() *Config {
+	return c.config
+}
+
+// Close closes the client and releases resources.
+// This is a no-op for HTTP clients but included for future extensibility.
+func (c *Client) Close() error {
+	// Future: close persistent connections if needed
+	return nil
+}
+
+// Health checks the health status of the OpenBao server.
 // This performs a basic health check without requiring authentication.
 //
 // Example:
@@ -17,7 +116,7 @@ import (
 //	defer cancel()
 //
 //	if err := client.Health(ctx); err != nil {
-//	    log.Printf("Vault unhealthy: %v", err)
+//	    log.Printf("OpenBao unhealthy: %v", err)
 //	}
 func (c *Client) Health(ctx context.Context) error {
 	// Use SDK's Health API
@@ -25,25 +124,25 @@ func (c *Client) Health(ctx context.Context) error {
 	if err != nil {
 		if ctx.Err() != nil {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				return fmt.Errorf("vault: health check timeout: %w", ErrTimeout)
+				return fmt.Errorf("bao: health check timeout: %w", ErrTimeout)
 			}
-			return fmt.Errorf("vault: health check cancelled: %w", ctx.Err())
+			return fmt.Errorf("bao: health check cancelled: %w", ctx.Err())
 		}
-		return fmt.Errorf("vault: health check failed: %w", ErrHealthCheckFailed)
+		return fmt.Errorf("bao: health check failed: %w", ErrHealthCheckFailed)
 	}
 
-	// Check if Vault is initialized and unsealed
+	// Check if OpenBao is initialized and unsealed
 	if !healthResp.Initialized {
-		return fmt.Errorf("vault: not initialized: %w", ErrHealthCheckFailed)
+		return fmt.Errorf("bao: not initialized: %w", ErrHealthCheckFailed)
 	}
 	if healthResp.Sealed {
-		return fmt.Errorf("vault: sealed: %w", ErrHealthCheckFailed)
+		return fmt.Errorf("bao: sealed: %w", ErrHealthCheckFailed)
 	}
 
 	return nil
 }
 
-// ValidateConnection validates that the client can successfully connect to Vault
+// ValidateConnection validates that the client can successfully connect to OpenBao
 // and authenticate. This checks both connectivity and authentication.
 //
 // Example:
@@ -52,12 +151,12 @@ func (c *Client) Health(ctx context.Context) error {
 //	defer cancel()
 //
 //	if err := client.ValidateConnection(ctx); err != nil {
-//	    log.Fatalf("Cannot connect to Vault: %v", err)
+//	    log.Fatalf("Cannot connect to OpenBao: %v", err)
 //	}
 func (c *Client) ValidateConnection(ctx context.Context) error {
 	// First check health
 	if err := c.Health(ctx); err != nil {
-		return fmt.Errorf("vault: connection validation: %w", err)
+		return fmt.Errorf("bao: connection validation: %w", err)
 	}
 
 	// Try to read PKI mount config to verify authentication and mount access
@@ -68,22 +167,22 @@ func (c *Client) ValidateConnection(ctx context.Context) error {
 		if apiErr, ok := err.(*api.ResponseError); ok {
 			switch apiErr.StatusCode {
 			case 401:
-				return fmt.Errorf("vault: unauthorized: %w", ErrUnauthorized)
+				return fmt.Errorf("bao: unauthorized: %w", ErrUnauthorized)
 			case 403:
-				return fmt.Errorf("vault: permission denied for mount '%s': %w", c.config.Mount, ErrPermissionDenied)
+				return fmt.Errorf("bao: permission denied for mount '%s': %w", c.config.Mount, ErrPermissionDenied)
 			case 404:
-				return fmt.Errorf("vault: PKI mount '%s' not found: %w", c.config.Mount, ErrMountNotFound)
+				return fmt.Errorf("bao: PKI mount '%s' not found: %w", c.config.Mount, ErrMountNotFound)
 			}
 		}
-		return fmt.Errorf("vault: connection validation: %w", err)
+		return fmt.Errorf("bao: connection validation: %w", err)
 	}
 
-	// SDK returns nil secret and nil error for 404
-	// We need to verify the mount actually exists by checking for valid response
-	// For PKI mounts, config/urls should always return something (even if empty data)
-	// If secret is nil, the mount likely doesn't exist
+	// OpenBao SDK quirk: returns (nil secret, nil error) for non-existent paths
+	// instead of (nil, 404 error). We validate the mount exists by checking
+	// for a non-nil response. PKI mounts should always return a response for
+	// config/urls endpoint, even with empty data.
 	if secret == nil {
-		return fmt.Errorf("vault: PKI mount '%s' not found: %w", c.config.Mount, ErrMountNotFound)
+		return fmt.Errorf("bao: PKI mount '%s' not found or inaccessible: %w", c.config.Mount, ErrMountNotFound)
 	}
 
 	return nil

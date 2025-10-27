@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"net/url"
 	"time"
-
-	"github.com/openbao/openbao/api/v2"
 )
 
 // Config contains configuration for connecting to Vault/OpenBao.
@@ -111,102 +109,5 @@ func (c *Config) Validate() error {
 		c.Timeout = 30 * time.Second
 	}
 
-	return nil
-}
-
-// Client represents a Vault/OpenBao PKI client.
-type Client struct {
-	config     *Config
-	client     *api.Client  // OpenBao SDK client
-	httpClient *http.Client // Kept for backward compatibility
-	baseURL    *url.URL     // Kept for backward compatibility
-}
-
-// NewClient creates a new Vault/OpenBao client using the OpenBao SDK.
-// The client validates the configuration and establishes connection settings.
-//
-// Example:
-//
-//	client, err := vault.NewClient(&vault.Config{
-//	    Address: "https://vault.example.com",
-//	    Token:   os.Getenv("VAULT_TOKEN"),
-//	    Mount:   "pki",
-//	})
-func NewClient(config *Config) (*Client, error) {
-	if config == nil {
-		return nil, fmt.Errorf("vault: config is required")
-	}
-
-	// Validate configuration
-	if err := config.Validate(); err != nil {
-		return nil, err
-	}
-
-	// Create OpenBao SDK config
-	apiConfig := api.DefaultConfig()
-	apiConfig.Address = config.Address
-
-	// Configure TLS if provided
-	if config.TLSConfig != nil {
-		tlsConfig := &api.TLSConfig{
-			CACert:        "",
-			CAPath:        "",
-			ClientCert:    "",
-			ClientKey:     "",
-			TLSServerName: "",
-			Insecure:      config.TLSConfig.InsecureSkipVerify,
-		}
-		if err := apiConfig.ConfigureTLS(tlsConfig); err != nil {
-			return nil, fmt.Errorf("vault: configure TLS: %w", err)
-		}
-	}
-
-	// Set timeout
-	if config.Timeout > 0 {
-		apiConfig.Timeout = config.Timeout
-	}
-
-	// Create HTTP client if provided (for custom transport)
-	if config.HTTPClient != nil {
-		apiConfig.HttpClient = config.HTTPClient
-	}
-
-	// Create OpenBao SDK client
-	client, err := api.NewClient(apiConfig)
-	if err != nil {
-		return nil, fmt.Errorf("vault: create SDK client: %w", err)
-	}
-
-	// Set authentication token
-	client.SetToken(config.Token)
-
-	// Set namespace if provided
-	if config.Namespace != "" {
-		client.SetNamespace(config.Namespace)
-	}
-
-	// Parse base URL (kept for backward compatibility)
-	baseURL, err := url.Parse(config.Address)
-	if err != nil {
-		return nil, fmt.Errorf("vault: parse address: %w", err)
-	}
-
-	return &Client{
-		config:     config,
-		client:     client,
-		httpClient: apiConfig.HttpClient,
-		baseURL:    baseURL,
-	}, nil
-}
-
-// Config returns the client configuration.
-func (c *Client) Config() *Config {
-	return c.config
-}
-
-// Close closes the client and releases resources.
-// This is a no-op for HTTP clients but included for future extensibility.
-func (c *Client) Close() error {
-	// Future: close persistent connections if needed
 	return nil
 }
