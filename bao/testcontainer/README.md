@@ -63,7 +63,11 @@ if err != nil {
 defer container.Terminate(ctx)
 ```
 
-### Enable PKI Secrets Engine
+### Enable Secrets Engines
+
+OpenBao supports various secrets engines. The testcontainer provides convenient methods to enable the most common ones:
+
+#### PKI Secrets Engine
 
 ```go
 // Enable PKI at default path with default TTL (10 years)
@@ -77,6 +81,68 @@ err = container.EnablePKI(ctx, "pki-intermediate", "43800h")
 if err != nil {
     t.Fatalf("Failed to enable PKI: %v", err)
 }
+```
+
+#### KV (Key-Value) Secrets Engine
+
+```go
+// Enable KV v2 (default)
+err := container.EnableKV(ctx, "secret", 2)
+if err != nil {
+    t.Fatalf("Failed to enable KV: %v", err)
+}
+
+// Enable KV v1
+err = container.EnableKV(ctx, "kv-v1", 1)
+if err != nil {
+    t.Fatalf("Failed to enable KV v1: %v", err)
+}
+```
+
+#### Transit Secrets Engine
+
+```go
+// Enable Transit (encryption as a service)
+err := container.EnableTransit(ctx, "transit")
+if err != nil {
+    t.Fatalf("Failed to enable Transit: %v", err)
+}
+```
+
+#### Database Secrets Engine
+
+```go
+// Enable Database (dynamic database credentials)
+err := container.EnableDatabase(ctx, "database")
+if err != nil {
+    t.Fatalf("Failed to enable Database: %v", err)
+}
+```
+
+#### SSH Secrets Engine
+
+```go
+// Enable SSH
+err := container.EnableSSH(ctx, "ssh")
+if err != nil {
+    t.Fatalf("Failed to enable SSH: %v", err)
+}
+```
+
+#### Other Secrets Engines
+
+```go
+// TOTP (Time-based One-Time Passwords)
+err := container.EnableTOTP(ctx, "totp")
+
+// AWS (Dynamic AWS credentials)
+err := container.EnableAWS(ctx, "aws")
+
+// GCP (Dynamic GCP credentials)
+err := container.EnableGCP(ctx, "gcp")
+
+// RabbitMQ (Dynamic RabbitMQ credentials)
+err := container.EnableRabbitMQ(ctx, "rabbitmq")
 ```
 
 ### Wait for Container to be Healthy
@@ -199,6 +265,31 @@ func TestFullPKIWorkflow(t *testing.T) {
     t.Log("OpenBao is ready for PKI operations!")
 }
 ```
+
+## API Reference
+
+### Container Methods
+
+| Method | Description |
+|--------|-------------|
+| `Start(ctx, config)` | Creates and starts an OpenBao container |
+| `Terminate(ctx)` | Stops and removes the container |
+| `WaitForHealthy(ctx, timeout)` | Waits for container to be healthy |
+| `Config()` | Returns the container configuration |
+
+### Secrets Engine Methods
+
+| Method | Description | Example |
+|--------|-------------|---------|
+| `EnablePKI(ctx, path, ttl)` | Enable PKI secrets engine | `container.EnablePKI(ctx, "pki", "87600h")` |
+| `EnableKV(ctx, path, version)` | Enable KV v1 or v2 | `container.EnableKV(ctx, "secret", 2)` |
+| `EnableTransit(ctx, path)` | Enable Transit encryption | `container.EnableTransit(ctx, "transit")` |
+| `EnableDatabase(ctx, path)` | Enable Database secrets | `container.EnableDatabase(ctx, "database")` |
+| `EnableSSH(ctx, path)` | Enable SSH secrets | `container.EnableSSH(ctx, "ssh")` |
+| `EnableTOTP(ctx, path)` | Enable TOTP | `container.EnableTOTP(ctx, "totp")` |
+| `EnableAWS(ctx, path)` | Enable AWS secrets | `container.EnableAWS(ctx, "aws")` |
+| `EnableGCP(ctx, path)` | Enable GCP secrets | `container.EnableGCP(ctx, "gcp")` |
+| `EnableRabbitMQ(ctx, path)` | Enable RabbitMQ secrets | `container.EnableRabbitMQ(ctx, "rabbitmq")` |
 
 ## License
 

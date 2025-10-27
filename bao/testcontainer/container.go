@@ -161,6 +161,131 @@ func (c *Container) EnablePKI(ctx context.Context, mountPath string, maxLeaseTTL
 		maxLeaseTTL = "87600h" // 10 years
 	}
 
+	return c.enableSecretsEngine(ctx, mountPath, "pki", &api.MountConfigInput{
+		MaxLeaseTTL: maxLeaseTTL,
+	})
+}
+
+// EnableKV enables the KV (Key-Value) secrets engine at the specified mount path.
+// Version can be 1 or 2. If version is 0, defaults to version 2.
+//
+// Example:
+//
+//	err := container.EnableKV(ctx, "secret", 2)
+//	if err != nil {
+//	    t.Fatalf("Failed to enable KV: %v", err)
+//	}
+func (c *Container) EnableKV(ctx context.Context, mountPath string, version int) error {
+	if version == 0 {
+		version = 2
+	}
+
+	engineType := "kv"
+	var options map[string]string
+	if version == 2 {
+		engineType = "kv-v2"
+		options = map[string]string{"version": "2"}
+	}
+
+	return c.enableSecretsEngine(ctx, mountPath, engineType, &api.MountConfigInput{
+		Options: options,
+	})
+}
+
+// EnableTransit enables the Transit secrets engine at the specified mount path.
+// Transit provides encryption as a service.
+//
+// Example:
+//
+//	err := container.EnableTransit(ctx, "transit")
+//	if err != nil {
+//	    t.Fatalf("Failed to enable Transit: %v", err)
+//	}
+func (c *Container) EnableTransit(ctx context.Context, mountPath string) error {
+	return c.enableSecretsEngine(ctx, mountPath, "transit", nil)
+}
+
+// EnableDatabase enables the Database secrets engine at the specified mount path.
+// Database provides dynamic database credentials.
+//
+// Example:
+//
+//	err := container.EnableDatabase(ctx, "database")
+//	if err != nil {
+//	    t.Fatalf("Failed to enable Database: %v", err)
+//	}
+func (c *Container) EnableDatabase(ctx context.Context, mountPath string) error {
+	return c.enableSecretsEngine(ctx, mountPath, "database", nil)
+}
+
+// EnableSSH enables the SSH secrets engine at the specified mount path.
+// SSH provides SSH credentials and certificate signing.
+//
+// Example:
+//
+//	err := container.EnableSSH(ctx, "ssh")
+//	if err != nil {
+//	    t.Fatalf("Failed to enable SSH: %v", err)
+//	}
+func (c *Container) EnableSSH(ctx context.Context, mountPath string) error {
+	return c.enableSecretsEngine(ctx, mountPath, "ssh", nil)
+}
+
+// EnableTOTP enables the TOTP secrets engine at the specified mount path.
+// TOTP provides time-based one-time passwords.
+//
+// Example:
+//
+//	err := container.EnableTOTP(ctx, "totp")
+//	if err != nil {
+//	    t.Fatalf("Failed to enable TOTP: %v", err)
+//	}
+func (c *Container) EnableTOTP(ctx context.Context, mountPath string) error {
+	return c.enableSecretsEngine(ctx, mountPath, "totp", nil)
+}
+
+// EnableAWS enables the AWS secrets engine at the specified mount path.
+// AWS provides dynamic AWS credentials.
+//
+// Example:
+//
+//	err := container.EnableAWS(ctx, "aws")
+//	if err != nil {
+//	    t.Fatalf("Failed to enable AWS: %v", err)
+//	}
+func (c *Container) EnableAWS(ctx context.Context, mountPath string) error {
+	return c.enableSecretsEngine(ctx, mountPath, "aws", nil)
+}
+
+// EnableGCP enables the GCP secrets engine at the specified mount path.
+// GCP provides dynamic GCP credentials.
+//
+// Example:
+//
+//	err := container.EnableGCP(ctx, "gcp")
+//	if err != nil {
+//	    t.Fatalf("Failed to enable GCP: %v", err)
+//	}
+func (c *Container) EnableGCP(ctx context.Context, mountPath string) error {
+	return c.enableSecretsEngine(ctx, mountPath, "gcp", nil)
+}
+
+// EnableRabbitMQ enables the RabbitMQ secrets engine at the specified mount path.
+// RabbitMQ provides dynamic RabbitMQ credentials.
+//
+// Example:
+//
+//	err := container.EnableRabbitMQ(ctx, "rabbitmq")
+//	if err != nil {
+//	    t.Fatalf("Failed to enable RabbitMQ: %v", err)
+//	}
+func (c *Container) EnableRabbitMQ(ctx context.Context, mountPath string) error {
+	return c.enableSecretsEngine(ctx, mountPath, "rabbitmq", nil)
+}
+
+// enableSecretsEngine is a helper function to enable any secrets engine.
+// This is the common implementation used by all Enable* methods.
+func (c *Container) enableSecretsEngine(ctx context.Context, mountPath, engineType string, config *api.MountConfigInput) error {
 	// Create OpenBao SDK client
 	apiConfig := api.DefaultConfig()
 	apiConfig.Address = c.Address
@@ -172,19 +297,23 @@ func (c *Container) EnablePKI(ctx context.Context, mountPath string, maxLeaseTTL
 
 	client.SetToken(c.Token)
 
-	// Enable PKI secrets engine
-	err = client.Sys().MountWithContext(ctx, mountPath, &api.MountInput{
-		Type: "pki",
-		Config: api.MountConfigInput{
-			MaxLeaseTTL: maxLeaseTTL,
-		},
-	})
+	// Prepare mount input
+	mountInput := &api.MountInput{
+		Type: engineType,
+	}
+	if config != nil {
+		mountInput.Config = *config
+	}
+
+	// Enable secrets engine
+	err = client.Sys().MountWithContext(ctx, mountPath, mountInput)
 	if err != nil {
-		return fmt.Errorf("mount PKI: %w", err)
+		return fmt.Errorf("mount %s at %s: %w", engineType, mountPath, err)
 	}
 
 	return nil
 }
+
 
 // WaitForHealthy waits for OpenBao to become healthy with exponential backoff.
 // Returns error if OpenBao doesn't become healthy within timeout.

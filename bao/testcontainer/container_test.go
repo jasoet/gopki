@@ -94,6 +94,126 @@ func TestEnablePKI(t *testing.T) {
 	}
 }
 
+func TestEnableKV(t *testing.T) {
+	ctx := context.Background()
+
+	container, err := testcontainer.Start(ctx, testcontainer.DefaultConfig())
+	if err != nil {
+		t.Fatalf("Start() failed: %v", err)
+	}
+	defer container.Terminate(ctx)
+
+	// Enable KV v2 (default)
+	err = container.EnableKV(ctx, "kv", 0)
+	if err != nil {
+		t.Fatalf("EnableKV() v2 failed: %v", err)
+	}
+
+	// Enable KV v2 explicitly
+	err = container.EnableKV(ctx, "secret", 2)
+	if err != nil {
+		t.Fatalf("EnableKV() v2 explicit failed: %v", err)
+	}
+
+	// Enable KV v1
+	err = container.EnableKV(ctx, "kv-v1", 1)
+	if err != nil {
+		t.Fatalf("EnableKV() v1 failed: %v", err)
+	}
+}
+
+func TestEnableTransit(t *testing.T) {
+	ctx := context.Background()
+
+	container, err := testcontainer.Start(ctx, testcontainer.DefaultConfig())
+	if err != nil {
+		t.Fatalf("Start() failed: %v", err)
+	}
+	defer container.Terminate(ctx)
+
+	err = container.EnableTransit(ctx, "transit")
+	if err != nil {
+		t.Fatalf("EnableTransit() failed: %v", err)
+	}
+}
+
+func TestEnableDatabase(t *testing.T) {
+	ctx := context.Background()
+
+	container, err := testcontainer.Start(ctx, testcontainer.DefaultConfig())
+	if err != nil {
+		t.Fatalf("Start() failed: %v", err)
+	}
+	defer container.Terminate(ctx)
+
+	err = container.EnableDatabase(ctx, "database")
+	if err != nil {
+		t.Fatalf("EnableDatabase() failed: %v", err)
+	}
+}
+
+func TestEnableSSH(t *testing.T) {
+	ctx := context.Background()
+
+	container, err := testcontainer.Start(ctx, testcontainer.DefaultConfig())
+	if err != nil {
+		t.Fatalf("Start() failed: %v", err)
+	}
+	defer container.Terminate(ctx)
+
+	err = container.EnableSSH(ctx, "ssh")
+	if err != nil {
+		t.Fatalf("EnableSSH() failed: %v", err)
+	}
+}
+
+func TestEnableTOTP(t *testing.T) {
+	ctx := context.Background()
+
+	container, err := testcontainer.Start(ctx, testcontainer.DefaultConfig())
+	if err != nil {
+		t.Fatalf("Start() failed: %v", err)
+	}
+	defer container.Terminate(ctx)
+
+	err = container.EnableTOTP(ctx, "totp")
+	if err != nil {
+		t.Fatalf("EnableTOTP() failed: %v", err)
+	}
+}
+
+func TestEnableMultipleEngines(t *testing.T) {
+	ctx := context.Background()
+
+	container, err := testcontainer.Start(ctx, testcontainer.DefaultConfig())
+	if err != nil {
+		t.Fatalf("Start() failed: %v", err)
+	}
+	defer container.Terminate(ctx)
+
+	// Enable multiple engines
+	engines := []struct {
+		name string
+		fn   func() error
+	}{
+		{"PKI", func() error { return container.EnablePKI(ctx, "pki", "") }},
+		{"KV", func() error { return container.EnableKV(ctx, "secret", 2) }},
+		{"Transit", func() error { return container.EnableTransit(ctx, "transit") }},
+		{"Database", func() error { return container.EnableDatabase(ctx, "database") }},
+		{"SSH", func() error { return container.EnableSSH(ctx, "ssh") }},
+		{"TOTP", func() error { return container.EnableTOTP(ctx, "totp") }},
+	}
+
+	for _, engine := range engines {
+		t.Run(engine.name, func(t *testing.T) {
+			if err := engine.fn(); err != nil {
+				t.Errorf("Failed to enable %s: %v", engine.name, err)
+			}
+		})
+	}
+}
+
+
 func TestWaitForHealthy(t *testing.T) {
 	ctx := context.Background()
 
