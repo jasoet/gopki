@@ -715,7 +715,7 @@ func TestUpdateKeyName(t *testing.T) {
 	}
 }
 
-func TestExportKey(t *testing.T) {
+func TestExportRSAKey(t *testing.T) {
 	// Generate a real RSA key for valid PEM data
 	testKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
 	if err != nil {
@@ -729,9 +729,7 @@ func TestExportKey(t *testing.T) {
 	tests := []struct {
 		name       string
 		keyRef     string
-		keyType    string
 		statusCode int
-		getResp    string
 		exportResp string
 		wantErr    bool
 		errMsg     string
@@ -739,16 +737,7 @@ func TestExportKey(t *testing.T) {
 		{
 			name:       "Successful RSA key export",
 			keyRef:     "test-rsa-key",
-			keyType:    "rsa",
 			statusCode: 200,
-			getResp: `{
-				"data": {
-					"key_id": "test-rsa-key",
-					"key_name": "my-rsa-key",
-					"key_type": "rsa",
-					"key_bits": 2048
-				}
-			}`,
 			exportResp: createJSONResponse(map[string]interface{}{
 				"private_key": string(privKeyPEM),
 				"key_type":    "rsa",
@@ -764,16 +753,7 @@ func TestExportKey(t *testing.T) {
 		{
 			name:       "Key not exportable",
 			keyRef:     "non-exportable",
-			keyType:    "rsa",
 			statusCode: 403,
-			getResp: `{
-				"data": {
-					"key_id": "non-exportable",
-					"key_name": "my-key",
-					"key_type": "rsa",
-					"key_bits": 2048
-				}
-			}`,
 			exportResp: `{"errors": ["key is not exportable"]}`,
 			wantErr:    true,
 		},
@@ -781,29 +761,15 @@ func TestExportKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Track request count
-			requestCount := 0
-
 			// Create mock server
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				requestCount++
-
 				if !tt.wantErr || tt.statusCode > 0 {
-					if requestCount == 1 {
-						// First request: GetKey
-						if r.Method != "GET" {
-							t.Errorf("Expected GET request, got %s", r.Method)
-						}
-						w.WriteHeader(200)
-						w.Write([]byte(tt.getResp))
-					} else {
-						// Second request: Export
-						if r.Method != "GET" {
-							t.Errorf("Expected GET request, got %s", r.Method)
-						}
-						w.WriteHeader(tt.statusCode)
-						w.Write([]byte(tt.exportResp))
+					// Export request
+					if r.Method != "GET" {
+						t.Errorf("Expected GET request, got %s", r.Method)
 					}
+					w.WriteHeader(tt.statusCode)
+					w.Write([]byte(tt.exportResp))
 				}
 			}))
 			defer server.Close()
@@ -816,7 +782,7 @@ func TestExportKey(t *testing.T) {
 			})
 
 			// Call function
-			result, err := client.ExportKey(context.Background(), tt.keyRef)
+			result, err := client.ExportRSAKey(context.Background(), tt.keyRef)
 
 			// Check error
 			if tt.wantErr {
@@ -836,6 +802,212 @@ func TestExportKey(t *testing.T) {
 			// Validate result
 			if result == nil {
 				t.Fatal("Expected result, got nil")
+			}
+
+			// Verify it's an RSA key pair
+			if result.PrivateKey == nil {
+				t.Error("Expected non-nil private key")
+			}
+			if result.PublicKey == nil {
+				t.Error("Expected non-nil public key")
+			}
+		})
+	}
+}
+
+func TestExportECDSAKey(t *testing.T) {
+	// Generate a real ECDSA key for valid PEM data
+	testKeyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
+	if err != nil {
+		t.Fatalf("Failed to generate test key: %v", err)
+	}
+	privKeyPEM, err := testKeyPair.PrivateKeyToPEM()
+	if err != nil {
+		t.Fatalf("Failed to convert private key to PEM: %v", err)
+	}
+
+	tests := []struct {
+		name       string
+		keyRef     string
+		statusCode int
+		exportResp string
+		wantErr    bool
+		errMsg     string
+	}{
+		{
+			name:       "Successful ECDSA key export",
+			keyRef:     "test-ec-key",
+			statusCode: 200,
+			exportResp: createJSONResponse(map[string]interface{}{
+				"private_key": string(privKeyPEM),
+				"key_type":    "ec",
+			}),
+			wantErr: false,
+		},
+		{
+			name:    "Empty key reference",
+			keyRef:  "",
+			wantErr: true,
+			errMsg:  "key reference is required",
+		},
+		{
+			name:       "Key not exportable",
+			keyRef:     "non-exportable",
+			statusCode: 403,
+			exportResp: `{"errors": ["key is not exportable"]}`,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create mock server
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if !tt.wantErr || tt.statusCode > 0 {
+					if r.Method != "GET" {
+						t.Errorf("Expected GET request, got %s", r.Method)
+					}
+					w.WriteHeader(tt.statusCode)
+					w.Write([]byte(tt.exportResp))
+				}
+			}))
+			defer server.Close()
+
+			// Create client
+			client, _ := NewClient(&Config{
+				Address: server.URL,
+				Token:   "test-token",
+				Mount:   "pki",
+			})
+
+			// Call function
+			result, err := client.ExportECDSAKey(context.Background(), tt.keyRef)
+
+			// Check error
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error, got nil")
+				} else if tt.errMsg != "" && !contains(err.Error(), tt.errMsg) {
+					t.Errorf("Expected error message to contain %q, got %q", tt.errMsg, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			// Validate result
+			if result == nil {
+				t.Fatal("Expected result, got nil")
+			}
+
+			// Verify it's an ECDSA key pair
+			if result.PrivateKey == nil {
+				t.Error("Expected non-nil private key")
+			}
+			if result.PublicKey == nil {
+				t.Error("Expected non-nil public key")
+			}
+		})
+	}
+}
+
+func TestExportEd25519Key(t *testing.T) {
+	// Generate a real Ed25519 key for valid PEM data
+	testKeyPair, err := algo.GenerateEd25519KeyPair()
+	if err != nil {
+		t.Fatalf("Failed to generate test key: %v", err)
+	}
+	privKeyPEM, err := testKeyPair.PrivateKeyToPEM()
+	if err != nil {
+		t.Fatalf("Failed to convert private key to PEM: %v", err)
+	}
+
+	tests := []struct {
+		name       string
+		keyRef     string
+		statusCode int
+		exportResp string
+		wantErr    bool
+		errMsg     string
+	}{
+		{
+			name:       "Successful Ed25519 key export",
+			keyRef:     "test-ed25519-key",
+			statusCode: 200,
+			exportResp: createJSONResponse(map[string]interface{}{
+				"private_key": string(privKeyPEM),
+				"key_type":    "ed25519",
+			}),
+			wantErr: false,
+		},
+		{
+			name:    "Empty key reference",
+			keyRef:  "",
+			wantErr: true,
+			errMsg:  "key reference is required",
+		},
+		{
+			name:       "Key not exportable",
+			keyRef:     "non-exportable",
+			statusCode: 403,
+			exportResp: `{"errors": ["key is not exportable"]}`,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create mock server
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if !tt.wantErr || tt.statusCode > 0 {
+					if r.Method != "GET" {
+						t.Errorf("Expected GET request, got %s", r.Method)
+					}
+					w.WriteHeader(tt.statusCode)
+					w.Write([]byte(tt.exportResp))
+				}
+			}))
+			defer server.Close()
+
+			// Create client
+			client, _ := NewClient(&Config{
+				Address: server.URL,
+				Token:   "test-token",
+				Mount:   "pki",
+			})
+
+			// Call function
+			result, err := client.ExportEd25519Key(context.Background(), tt.keyRef)
+
+			// Check error
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error, got nil")
+				} else if tt.errMsg != "" && !contains(err.Error(), tt.errMsg) {
+					t.Errorf("Expected error message to contain %q, got %q", tt.errMsg, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			// Validate result
+			if result == nil {
+				t.Fatal("Expected result, got nil")
+			}
+
+			// Verify it's an Ed25519 key pair
+			if len(result.PrivateKey) == 0 {
+				t.Error("Expected non-empty private key")
+			}
+			if len(result.PublicKey) == 0 {
+				t.Error("Expected non-empty public key")
 			}
 		})
 	}
