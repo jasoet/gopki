@@ -1,3 +1,20 @@
+## [1.19.0](https://github.com/jasoet/gopki/compare/v1.18.0...v1.19.0) (2025-10-27)
+
+
+### ✨ Features
+
+* **bao:** OpenBao integration with type-safe PKI operations ([#4](https://github.com/jasoet/gopki/issues/4)) ([eb3f53d](https://github.com/jasoet/gopki/commit/eb3f53da17fa38236a9a230d02d632681e898be8))
+
+
+### ✅ Tests
+
+* add regression tests for PKCS[#7](https://github.com/jasoet/gopki/issues/7) duplicate certificate bug (Issue [#1](https://github.com/jasoet/gopki/issues/1)) ([#3](https://github.com/jasoet/gopki/issues/3)) ([74f73e6](https://github.com/jasoet/gopki/commit/74f73e624486b98e81a65165abe2700b6bb85de4))
+
+
+### 🔧 Miscellaneous
+
+* **docs:** Remove obsolete documentation files ([72b97d7](https://github.com/jasoet/gopki/commit/72b97d76f3ad2cef75c401ccc8b1bbd777b4b60f))
+
 ## [1.18.0](https://github.com/jasoet/gopki/compare/v1.17.3...v1.18.0) (2025-10-08)
 
 
