@@ -7,51 +7,51 @@ import (
 
 // RoleOptions contains parameters for creating or updating a role.
 type RoleOptions struct {
-	IssuerRef                     string   // Issuer to use for this role
-	TTL                           string   // Time to live (e.g., "720h")
-	MaxTTL                        string   // Maximum TTL (e.g., "8760h")
-	AllowLocalhost                bool     // Allow localhost in certificates
-	AllowedDomains                []string // Allowed domains
-	AllowedDomainsTemplate        bool     // Allow templating in domain names
-	AllowBareDomains              bool     // Allow bare domains (no subdomains)
-	AllowSubdomains               bool     // Allow subdomains
-	AllowGlobDomains              bool     // Allow glob patterns in domains
-	AllowWildcardCertificates     bool     // Allow wildcard certificates
-	AllowAnyName                  bool     // Allow any common name
-	EnforceHostnames              bool     // Enforce hostname format
-	AllowIPSANs                   bool     // Allow IP SANs
-	AllowedIPSANs                 []string // Allowed IP SANs (CIDR blocks)
-	AllowedURISANs                []string // Allowed URI SANs
-	AllowedOtherSANs              []string // Allowed other SANs
-	AllowedSerialNumbers          []string // Allowed serial numbers
-	ServerFlag                    bool     // Set server auth extended key usage
-	ClientFlag                    bool     // Set client auth extended key usage
-	CodeSigningFlag               bool     // Set code signing extended key usage
-	EmailProtectionFlag           bool     // Set email protection extended key usage
-	KeyType                       string   // "rsa", "ec", "ed25519", "any"
-	KeyBits                       int      // Key size
-	SignatureBits                 int      // Signature bits (for RSA PSS)
-	UsePSS                        bool     // Use RSA-PSS for RSA keys
-	KeyUsage                      []string // Key usage extensions
-	ExtKeyUsage                   []string // Extended key usage extensions
-	ExtKeyUsageOIDs               []string // Extended key usage OIDs
-	UseCSRCommonName              bool     // Use CN from CSR
-	UseCSRSANs                    bool     // Use SANs from CSR
-	OrganizationUnit              []string // Organization unit
-	Organization                  []string // Organization
-	Country                       []string // Country
-	Locality                      []string // Locality
-	Province                      []string // Province
-	StreetAddress                 []string // Street address
-	PostalCode                    []string // Postal code
-	GenerateLease                 bool     // Generate lease for certificate
-	NoStore                       bool     // Don't store certificate
-	RequireCN                     bool     // Require common name
-	PolicyIdentifiers             []string // Policy identifiers
-	BasicConstraintsValidForNonCA bool     // Allow basic constraints for non-CA
-	NotBeforeDuration             string   // Not before duration
-	CNValidations                 []string // CN validation rules
-	AllowedUserIDs                []string // Allowed user IDs
+	IssuerRef                     string   `json:"issuer_ref,omitempty"`                        // Issuer to use for this role
+	TTL                           string   `json:"ttl,omitempty"`                               // Time to live (e.g., "720h")
+	MaxTTL                        string   `json:"max_ttl,omitempty"`                           // Maximum TTL (e.g., "8760h")
+	AllowLocalhost                bool     `json:"allow_localhost,omitempty"`                   // Allow localhost in certificates
+	AllowedDomains                []string `json:"allowed_domains,omitempty"`                   // Allowed domains
+	AllowedDomainsTemplate        bool     `json:"allowed_domains_template,omitempty"`          // Allow templating in domain names
+	AllowBareDomains              bool     `json:"allow_bare_domains,omitempty"`                // Allow bare domains (no subdomains)
+	AllowSubdomains               bool     `json:"allow_subdomains,omitempty"`                  // Allow subdomains
+	AllowGlobDomains              bool     `json:"allow_glob_domains,omitempty"`                // Allow glob patterns in domains
+	AllowWildcardCertificates     bool     `json:"allow_wildcard_certificates,omitempty"`       // Allow wildcard certificates
+	AllowAnyName                  bool     `json:"allow_any_name,omitempty"`                    // Allow any common name
+	EnforceHostnames              bool     `json:"enforce_hostnames,omitempty"`                 // Enforce hostname format
+	AllowIPSANs                   bool     `json:"allow_ip_sans,omitempty"`                     // Allow IP SANs
+	AllowedIPSANs                 []string `json:"allowed_ip_sans,omitempty"`                   // Allowed IP SANs (CIDR blocks)
+	AllowedURISANs                []string `json:"allowed_uri_sans,omitempty"`                  // Allowed URI SANs
+	AllowedOtherSANs              []string `json:"allowed_other_sans,omitempty"`                // Allowed other SANs
+	AllowedSerialNumbers          []string `json:"allowed_serial_numbers,omitempty"`            // Allowed serial numbers
+	ServerFlag                    bool     `json:"server_flag,omitempty"`                       // Set server auth extended key usage
+	ClientFlag                    bool     `json:"client_flag,omitempty"`                       // Set client auth extended key usage
+	CodeSigningFlag               bool     `json:"code_signing_flag,omitempty"`                 // Set code signing extended key usage
+	EmailProtectionFlag           bool     `json:"email_protection_flag,omitempty"`             // Set email protection extended key usage
+	KeyType                       string   `json:"key_type,omitempty"`                          // "rsa", "ec", "ed25519", "any"
+	KeyBits                       int      `json:"key_bits,omitempty"`                          // Key size
+	SignatureBits                 int      `json:"signature_bits,omitempty"`                    // Signature bits (for RSA PSS)
+	UsePSS                        bool     `json:"use_pss,omitempty"`                           // Use RSA-PSS for RSA keys
+	KeyUsage                      []string `json:"key_usage,omitempty"`                         // Key usage extensions
+	ExtKeyUsage                   []string `json:"ext_key_usage,omitempty"`                     // Extended key usage extensions
+	ExtKeyUsageOIDs               []string `json:"ext_key_usage_oids,omitempty"`                // Extended key usage OIDs
+	UseCSRCommonName              bool     `json:"use_csr_common_name,omitempty"`               // Use CN from CSR
+	UseCSRSANs                    bool     `json:"use_csr_sans,omitempty"`                      // Use SANs from CSR
+	OrganizationUnit              []string `json:"ou,omitempty"`                                // Organization unit
+	Organization                  []string `json:"organization,omitempty"`                      // Organization
+	Country                       []string `json:"country,omitempty"`                           // Country
+	Locality                      []string `json:"locality,omitempty"`                          // Locality
+	Province                      []string `json:"province,omitempty"`                          // Province
+	StreetAddress                 []string `json:"street_address,omitempty"`                    // Street address
+	PostalCode                    []string `json:"postal_code,omitempty"`                       // Postal code
+	GenerateLease                 bool     `json:"generate_lease,omitempty"`                    // Generate lease for certificate
+	NoStore                       bool     `json:"no_store,omitempty"`                          // Don't store certificate
+	RequireCN                     bool     `json:"require_cn,omitempty"`                        // Require common name
+	PolicyIdentifiers             []string `json:"policy_identifiers,omitempty"`                // Policy identifiers
+	BasicConstraintsValidForNonCA bool     `json:"basic_constraints_valid_for_non_ca,omitempty"` // Allow basic constraints for non-CA
+	NotBeforeDuration             string   `json:"not_before_duration,omitempty"`               // Not before duration
+	CNValidations                 []string `json:"cn_validations,omitempty"`                    // CN validation rules
+	AllowedUserIDs                []string `json:"allowed_user_ids,omitempty"`                  // Allowed user IDs
 }
 
 // Role represents a Vault PKI role configuration.

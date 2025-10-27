@@ -12,6 +12,15 @@ import (
 	"github.com/jasoet/gopki/keypair/algo"
 )
 
+// Helper function to create properly escaped JSON response
+func createJSONResponse(data interface{}) string {
+	response := map[string]interface{}{
+		"data": data,
+	}
+	jsonBytes, _ := json.Marshal(response)
+	return string(jsonBytes)
+}
+
 func TestGenerateRootCA(t *testing.T) {
 	// Create test certificate PEM
 	keyPair, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
@@ -39,16 +48,14 @@ func TestGenerateRootCA(t *testing.T) {
 				TTL:          "87600h",
 			},
 			statusCode: 200,
-			response: `{
-				"data": {
-					"certificate": "` + certPEM + `",
-					"issuing_ca": "` + certPEM + `",
-					"ca_chain": ["` + certPEM + `"],
-					"serial_number": "01:02:03:04:05",
-					"issuer_id": "issuer-123",
-					"key_id": "key-456"
-				}
-			}`,
+			response: createJSONResponse(map[string]interface{}{
+				"certificate":   certPEM,
+				"issuing_ca":    certPEM,
+				"ca_chain":      []string{certPEM},
+				"serial_number": "01:02:03:04:05",
+				"issuer_id":     "issuer-123",
+				"key_id":        "key-456",
+			}),
 			wantErr: false,
 		},
 		{
@@ -60,17 +67,15 @@ func TestGenerateRootCA(t *testing.T) {
 				KeyBits:    2048,
 			},
 			statusCode: 200,
-			response: `{
-				"data": {
-					"certificate": "` + certPEM + `",
-					"issuing_ca": "` + certPEM + `",
-					"serial_number": "01:02:03:04:05",
-					"issuer_id": "issuer-123",
-					"key_id": "key-456",
-					"private_key": "-----BEGIN RSA PRIVATE KEY-----\ntest\n-----END RSA PRIVATE KEY-----",
-					"private_key_type": "rsa"
-				}
-			}`,
+			response: createJSONResponse(map[string]interface{}{
+				"certificate":        certPEM,
+				"issuing_ca":         certPEM,
+				"serial_number":      "01:02:03:04:05",
+				"issuer_id":          "issuer-123",
+				"key_id":             "key-456",
+				"private_key":        "-----BEGIN RSA PRIVATE KEY-----\ntest\n-----END RSA PRIVATE KEY-----",
+				"private_key_type":   "rsa",
+			}),
 			wantErr: false,
 		},
 		{
@@ -172,15 +177,13 @@ func TestGenerateIntermediateCA(t *testing.T) {
 				KeyBits:    2048,
 			},
 			statusCode: 200,
-			response: `{
-				"data": {
-					"certificate": "` + certPEM + `",
-					"issuing_ca": "` + certPEM + `",
-					"serial_number": "01:02:03:04:05",
-					"issuer_id": "issuer-789",
-					"key_id": "key-012"
-				}
-			}`,
+			response: createJSONResponse(map[string]interface{}{
+				"certificate":   certPEM,
+				"issuing_ca":    certPEM,
+				"serial_number": "01:02:03:04:05",
+				"issuer_id":     "issuer-789",
+				"key_id":        "key-012",
+			}),
 			wantErr:  false,
 			checkCSR: false,
 		},
@@ -287,13 +290,11 @@ func TestSignIntermediateCSR(t *testing.T) {
 				TTL:        "43800h",
 			},
 			statusCode: 200,
-			response: `{
-				"data": {
-					"certificate": "` + certPEM + `",
-					"issuing_ca": "` + certPEM + `",
-					"serial_number": "01:02:03:04:05"
-				}
-			}`,
+			response: createJSONResponse(map[string]interface{}{
+				"certificate":   certPEM,
+				"issuing_ca":    certPEM,
+				"serial_number": "01:02:03:04:05",
+			}),
 			wantErr: false,
 		},
 		{
@@ -407,14 +408,13 @@ func TestImportCA(t *testing.T) {
 				if r.URL.Path == "/v1/pki/issuer/issuer-123" {
 					getIssuerCalled = true
 					w.WriteHeader(200)
-					w.Write([]byte(`{
-						"data": {
-							"issuer_id": "issuer-123",
-							"issuer_name": "imported-ca",
-							"key_id": "key-456",
-							"certificate": "` + certPEM + `"
-						}
-					}`))
+					issuerResponse := createJSONResponse(map[string]interface{}{
+						"issuer_id":   "issuer-123",
+						"issuer_name": "imported-ca",
+						"key_id":      "key-456",
+						"certificate": certPEM,
+					})
+					w.Write([]byte(issuerResponse))
 					return
 				}
 				w.WriteHeader(tt.statusCode)

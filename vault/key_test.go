@@ -717,6 +717,16 @@ func TestUpdateKeyName(t *testing.T) {
 }
 
 func TestExportKey(t *testing.T) {
+	// Generate a real RSA key for valid PEM data
+	testKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate test key: %v", err)
+	}
+	privKeyPEM, err := testKeyPair.PrivateKeyToPEM()
+	if err != nil {
+		t.Fatalf("Failed to convert private key to PEM: %v", err)
+	}
+
 	tests := []struct {
 		name       string
 		keyRef     string
@@ -740,12 +750,10 @@ func TestExportKey(t *testing.T) {
 					"key_bits": 2048
 				}
 			}`,
-			exportResp: `{
-				"data": {
-					"private_key": "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA0Z...\n-----END RSA PRIVATE KEY-----",
-					"key_type": "rsa"
-				}
-			}`,
+			exportResp: createJSONResponse(map[string]interface{}{
+				"private_key": string(privKeyPEM),
+				"key_type":    "rsa",
+			}),
 			wantErr: false,
 		},
 		{
