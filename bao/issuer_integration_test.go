@@ -1,6 +1,6 @@
 //go:build integration
 
-package vault
+package bao
 
 import (
 	"context"
