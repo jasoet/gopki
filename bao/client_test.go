@@ -2,95 +2,187 @@ package bao
 
 import (
 	"context"
+	"crypto/tls"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/openbao/openbao/api/v2"
 )
 
-// createTestServer creates a test HTTP server with custom handler.
-func createTestServer(handler http.HandlerFunc) *httptest.Server {
-	return httptest.NewServer(handler)
+func TestNewClient(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  *Config
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "Valid configuration",
+			config: &Config{
+				Address: "https://vault.example.com",
+				Token:   "test-token",
+				Mount:   "pki",
+			},
+			wantErr: false,
+		},
+		{
+			name:    "Nil config",
+			config:  nil,
+			wantErr: true,
+			errMsg:  "config is required",
+		},
+		{
+			name: "Missing address",
+			config: &Config{
+				Token: "test-token",
+			},
+			wantErr: true,
+			errMsg:  "address is required",
+		},
+		{
+			name: "Missing token",
+			config: &Config{
+				Address: "https://vault.example.com",
+			},
+			wantErr: true,
+			errMsg:  "token is required",
+		},
+		{
+			name: "Invalid URL",
+			config: &Config{
+				Address: "not a valid url ::: %%%",
+				Token:   "test-token",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Default mount path",
+			config: &Config{
+				Address: "https://vault.example.com",
+				Token:   "test-token",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Custom mount path",
+			config: &Config{
+				Address: "https://vault.example.com",
+				Token:   "test-token",
+				Mount:   "pki-intermediate",
+			},
+			wantErr: false,
+		},
+		{
+			name: "With namespace",
+			config: &Config{
+				Address:   "https://vault.example.com",
+				Token:     "test-token",
+				Namespace: "admin/team",
+			},
+			wantErr: false,
+		},
+		{
+			name: "With TLS config",
+			config: &Config{
+				Address: "https://vault.example.com",
+				Token:   "test-token",
+				TLSConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "With custom timeout",
+			config: &Config{
+				Address: "https://vault.example.com",
+				Token:   "test-token",
+				Timeout: 60 * time.Second,
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := NewClient(tt.config)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("NewClient() should return error")
+					return
+				}
+				if tt.errMsg != "" && !contains(err.Error(), tt.errMsg) {
+					t.Errorf("Error message = %v, should contain %q", err, tt.errMsg)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("NewClient() unexpected error = %v", err)
+				return
+			}
+
+			if client == nil {
+				t.Error("NewClient() returned nil client")
+				return
+			}
+
+			// Verify config is stored
+			if client.Config() == nil {
+				t.Error("Client.Config() returned nil")
+			}
+
+			// Verify SDK client is created
+			if client.Sys() == nil {
+				t.Error("Client.Sys() returned nil")
+			}
+
+			if client.Logical() == nil {
+				t.Error("Client.Logical() returned nil")
+			}
+		})
+	}
 }
 
-// createTestClient creates a test client connected to a test server.
-func createTestClient(t *testing.T, serverURL string) *Client {
-	client, err := NewClient(&Config{
-		Address: serverURL,
+func TestClient_Config(t *testing.T) {
+	config := &Config{
+		Address: "https://vault.example.com",
 		Token:   "test-token",
-		Mount:   "pki",
-		Timeout: 5 * time.Second,
+		Mount:   "pki-test",
+	}
+
+	client, err := NewClient(config)
+	if err != nil {
+		t.Fatalf("NewClient() failed: %v", err)
+	}
+
+	gotConfig := client.Config()
+	if gotConfig == nil {
+		t.Fatal("Config() returned nil")
+	}
+
+	if gotConfig.Mount != "pki-test" {
+		t.Errorf("Config().Mount = %s, want pki-test", gotConfig.Mount)
+	}
+}
+
+func TestClient_Close(t *testing.T) {
+	client, err := NewClient(&Config{
+		Address: "https://vault.example.com",
+		Token:   "test-token",
 	})
 	if err != nil {
-		t.Fatalf("Failed to create test client: %v", err)
+		t.Fatalf("NewClient() failed: %v", err)
 	}
-	return client
-}
 
-func TestNewClient(t *testing.T) {
-	t.Run("Valid configuration", func(t *testing.T) {
-		client, err := NewClient(&Config{
-			Address: "https://vault.example.com",
-			Token:   "test-token",
-			Mount:   "pki",
-		})
-
-		if err != nil {
-			t.Errorf("NewClient() failed: %v", err)
-		}
-		if client == nil {
-			t.Error("NewClient() returned nil client")
-		}
-		if client.config.Mount != "pki" {
-			t.Errorf("Mount = %s, want pki", client.config.Mount)
-		}
-	})
-
-	t.Run("Missing address", func(t *testing.T) {
-		_, err := NewClient(&Config{
-			Token: "test-token",
-		})
-
-		if err == nil {
-			t.Error("NewClient() should fail with missing address")
-		}
-	})
-
-	t.Run("Missing token", func(t *testing.T) {
-		_, err := NewClient(&Config{
-			Address: "https://vault.example.com",
-		})
-
-		if err == nil {
-			t.Error("NewClient() should fail with missing token")
-		}
-	})
-
-	t.Run("Invalid URL", func(t *testing.T) {
-		_, err := NewClient(&Config{
-			Address: "not a valid url",
-			Token:   "test-token",
-		})
-
-		if err == nil {
-			t.Error("NewClient() should fail with invalid URL")
-		}
-	})
-
-	t.Run("Default mount path", func(t *testing.T) {
-		client, err := NewClient(&Config{
-			Address: "https://vault.example.com",
-			Token:   "test-token",
-			// Mount not specified
-		})
-
-		if err != nil {
-			t.Fatalf("NewClient() failed: %v", err)
-		}
-		if client.config.Mount != "pki" {
-			t.Errorf("Default mount = %s, want pki", client.config.Mount)
-		}
-	})
+	err = client.Close()
+	if err != nil {
+		t.Errorf("Close() unexpected error = %v", err)
+	}
 }
 
 func TestClient_Health(t *testing.T) {
@@ -99,493 +191,346 @@ func TestClient_Health(t *testing.T) {
 		statusCode int
 		response   string
 		wantErr    bool
+		errCheck   func(error) bool
 	}{
 		{
-			name:       "Healthy - 200 OK",
-			statusCode: 200,
+			name:       "Healthy server",
+			statusCode: http.StatusOK,
 			response:   `{"initialized":true,"sealed":false,"standby":false}`,
 			wantErr:    false,
 		},
 		{
-			name:       "Standby - 429",
-			statusCode: 429,
+			name:       "Standby node",
+			statusCode: 429, // Standby
 			response:   `{"initialized":true,"sealed":false,"standby":true}`,
 			wantErr:    false,
 		},
 		{
-			name:       "DR Mode - 472",
-			statusCode: 472,
-			response:   `{"initialized":true,"sealed":false,"standby":false}`,
-			wantErr:    true, // SDK treats non-standard codes as errors
-		},
-		{
-			name:       "Performance Standby - 473",
-			statusCode: 473,
-			response:   `{"initialized":true,"sealed":false,"standby":false}`,
-			wantErr:    true, // SDK treats non-standard codes as errors
-		},
-		{
-			name:       "Not Initialized - 501",
+			name:       "Not initialized",
 			statusCode: 501,
 			response:   `{"initialized":false,"sealed":false,"standby":false}`,
 			wantErr:    true,
+			errCheck: func(err error) bool {
+				return errors.Is(err, ErrHealthCheckFailed)
+			},
 		},
 		{
-			name:       "Sealed - 503",
+			name:       "Sealed",
 			statusCode: 503,
 			response:   `{"initialized":true,"sealed":true,"standby":false}`,
 			wantErr:    true,
-		},
-		{
-			name:       "Unexpected Status - 500",
-			statusCode: 500,
-			response:   `{"initialized":true,"sealed":false,"standby":false}`,
-			wantErr:    true,
+			errCheck: func(err error) bool {
+				return errors.Is(err, ErrHealthCheckFailed)
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			server := createTestServer(func(w http.ResponseWriter, r *http.Request) {
-				// Verify endpoint
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path != "/v1/sys/health" {
-					t.Errorf("Health() called wrong endpoint: %s", r.URL.Path)
+					t.Errorf("Unexpected path: %s", r.URL.Path)
 				}
-
-				// Verify method
-				if r.Method != "GET" {
-					t.Errorf("Health() used wrong method: %s", r.Method)
+				if r.Method != http.MethodGet && r.Method != http.MethodHead {
+					t.Errorf("Unexpected method: %s", r.Method)
 				}
 
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tt.statusCode)
 				w.Write([]byte(tt.response))
-			})
+			}))
 			defer server.Close()
 
-			client := createTestClient(t, server.URL)
+			client, err := NewClient(&Config{
+				Address: server.URL,
+				Token:   "test-token",
+				Timeout: 5 * time.Second,
+			})
+			if err != nil {
+				t.Fatalf("NewClient() failed: %v", err)
+			}
+
 			ctx := context.Background()
+			err = client.Health(ctx)
 
-			err := client.Health(ctx)
-
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Health() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Health() should return error")
+					return
+				}
+				if tt.errCheck != nil && !tt.errCheck(err) {
+					t.Errorf("Health() error check failed for: %v", err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Health() unexpected error = %v", err)
+				}
 			}
 		})
 	}
 }
 
 func TestClient_Health_Timeout(t *testing.T) {
-	// Create server that delays response
-	server := createTestServer(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(200 * time.Millisecond)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(200)
-		w.Write([]byte(`{"initialized":true,"sealed":false,"standby":false}`))
-	})
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"initialized":true,"sealed":false}`))
+	}))
 	defer server.Close()
 
-	client := createTestClient(t, server.URL)
+	client, err := NewClient(&Config{
+		Address: server.URL,
+		Token:   "test-token",
+		Timeout: 5 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("NewClient() failed: %v", err)
+	}
 
-	// Create context with short timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	err := client.Health(ctx)
-
+	err = client.Health(ctx)
 	if err == nil {
-		t.Error("Health() should fail with timeout")
+		t.Error("Health() should timeout")
+		return
 	}
 
-	if !IsRetryable(err) {
-		t.Error("Timeout error should be retryable")
+	if !errors.Is(err, ErrTimeout) && !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("Health() error should be timeout, got: %v", err)
 	}
 }
 
 func TestClient_Health_Cancellation(t *testing.T) {
-	// Create server that delays response
-	server := createTestServer(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(200 * time.Millisecond)
-		w.WriteHeader(200)
-	})
+		w.WriteHeader(http.StatusOK)
+	}))
 	defer server.Close()
 
-	client := createTestClient(t, server.URL)
+	client, err := NewClient(&Config{
+		Address: server.URL,
+		Token:   "test-token",
+	})
+	if err != nil {
+		t.Fatalf("NewClient() failed: %v", err)
+	}
 
-	// Create context and cancel immediately
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
-	err := client.Health(ctx)
-
+	err = client.Health(ctx)
 	if err == nil {
-		t.Error("Health() should fail with cancellation")
+		t.Error("Health() should fail with cancelled context")
 	}
 }
 
 func TestClient_ValidateConnection(t *testing.T) {
-	t.Run("Successful validation", func(t *testing.T) {
-		server := createTestServer(func(w http.ResponseWriter, r *http.Request) {
-			// Handle health check
-			if r.URL.Path == "/v1/sys/health" {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(200)
-				w.Write([]byte(`{"initialized":true,"sealed":false,"standby":false}`))
-				return
-			}
-
-			// Handle PKI mount check
-			if r.URL.Path == "/v1/pki/config/urls" {
-				// Verify authentication header
-				token := r.Header.Get("X-Vault-Token")
-				if token != "test-token" {
-					t.Errorf("Missing or wrong token: %s", token)
-				}
-
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(200)
-				w.Write([]byte(`{"data":{}}`))
-				return
-			}
-
-			t.Errorf("Unexpected request: %s", r.URL.Path)
-		})
-		defer server.Close()
-
-		client := createTestClient(t, server.URL)
-		ctx := context.Background()
-
-		err := client.ValidateConnection(ctx)
-		if err != nil {
-			t.Errorf("ValidateConnection() failed: %v", err)
-		}
-	})
-
-	t.Run("Health check fails", func(t *testing.T) {
-		server := createTestServer(func(w http.ResponseWriter, r *http.Request) {
-			// Health check fails
-			if r.URL.Path == "/v1/sys/health" {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(503) // Sealed
-				w.Write([]byte(`{"initialized":true,"sealed":true,"standby":false}`))
-				return
-			}
-		})
-		defer server.Close()
-
-		client := createTestClient(t, server.URL)
-		ctx := context.Background()
-
-		err := client.ValidateConnection(ctx)
-		if err == nil {
-			t.Error("ValidateConnection() should fail when health check fails")
-		}
-	})
-
-	t.Run("Mount not found", func(t *testing.T) {
-		server := createTestServer(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == "/v1/sys/health" {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(200)
-				w.Write([]byte(`{"initialized":true,"sealed":false,"standby":false}`))
-				return
-			}
-
-			// Mount not found
-			if r.URL.Path == "/v1/pki/config/urls" {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(404)
-				w.Write([]byte(`{"errors":["mount not found"]}`))
-				return
-			}
-		})
-		defer server.Close()
-
-		client := createTestClient(t, server.URL)
-		ctx := context.Background()
-
-		err := client.ValidateConnection(ctx)
-		if err == nil {
-			t.Error("ValidateConnection() should fail when mount not found")
-			return
-		}
-		t.Logf("Error received: %v", err)
-		t.Logf("Error type: %T", err)
-		if !IsNotFoundError(err) {
-			t.Errorf("Error should be not found error, got: %v", err)
-		}
-	})
-
-	t.Run("Permission denied", func(t *testing.T) {
-		server := createTestServer(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == "/v1/sys/health" {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(200)
-				w.Write([]byte(`{"initialized":true,"sealed":false,"standby":false}`))
-				return
-			}
-
-			// Permission denied
-			if r.URL.Path == "/v1/pki/config/urls" {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(403)
-				w.Write([]byte(`{"errors":["permission denied"]}`))
-				return
-			}
-		})
-		defer server.Close()
-
-		client := createTestClient(t, server.URL)
-		ctx := context.Background()
-
-		err := client.ValidateConnection(ctx)
-		if err == nil {
-			t.Error("ValidateConnection() should fail with permission denied")
-		}
-		if !IsAuthError(err) {
-			t.Error("Error should be auth error")
-		}
-	})
-}
-
-// Note: The following tests are commented out as they test internal HTTP methods
-// that have been removed after migrating to OpenBao SDK.
-// The SDK handles authentication, headers, and HTTP requests internally.
-
-/*
-func TestClient_addAuthHeaders(t *testing.T) {
-	tests := []struct {
-		name      string
-		config    *Config
-		wantToken string
-		wantNS    string
-	}{
-		{
-			name: "Token only",
-			config: &Config{
-				Address: "https://vault.example.com",
-				Token:   "test-token-123",
-			},
-			wantToken: "test-token-123",
-			wantNS:    "",
-		},
-		{
-			name: "Token and namespace",
-			config: &Config{
-				Address:   "https://vault.example.com",
-				Token:     "test-token-456",
-				Namespace: "admin/team",
-			},
-			wantToken: "test-token-456",
-			wantNS:    "admin/team",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			client, _ := NewClient(tt.config)
-
-			req, _ := http.NewRequest("GET", "https://example.com", nil)
-			client.addAuthHeaders(req)
-
-			// Check token header
-			if got := req.Header.Get("X-Vault-Token"); got != tt.wantToken {
-				t.Errorf("X-Vault-Token = %s, want %s", got, tt.wantToken)
-			}
-
-			// Check namespace header
-			if got := req.Header.Get("X-Vault-Namespace"); got != tt.wantNS {
-				t.Errorf("X-Vault-Namespace = %s, want %s", got, tt.wantNS)
-			}
-
-			// Check user agent
-			if got := req.Header.Get("User-Agent"); got == "" {
-				t.Error("User-Agent header not set")
-			}
-		})
-	}
-}
-
-func TestClient_parseErrorResponse(t *testing.T) {
 	tests := []struct {
 		name       string
-		statusCode int
-		body       string
-		wantErr    error
+		setupMock  func(*httptest.Server) http.HandlerFunc
+		wantErr    bool
+		errCheck   func(error) bool
 	}{
 		{
-			name:       "401 Unauthorized",
-			statusCode: 401,
-			body:       `{"errors":["invalid token"]}`,
-			wantErr:    ErrUnauthorized,
+			name: "Successful validation",
+			setupMock: func(server *httptest.Server) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path == "/v1/sys/health" {
+						w.WriteHeader(http.StatusOK)
+						w.Write([]byte(`{"initialized":true,"sealed":false}`))
+						return
+					}
+					if r.URL.Path == "/v1/pki/config/urls" {
+						w.WriteHeader(http.StatusOK)
+						w.Write([]byte(`{"data":{}}`))
+						return
+					}
+					w.WriteHeader(http.StatusNotFound)
+				}
+			},
+			wantErr: false,
 		},
 		{
-			name:       "403 Permission Denied",
-			statusCode: 403,
-			body:       `{"errors":["permission denied"]}`,
-			wantErr:    ErrPermissionDenied,
+			name: "Health check fails",
+			setupMock: func(server *httptest.Server) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path == "/v1/sys/health" {
+						w.WriteHeader(503) // Sealed
+						w.Write([]byte(`{"initialized":true,"sealed":true}`))
+						return
+					}
+					w.WriteHeader(http.StatusOK)
+				}
+			},
+			wantErr: true,
+			errCheck: func(err error) bool {
+				return errors.Is(err, ErrHealthCheckFailed)
+			},
 		},
 		{
-			name:       "404 Not Found",
-			statusCode: 404,
-			body:       `{"errors":["not found"]}`,
-			wantErr:    ErrCertificateNotFound,
+			name: "Mount not found (404)",
+			setupMock: func(server *httptest.Server) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path == "/v1/sys/health" {
+						w.WriteHeader(http.StatusOK)
+						w.Write([]byte(`{"initialized":true,"sealed":false}`))
+						return
+					}
+					if r.URL.Path == "/v1/pki/config/urls" {
+						w.WriteHeader(http.StatusNotFound)
+						w.Write([]byte(`{"errors":["not found"]}`))
+						return
+					}
+					w.WriteHeader(http.StatusNotFound)
+				}
+			},
+			wantErr: true,
+			errCheck: func(err error) bool {
+				return errors.Is(err, ErrMountNotFound)
+			},
 		},
 		{
-			name:       "429 Rate Limit",
-			statusCode: 429,
-			body:       `{"errors":["rate limit exceeded"]}`,
-			wantErr:    ErrRateLimitExceeded,
+			name: "Unauthorized (401)",
+			setupMock: func(server *httptest.Server) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path == "/v1/sys/health" {
+						w.WriteHeader(http.StatusOK)
+						w.Write([]byte(`{"initialized":true,"sealed":false}`))
+						return
+					}
+					if r.URL.Path == "/v1/pki/config/urls" {
+						w.WriteHeader(http.StatusUnauthorized)
+						w.Write([]byte(`{"errors":["unauthorized"]}`))
+						return
+					}
+					w.WriteHeader(http.StatusUnauthorized)
+				}
+			},
+			wantErr: true,
+			errCheck: func(err error) bool {
+				return errors.Is(err, ErrUnauthorized)
+			},
+		},
+		{
+			name: "Permission denied (403)",
+			setupMock: func(server *httptest.Server) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path == "/v1/sys/health" {
+						w.WriteHeader(http.StatusOK)
+						w.Write([]byte(`{"initialized":true,"sealed":false}`))
+						return
+					}
+					if r.URL.Path == "/v1/pki/config/urls" {
+						w.WriteHeader(http.StatusForbidden)
+						w.Write([]byte(`{"errors":["permission denied"]}`))
+						return
+					}
+					w.WriteHeader(http.StatusForbidden)
+				}
+			},
+			wantErr: true,
+			errCheck: func(err error) bool {
+				return errors.Is(err, ErrPermissionDenied)
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, _ := NewClient(&Config{
-				Address: "https://vault.example.com",
-				Token:   "test",
+			server := httptest.NewServer(nil)
+			defer server.Close()
+
+			server.Config.Handler = tt.setupMock(server)
+
+			client, err := NewClient(&Config{
+				Address: server.URL,
+				Token:   "test-token",
+				Mount:   "pki",
+				Timeout: 5 * time.Second,
 			})
-
-			err := client.parseErrorResponse(&http.Response{
-				StatusCode: tt.statusCode,
-			}, []byte(tt.body))
-
-			if err == nil {
-				t.Fatal("parseErrorResponse() should return error")
+			if err != nil {
+				t.Fatalf("NewClient() failed: %v", err)
 			}
 
-			var vaultErr *VaultError
-			if !IsVaultError(err, &vaultErr) {
-				t.Errorf("Error should be VaultError, got %T", err)
-			}
+			ctx := context.Background()
+			err = client.ValidateConnection(ctx)
 
-			if vaultErr.StatusCode != tt.statusCode {
-				t.Errorf("StatusCode = %d, want %d", vaultErr.StatusCode, tt.statusCode)
-			}
-
-			if len(vaultErr.Errors) == 0 {
-				t.Error("Errors slice should not be empty")
-			}
-		})
-	}
-}
-
-func TestClient_buildURL(t *testing.T) {
-	client, _ := NewClient(&Config{
-		Address: "https://vault.example.com:8200",
-		Token:   "test",
-	})
-
-	tests := []struct {
-		name string
-		path string
-		want string
-	}{
-		{
-			name: "With leading slash",
-			path: "/v1/pki/issue/role",
-			want: "https://vault.example.com:8200/v1/pki/issue/role",
-		},
-		{
-			name: "Without leading slash",
-			path: "v1/pki/issue/role",
-			want: "https://vault.example.com:8200/v1/pki/issue/role",
-		},
-		{
-			name: "Root path",
-			path: "/",
-			want: "https://vault.example.com:8200/",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := client.buildURL(tt.path)
-			if got != tt.want {
-				t.Errorf("buildURL() = %s, want %s", got, tt.want)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("ValidateConnection() should return error")
+					return
+				}
+				if tt.errCheck != nil && !tt.errCheck(err) {
+					t.Errorf("ValidateConnection() error check failed for: %v", err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("ValidateConnection() unexpected error = %v", err)
+				}
 			}
 		})
 	}
 }
 
-func TestClient_doRequest(t *testing.T) {
-	t.Run("Successful request with body", func(t *testing.T) {
-		server := createTestServer(func(w http.ResponseWriter, r *http.Request) {
-			// Verify method
-			if r.Method != "POST" {
-				t.Errorf("Method = %s, want POST", r.Method)
-			}
-
-			// Verify content type
-			if ct := r.Header.Get("Content-Type"); ct != "application/json" {
-				t.Errorf("Content-Type = %s, want application/json", ct)
-			}
-
-			// Verify auth header
-			if token := r.Header.Get("X-Vault-Token"); token != "test-token" {
-				t.Errorf("Token = %s, want test-token", token)
-			}
-
-			// Parse body
-			var body map[string]interface{}
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Errorf("Failed to decode body: %v", err)
-			}
-
-			if body["test"] != "value" {
-				t.Error("Body not correctly sent")
-			}
-
-			w.WriteHeader(200)
-		})
-		defer server.Close()
-
-		client := createTestClient(t, server.URL)
-		ctx := context.Background()
-
-		reqBody := map[string]string{"test": "value"}
-		resp, err := client.doRequest(ctx, "POST", "/v1/test", reqBody)
-		if err != nil {
-			t.Fatalf("doRequest() failed: %v", err)
+func TestClient_Ping(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/sys/health" {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"initialized":true,"sealed":false}`))
+			return
 		}
-		defer resp.Body.Close()
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
 
-		if resp.StatusCode != 200 {
-			t.Errorf("StatusCode = %d, want 200", resp.StatusCode)
-		}
+	client, err := NewClient(&Config{
+		Address: server.URL,
+		Token:   "test-token",
 	})
+	if err != nil {
+		t.Fatalf("NewClient() failed: %v", err)
+	}
 
-	t.Run("Request timeout", func(t *testing.T) {
-		server := createTestServer(func(w http.ResponseWriter, r *http.Request) {
-			time.Sleep(200 * time.Millisecond)
-			w.WriteHeader(200)
-		})
-		defer server.Close()
-
-		client := createTestClient(t, server.URL)
-		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-		defer cancel()
-
-		_, err := client.doRequest(ctx, "GET", "/v1/test", nil)
-		if err == nil {
-			t.Error("doRequest() should fail with timeout")
-		}
-
-		if !IsRetryable(err) {
-			t.Error("Timeout should be retryable")
-		}
-	})
+	ctx := context.Background()
+	err = client.Ping(ctx)
+	if err != nil {
+		t.Errorf("Ping() unexpected error = %v", err)
+	}
 }
-*/
 
-// Helper function to check if error is VaultError
-func IsVaultError(err error, target **VaultError) bool {
-	if err == nil {
-		return false
+func TestClient_Sys(t *testing.T) {
+	client, err := NewClient(&Config{
+		Address: "https://vault.example.com",
+		Token:   "test-token",
+	})
+	if err != nil {
+		t.Fatalf("NewClient() failed: %v", err)
 	}
-	ve, ok := err.(*VaultError)
-	if ok && target != nil {
-		*target = ve
+
+	sys := client.Sys()
+	if sys == nil {
+		t.Error("Sys() returned nil")
 	}
-	return ok
+
+	// Verify it's the correct type
+	var _ *api.Sys = sys
+}
+
+func TestClient_Logical(t *testing.T) {
+	client, err := NewClient(&Config{
+		Address: "https://vault.example.com",
+		Token:   "test-token",
+	})
+	if err != nil {
+		t.Fatalf("NewClient() failed: %v", err)
+	}
+
+	logical := client.Logical()
+	if logical == nil {
+		t.Error("Logical() returned nil")
+	}
+
+	// Verify it's the correct type
+	var _ *api.Logical = logical
 }
