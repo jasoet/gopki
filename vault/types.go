@@ -85,20 +85,35 @@ type IssuerInfo struct {
 	// KeyID is the associated key identifier
 	KeyID string
 
-	// Certificate is the issuer certificate
-	Certificate *x509.Certificate
+	// Certificate is the issuer certificate (PEM format)
+	Certificate string
 
-	// CAChain is the certificate authority chain
-	CAChain []*x509.Certificate
+	// CAChain is the certificate authority chain (PEM format)
+	CAChain []string
 
-	// ManualChain is a manually configured chain
-	ManualChain []*x509.Certificate
+	// ManualChain is a manually configured chain (issuer IDs)
+	ManualChain []string
 
-	// LeafNotAfterBehavior controls leaf certificate expiration handling
+	// LeafNotAfterBehavior controls leaf certificate expiration handling ("err", "truncate", "permit")
 	LeafNotAfterBehavior string
 
-	// Usage specifies the issuer usage (read-only, issuing-certificates, etc.)
+	// Usage specifies the issuer usage (read-only, issuing-certificates, crl-signing, ocsp-signing)
 	Usage string
+
+	// RevocationSignatureAlgorithm is the signature algorithm for revocation
+	RevocationSignatureAlgorithm string
+
+	// IssuingCertificates are the issuing certificate URLs
+	IssuingCertificates []string
+
+	// CRLDistributionPoints are the CRL distribution point URLs
+	CRLDistributionPoints []string
+
+	// OCSPServers are the OCSP server URLs
+	OCSPServers []string
+
+	// EnableAIAURLTemplating enables AIA URL templating
+	EnableAIAURLTemplating bool
 }
 
 // KeyInfo represents information about a key in Vault.
@@ -114,97 +129,6 @@ type KeyInfo struct {
 
 	// KeyBits is the key size in bits
 	KeyBits int
-}
-
-// Role represents a Vault PKI role configuration.
-type Role struct {
-	// Name is the role name
-	Name string
-
-	// TTL is the default time-to-live
-	TTL string
-
-	// MaxTTL is the maximum allowed TTL
-	MaxTTL string
-
-	// AllowLocalhost allows localhost in SANs
-	AllowLocalhost bool
-
-	// AllowedDomains are the permitted domains
-	AllowedDomains []string
-
-	// AllowBareDomains allows bare domain names
-	AllowBareDomains bool
-
-	// AllowSubdomains allows subdomain matching
-	AllowSubdomains bool
-
-	// AllowGlobDomains allows glob matching
-	AllowGlobDomains bool
-
-	// AllowAnyName allows any name (dangerous)
-	AllowAnyName bool
-
-	// EnforceHostnames validates hostnames
-	EnforceHostnames bool
-
-	// AllowIPSANs permits IP SANs
-	AllowIPSANs bool
-
-	// ServerFlag marks certificates for server auth
-	ServerFlag bool
-
-	// ClientFlag marks certificates for client auth
-	ClientFlag bool
-
-	// CodeSigningFlag marks certificates for code signing
-	CodeSigningFlag bool
-
-	// EmailProtectionFlag marks certificates for email protection
-	EmailProtectionFlag bool
-
-	// KeyType specifies the key algorithm (rsa, ec, ed25519, any)
-	KeyType string
-
-	// KeyBits specifies the key size
-	KeyBits int
-
-	// KeyUsage are the key usage extensions
-	KeyUsage []string
-
-	// ExtKeyUsage are the extended key usage extensions
-	ExtKeyUsage []string
-}
-
-// RoleOptions contains options for creating/updating a role.
-type RoleOptions struct {
-	TTL                    string
-	MaxTTL                 string
-	AllowLocalhost         bool
-	AllowedDomains         []string
-	AllowedDomainsTemplate bool
-	AllowBareDomains       bool
-	AllowSubdomains        bool
-	AllowGlobDomains       bool
-	AllowAnyName           bool
-	EnforceHostnames       bool
-	AllowIPSANs            bool
-	AllowedURISANs         []string
-	ServerFlag             bool
-	ClientFlag             bool
-	CodeSigningFlag        bool
-	EmailProtectionFlag    bool
-	KeyType                string
-	KeyBits                int
-	KeyUsage               []string
-	ExtKeyUsage            []string
-	ExtKeyUsageOIDs        []string
-	UseCSRCommonName       bool
-	UseCSRSANs             bool
-	RequireCN              bool
-	PolicyIdentifiers      []string
-	BasicConstraintsValidForNonCA bool
-	NotBeforeDuration      string
 }
 
 // VaultError represents a structured error from Vault API.
