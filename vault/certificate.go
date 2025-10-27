@@ -160,21 +160,29 @@ func (c *Client) SignCSR(
 		}
 	}
 
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/sign/%s", c.config.Mount, role)
-	resp, err := c.doRequest(ctx, "POST", path, reqBody)
+	// Use SDK to sign CSR
+	path := fmt.Sprintf("%s/sign/%s", c.config.Mount, role)
+	secret, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("vault: sign CSR: %w", err)
 	}
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("vault: sign CSR: empty response")
+	}
 
-	// Parse response
-	var vaultResp vaultSignResponse
-	if err := c.parseResponse(resp, &vaultResp); err != nil {
-		return nil, fmt.Errorf("vault: sign CSR: %w", err)
+	// Extract certificate data from response
+	certificatePEM, ok := secret.Data["certificate"].(string)
+	if !ok {
+		return nil, fmt.Errorf("vault: sign CSR: invalid certificate data")
+	}
+
+	issuingCAPEM := ""
+	if ca, ok := secret.Data["issuing_ca"].(string); ok {
+		issuingCAPEM = ca
 	}
 
 	// Convert to GoPKI certificate
-	certificate, err := vaultCertToGoPKI(vaultResp.Data.Certificate, vaultResp.Data.IssuingCA)
+	certificate, err := vaultCertToGoPKI(certificatePEM, issuingCAPEM)
 	if err != nil {
 		return nil, fmt.Errorf("vault: sign CSR: %w", err)
 	}
@@ -192,25 +200,24 @@ func (c *Client) GetCertificate(ctx context.Context, serial string) (*cert.Certi
 		return nil, fmt.Errorf("vault: serial number is required")
 	}
 
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/cert/%s", c.config.Mount, serial)
-	resp, err := c.doRequest(ctx, "GET", path, nil)
+	// Use SDK to read certificate
+	path := fmt.Sprintf("%s/cert/%s", c.config.Mount, serial)
+	secret, err := c.client.Logical().ReadWithContext(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("vault: get certificate: %w", err)
 	}
-
-	// Parse response
-	var vaultResp struct {
-		Data struct {
-			Certificate string `json:"certificate"`
-		} `json:"data"`
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("vault: get certificate: not found")
 	}
-	if err := c.parseResponse(resp, &vaultResp); err != nil {
-		return nil, fmt.Errorf("vault: get certificate: %w", err)
+
+	// Extract certificate data from response
+	certificatePEM, ok := secret.Data["certificate"].(string)
+	if !ok {
+		return nil, fmt.Errorf("vault: get certificate: invalid certificate data")
 	}
 
 	// Convert to GoPKI certificate
-	certificate, err := vaultCertToGoPKI(vaultResp.Data.Certificate, "")
+	certificate, err := vaultCertToGoPKI(certificatePEM, "")
 	if err != nil {
 		return nil, fmt.Errorf("vault: get certificate: %w", err)
 	}
@@ -227,24 +234,31 @@ func (c *Client) GetCertificate(ctx context.Context, serial string) (*cert.Certi
 //	    fmt.Println(serial)
 //	}
 func (c *Client) ListCertificates(ctx context.Context) ([]string, error) {
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/certs", c.config.Mount)
-	resp, err := c.doRequest(ctx, "LIST", path, nil)
+	// Use SDK to list certificates
+	path := fmt.Sprintf("%s/certs", c.config.Mount)
+	secret, err := c.client.Logical().ListWithContext(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("vault: list certificates: %w", err)
 	}
-
-	// Parse response
-	var vaultResp struct {
-		Data struct {
-			Keys []string `json:"keys"`
-		} `json:"data"`
-	}
-	if err := c.parseResponse(resp, &vaultResp); err != nil {
-		return nil, fmt.Errorf("vault: list certificates: %w", err)
+	if secret == nil || secret.Data == nil {
+		return []string{}, nil
 	}
 
-	return vaultResp.Data.Keys, nil
+	// Extract keys from response
+	keys, ok := secret.Data["keys"].([]interface{})
+	if !ok {
+		return []string{}, nil
+	}
+
+	// Convert to string slice
+	result := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if keyStr, ok := key.(string); ok {
+			result = append(result, keyStr)
+		}
+	}
+
+	return result, nil
 }
 
 // RevokeCertificate revokes a certificate by serial number.
@@ -262,17 +276,11 @@ func (c *Client) RevokeCertificate(ctx context.Context, serial string) error {
 		"serial_number": serial,
 	}
 
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/revoke", c.config.Mount)
-	resp, err := c.doRequest(ctx, "POST", path, reqBody)
+	// Use SDK to revoke certificate
+	path := fmt.Sprintf("%s/revoke", c.config.Mount)
+	_, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
 	if err != nil {
 		return fmt.Errorf("vault: revoke certificate: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check response status
-	if resp.StatusCode != 200 && resp.StatusCode != 204 {
-		return fmt.Errorf("vault: revoke certificate failed (status %d)", resp.StatusCode)
 	}
 
 	return nil

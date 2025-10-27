@@ -131,8 +131,8 @@ func TestGenerateKey(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Only validate if we expect a successful call
 				if !tt.wantErr || tt.statusCode > 0 {
-					if r.Method != "POST" {
-						t.Errorf("Expected POST request, got %s", r.Method)
+					if r.Method != "PUT" {
+						t.Errorf("Expected PUT request, got %s", r.Method)
 					}
 					w.WriteHeader(tt.statusCode)
 					w.Write([]byte(tt.response))
@@ -292,8 +292,8 @@ func TestImportKey(t *testing.T) {
 			// Create mock server
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if !tt.wantErr || tt.statusCode > 0 {
-					if r.Method != "POST" {
-						t.Errorf("Expected POST request, got %s", r.Method)
+					if r.Method != "PUT" {
+						t.Errorf("Expected PUT request, got %s", r.Method)
 					}
 					w.WriteHeader(tt.statusCode)
 					w.Write([]byte(tt.response))
@@ -380,8 +380,8 @@ func TestListKeys(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mock server
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.Method != "LIST" {
-					t.Errorf("Expected LIST request, got %s", r.Method)
+				if r.Method != "GET" {
+					t.Errorf("Expected GET request, got %s", r.Method)
 				}
 				w.WriteHeader(tt.statusCode)
 				w.Write([]byte(tt.response))
@@ -669,8 +669,8 @@ func TestUpdateKeyName(t *testing.T) {
 			// Create mock server
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if !tt.wantErr || tt.statusCode > 0 {
-					if r.Method != "POST" {
-						t.Errorf("Expected POST request, got %s", r.Method)
+					if r.Method != "PUT" {
+						t.Errorf("Expected PUT request, got %s", r.Method)
 					}
 
 					// Validate request body

@@ -138,8 +138,8 @@ func TestIssueCertificateWithKeyPair(t *testing.T) {
 					t.Errorf("Wrong endpoint: %s", r.URL.Path)
 				}
 
-				// Verify method
-				if r.Method != "POST" {
+				// Verify method (Vault API uses PUT for write operations)
+				if r.Method != "PUT" {
 					t.Errorf("Wrong method: %s", r.Method)
 				}
 
@@ -270,7 +270,7 @@ func TestSignCSR(t *testing.T) {
 					t.Errorf("Wrong endpoint: got %s, want %s", r.URL.Path, expectedPath)
 				}
 
-				if r.Method != "POST" {
+				if r.Method != "PUT" {
 					t.Errorf("Wrong method: %s", r.Method)
 				}
 
@@ -410,7 +410,7 @@ func TestListCertificates(t *testing.T) {
 					t.Errorf("Wrong endpoint: %s", r.URL.Path)
 				}
 
-				if r.Method != "LIST" {
+				if r.Method != "GET" {
 					t.Errorf("Wrong method: %s", r.Method)
 				}
 
@@ -479,7 +479,7 @@ func TestRevokeCertificate(t *testing.T) {
 					t.Errorf("Wrong endpoint: %s", r.URL.Path)
 				}
 
-				if r.Method != "POST" {
+				if r.Method != "PUT" {
 					t.Errorf("Wrong method: %s", r.Method)
 				}
 

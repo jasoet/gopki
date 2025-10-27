@@ -631,8 +631,8 @@ func TestUpdateIssuer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.Method != "POST" && !tt.wantErr {
-					t.Errorf("Expected POST request, got %s", r.Method)
+				if r.Method != "PUT" && !tt.wantErr {
+					t.Errorf("Expected PUT request, got %s", r.Method)
 				}
 				w.WriteHeader(tt.statusCode)
 			}))
@@ -735,8 +735,8 @@ func TestSetDefaultIssuer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.Method != "POST" && !tt.wantErr {
-					t.Errorf("Expected POST request, got %s", r.Method)
+				if r.Method != "PUT" && !tt.wantErr {
+					t.Errorf("Expected PUT request, got %s", r.Method)
 				}
 
 				// Verify request body contains default field

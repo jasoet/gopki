@@ -159,34 +159,50 @@ func (c *Client) GenerateRootCA(ctx context.Context, opts *CAOptions) (*Generate
 	// Build request body
 	reqBody := buildCARequestBody(opts)
 
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/root/generate/%s", c.config.Mount, opts.Type)
-	resp, err := c.doRequest(ctx, "POST", path, reqBody)
+	// Use SDK to generate root CA
+	path := fmt.Sprintf("%s/root/generate/%s", c.config.Mount, opts.Type)
+	secret, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("vault: generate root CA: %w", err)
 	}
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("vault: generate root CA: empty response")
+	}
 
-	// Parse response
-	var vaultResp vaultGenerateCAResponse
-	if err := c.parseResponse(resp, &vaultResp); err != nil {
-		return nil, fmt.Errorf("vault: generate root CA: %w", err)
+	// Extract response data
+	certificatePEM, _ := secret.Data["certificate"].(string)
+	issuingCAPEM, _ := secret.Data["issuing_ca"].(string)
+	serialNumber, _ := secret.Data["serial_number"].(string)
+	issuerID, _ := secret.Data["issuer_id"].(string)
+	keyID, _ := secret.Data["key_id"].(string)
+	privateKey, _ := secret.Data["private_key"].(string)
+	privateKeyType, _ := secret.Data["private_key_type"].(string)
+
+	// Extract CA chain
+	var caChain []string
+	if chainData, ok := secret.Data["ca_chain"].([]interface{}); ok {
+		for _, item := range chainData {
+			if certStr, ok := item.(string); ok {
+				caChain = append(caChain, certStr)
+			}
+		}
 	}
 
 	// Convert certificate
-	certificate, err := vaultCertToGoPKI(vaultResp.Data.Certificate, vaultResp.Data.IssuingCA)
+	certificate, err := vaultCertToGoPKI(certificatePEM, issuingCAPEM)
 	if err != nil {
 		return nil, fmt.Errorf("vault: generate root CA: %w", err)
 	}
 
 	return &GenerateCAResponse{
 		Certificate:    certificate,
-		IssuingCA:      vaultResp.Data.IssuingCA,
-		CAChain:        vaultResp.Data.CAChain,
-		SerialNumber:   vaultResp.Data.SerialNumber,
-		IssuerID:       vaultResp.Data.IssuerID,
-		KeyID:          vaultResp.Data.KeyID,
-		PrivateKey:     vaultResp.Data.PrivateKey,
-		PrivateKeyType: vaultResp.Data.PrivateKeyType,
+		IssuingCA:      issuingCAPEM,
+		CAChain:        caChain,
+		SerialNumber:   serialNumber,
+		IssuerID:       issuerID,
+		KeyID:          keyID,
+		PrivateKey:     privateKey,
+		PrivateKeyType: privateKeyType,
 	}, nil
 }
 
@@ -223,28 +239,45 @@ func (c *Client) GenerateIntermediateCA(ctx context.Context, opts *IntermediateC
 	// Build request body
 	reqBody := buildIntermediateCARequestBody(opts)
 
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/intermediate/generate/%s", c.config.Mount, opts.Type)
-	resp, err := c.doRequest(ctx, "POST", path, reqBody)
+	// Use SDK to generate intermediate CA
+	path := fmt.Sprintf("%s/intermediate/generate/%s", c.config.Mount, opts.Type)
+	secret, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("vault: generate intermediate CA: %w", err)
 	}
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("vault: generate intermediate CA: empty response")
+	}
 
-	// Parse response
-	var vaultResp vaultGenerateCAResponse
-	if err := c.parseResponse(resp, &vaultResp); err != nil {
-		return nil, fmt.Errorf("vault: generate intermediate CA: %w", err)
+	// Extract response data
+	certificatePEM, _ := secret.Data["certificate"].(string)
+	issuingCAPEM, _ := secret.Data["issuing_ca"].(string)
+	serialNumber, _ := secret.Data["serial_number"].(string)
+	issuerID, _ := secret.Data["issuer_id"].(string)
+	keyID, _ := secret.Data["key_id"].(string)
+	privateKey, _ := secret.Data["private_key"].(string)
+	privateKeyType, _ := secret.Data["private_key_type"].(string)
+	csr, _ := secret.Data["csr"].(string)
+
+	// Extract CA chain
+	var caChain []string
+	if chainData, ok := secret.Data["ca_chain"].([]interface{}); ok {
+		for _, item := range chainData {
+			if certStr, ok := item.(string); ok {
+				caChain = append(caChain, certStr)
+			}
+		}
 	}
 
 	response := &GenerateCAResponse{
-		SerialNumber:   vaultResp.Data.SerialNumber,
-		IssuerID:       vaultResp.Data.IssuerID,
-		KeyID:          vaultResp.Data.KeyID,
-		PrivateKey:     vaultResp.Data.PrivateKey,
-		PrivateKeyType: vaultResp.Data.PrivateKeyType,
-		CSR:            vaultResp.Data.CSR,
-		IssuingCA:      vaultResp.Data.IssuingCA,
-		CAChain:        vaultResp.Data.CAChain,
+		SerialNumber:   serialNumber,
+		IssuerID:       issuerID,
+		KeyID:          keyID,
+		PrivateKey:     privateKey,
+		PrivateKeyType: privateKeyType,
+		CSR:            csr,
+		IssuingCA:      issuingCAPEM,
+		CAChain:        caChain,
 	}
 
 	// For exported type, CSR is returned instead of certificate
@@ -253,8 +286,8 @@ func (c *Client) GenerateIntermediateCA(ctx context.Context, opts *IntermediateC
 	}
 
 	// For internal type, certificate is returned
-	if vaultResp.Data.Certificate != "" {
-		certificate, err := vaultCertToGoPKI(vaultResp.Data.Certificate, vaultResp.Data.IssuingCA)
+	if certificatePEM != "" {
+		certificate, err := vaultCertToGoPKI(certificatePEM, issuingCAPEM)
 		if err != nil {
 			return nil, fmt.Errorf("vault: generate intermediate CA: %w", err)
 		}
@@ -308,21 +341,25 @@ func (c *Client) SignIntermediateCSR(ctx context.Context, csr *cert.CertificateS
 		reqBody["exclude_cn_from_sans"] = true
 	}
 
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/root/sign-intermediate", c.config.Mount)
-	resp, err := c.doRequest(ctx, "POST", path, reqBody)
+	// Use SDK to sign intermediate CSR
+	path := fmt.Sprintf("%s/root/sign-intermediate", c.config.Mount)
+	secret, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("vault: sign intermediate CSR: %w", err)
 	}
-
-	// Parse response
-	var vaultResp vaultGenerateCAResponse
-	if err := c.parseResponse(resp, &vaultResp); err != nil {
-		return nil, fmt.Errorf("vault: sign intermediate CSR: %w", err)
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("vault: sign intermediate CSR: empty response")
 	}
 
+	// Extract certificate data
+	certificatePEM, ok := secret.Data["certificate"].(string)
+	if !ok {
+		return nil, fmt.Errorf("vault: sign intermediate CSR: invalid certificate data")
+	}
+	issuingCAPEM, _ := secret.Data["issuing_ca"].(string)
+
 	// Convert certificate
-	certificate, err := vaultCertToGoPKI(vaultResp.Data.Certificate, vaultResp.Data.IssuingCA)
+	certificate, err := vaultCertToGoPKI(certificatePEM, issuingCAPEM)
 	if err != nil {
 		return nil, fmt.Errorf("vault: sign intermediate CSR: %w", err)
 	}
@@ -348,31 +385,32 @@ func (c *Client) ImportCA(ctx context.Context, bundle *CABundle) (*IssuerInfo, e
 		"pem_bundle": bundle.PEMBundle,
 	}
 
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/config/ca", c.config.Mount)
-	resp, err := c.doRequest(ctx, "POST", path, reqBody)
+	// Use SDK to import CA
+	path := fmt.Sprintf("%s/config/ca", c.config.Mount)
+	secret, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("vault: import CA: %w", err)
 	}
-
-	// Parse response
-	var vaultResp struct {
-		Data struct {
-			ImportedIssuers []string          `json:"imported_issuers"`
-			ImportedKeys    []string          `json:"imported_keys"`
-			Mapping         map[string]string `json:"mapping"`
-		} `json:"data"`
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("vault: import CA: empty response")
 	}
-	if err := c.parseResponse(resp, &vaultResp); err != nil {
-		return nil, fmt.Errorf("vault: import CA: %w", err)
+
+	// Extract imported issuers
+	importedIssuers := []string{}
+	if issuersData, ok := secret.Data["imported_issuers"].([]interface{}); ok {
+		for _, item := range issuersData {
+			if issuerStr, ok := item.(string); ok {
+				importedIssuers = append(importedIssuers, issuerStr)
+			}
+		}
 	}
 
 	// Get the first imported issuer
-	if len(vaultResp.Data.ImportedIssuers) == 0 {
+	if len(importedIssuers) == 0 {
 		return nil, fmt.Errorf("vault: no issuers imported")
 	}
 
-	issuerID := vaultResp.Data.ImportedIssuers[0]
+	issuerID := importedIssuers[0]
 
 	// Retrieve issuer details
 	issuerInfo, err := c.GetIssuer(ctx, issuerID)
@@ -393,33 +431,79 @@ func (c *Client) GetIssuer(ctx context.Context, issuerRef string) (*IssuerInfo, 
 		return nil, fmt.Errorf("vault: issuer reference is required")
 	}
 
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/issuer/%s", c.config.Mount, issuerRef)
-	resp, err := c.doRequest(ctx, "GET", path, nil)
+	// Use SDK to get issuer
+	path := fmt.Sprintf("%s/issuer/%s", c.config.Mount, issuerRef)
+	secret, err := c.client.Logical().ReadWithContext(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("vault: get issuer: %w", err)
 	}
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("vault: get issuer: not found")
+	}
 
-	// Parse response
-	var vaultResp vaultIssuerResponse
-	if err := c.parseResponse(resp, &vaultResp); err != nil {
-		return nil, fmt.Errorf("vault: get issuer: %w", err)
+	// Extract issuer data with type assertions
+	issuerID, _ := secret.Data["issuer_id"].(string)
+	issuerName, _ := secret.Data["issuer_name"].(string)
+	keyID, _ := secret.Data["key_id"].(string)
+	certificate, _ := secret.Data["certificate"].(string)
+	leafNotAfterBehavior, _ := secret.Data["leaf_not_after_behavior"].(string)
+	usage, _ := secret.Data["usage"].(string)
+	revocationSignatureAlgorithm, _ := secret.Data["revocation_signature_algorithm"].(string)
+	enableAIAURLTemplating, _ := secret.Data["enable_aia_url_templating"].(bool)
+
+	// Extract array fields
+	var caChain, manualChain, issuingCertificates, crlDistributionPoints, ocspServers []string
+
+	if data, ok := secret.Data["ca_chain"].([]interface{}); ok {
+		for _, item := range data {
+			if str, ok := item.(string); ok {
+				caChain = append(caChain, str)
+			}
+		}
+	}
+	if data, ok := secret.Data["manual_chain"].([]interface{}); ok {
+		for _, item := range data {
+			if str, ok := item.(string); ok {
+				manualChain = append(manualChain, str)
+			}
+		}
+	}
+	if data, ok := secret.Data["issuing_certificates"].([]interface{}); ok {
+		for _, item := range data {
+			if str, ok := item.(string); ok {
+				issuingCertificates = append(issuingCertificates, str)
+			}
+		}
+	}
+	if data, ok := secret.Data["crl_distribution_points"].([]interface{}); ok {
+		for _, item := range data {
+			if str, ok := item.(string); ok {
+				crlDistributionPoints = append(crlDistributionPoints, str)
+			}
+		}
+	}
+	if data, ok := secret.Data["ocsp_servers"].([]interface{}); ok {
+		for _, item := range data {
+			if str, ok := item.(string); ok {
+				ocspServers = append(ocspServers, str)
+			}
+		}
 	}
 
 	return &IssuerInfo{
-		IssuerID:                     vaultResp.Data.IssuerID,
-		IssuerName:                   vaultResp.Data.IssuerName,
-		KeyID:                        vaultResp.Data.KeyID,
-		Certificate:                  vaultResp.Data.Certificate,
-		CAChain:                      vaultResp.Data.CAChain,
-		ManualChain:                  vaultResp.Data.ManualChain,
-		LeafNotAfterBehavior:         vaultResp.Data.LeafNotAfterBehavior,
-		Usage:                        vaultResp.Data.Usage,
-		RevocationSignatureAlgorithm: vaultResp.Data.RevocationSignatureAlgorithm,
-		IssuingCertificates:          vaultResp.Data.IssuingCertificates,
-		CRLDistributionPoints:        vaultResp.Data.CRLDistributionPoints,
-		OCSPServers:                  vaultResp.Data.OCSPServers,
-		EnableAIAURLTemplating:       vaultResp.Data.EnableAIAURLTemplating,
+		IssuerID:                     issuerID,
+		IssuerName:                   issuerName,
+		KeyID:                        keyID,
+		Certificate:                  certificate,
+		CAChain:                      caChain,
+		ManualChain:                  manualChain,
+		LeafNotAfterBehavior:         leafNotAfterBehavior,
+		Usage:                        usage,
+		RevocationSignatureAlgorithm: revocationSignatureAlgorithm,
+		IssuingCertificates:          issuingCertificates,
+		CRLDistributionPoints:        crlDistributionPoints,
+		OCSPServers:                  ocspServers,
+		EnableAIAURLTemplating:       enableAIAURLTemplating,
 	}, nil
 }
 
@@ -432,20 +516,31 @@ func (c *Client) GetIssuer(ctx context.Context, issuerRef string) (*IssuerInfo, 
 //	    fmt.Println(issuerID)
 //	}
 func (c *Client) ListIssuers(ctx context.Context) ([]string, error) {
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/issuers", c.config.Mount)
-	resp, err := c.doRequest(ctx, "LIST", path, nil)
+	// Use SDK to list issuers
+	path := fmt.Sprintf("%s/issuers", c.config.Mount)
+	secret, err := c.client.Logical().ListWithContext(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("vault: list issuers: %w", err)
 	}
-
-	// Parse response
-	var vaultResp vaultListResponse
-	if err := c.parseResponse(resp, &vaultResp); err != nil {
-		return nil, fmt.Errorf("vault: list issuers: %w", err)
+	if secret == nil || secret.Data == nil {
+		return []string{}, nil
 	}
 
-	return vaultResp.Data.Keys, nil
+	// Extract keys from response
+	keys, ok := secret.Data["keys"].([]interface{})
+	if !ok {
+		return []string{}, nil
+	}
+
+	// Convert to string slice
+	result := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if keyStr, ok := key.(string); ok {
+			result = append(result, keyStr)
+		}
+	}
+
+	return result, nil
 }
 
 // UpdateIssuer updates issuer configuration.
@@ -495,17 +590,11 @@ func (c *Client) UpdateIssuer(ctx context.Context, issuerRef string, config *Iss
 		reqBody["manual_chain"] = config.ManualChain
 	}
 
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/issuer/%s", c.config.Mount, issuerRef)
-	resp, err := c.doRequest(ctx, "POST", path, reqBody)
+	// Use SDK to update issuer
+	path := fmt.Sprintf("%s/issuer/%s", c.config.Mount, issuerRef)
+	_, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
 	if err != nil {
 		return fmt.Errorf("vault: update issuer: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check response status
-	if resp.StatusCode != 200 && resp.StatusCode != 204 {
-		return fmt.Errorf("vault: update issuer failed (status %d)", resp.StatusCode)
 	}
 
 	return nil
@@ -522,17 +611,11 @@ func (c *Client) DeleteIssuer(ctx context.Context, issuerRef string) error {
 		return fmt.Errorf("vault: issuer reference is required")
 	}
 
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/issuer/%s", c.config.Mount, issuerRef)
-	resp, err := c.doRequest(ctx, "DELETE", path, nil)
+	// Use SDK to delete issuer
+	path := fmt.Sprintf("%s/issuer/%s", c.config.Mount, issuerRef)
+	_, err := c.client.Logical().DeleteWithContext(ctx, path)
 	if err != nil {
 		return fmt.Errorf("vault: delete issuer: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check response status
-	if resp.StatusCode != 200 && resp.StatusCode != 204 {
-		return fmt.Errorf("vault: delete issuer failed (status %d)", resp.StatusCode)
 	}
 
 	return nil
@@ -553,17 +636,11 @@ func (c *Client) SetDefaultIssuer(ctx context.Context, issuerRef string) error {
 		"default": issuerRef,
 	}
 
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/config/issuers", c.config.Mount)
-	resp, err := c.doRequest(ctx, "POST", path, reqBody)
+	// Use SDK to set default issuer
+	path := fmt.Sprintf("%s/config/issuers", c.config.Mount)
+	_, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
 	if err != nil {
 		return fmt.Errorf("vault: set default issuer: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check response status
-	if resp.StatusCode != 200 && resp.StatusCode != 204 {
-		return fmt.Errorf("vault: set default issuer failed (status %d)", resp.StatusCode)
 	}
 
 	return nil
@@ -575,24 +652,19 @@ func (c *Client) SetDefaultIssuer(ctx context.Context, issuerRef string) error {
 //
 //	issuerID, err := client.GetDefaultIssuer(ctx)
 func (c *Client) GetDefaultIssuer(ctx context.Context) (string, error) {
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/config/issuers", c.config.Mount)
-	resp, err := c.doRequest(ctx, "GET", path, nil)
+	// Use SDK to get default issuer
+	path := fmt.Sprintf("%s/config/issuers", c.config.Mount)
+	secret, err := c.client.Logical().ReadWithContext(ctx, path)
 	if err != nil {
 		return "", fmt.Errorf("vault: get default issuer: %w", err)
 	}
-
-	// Parse response
-	var vaultResp struct {
-		Data struct {
-			Default string `json:"default"`
-		} `json:"data"`
-	}
-	if err := c.parseResponse(resp, &vaultResp); err != nil {
-		return "", fmt.Errorf("vault: get default issuer: %w", err)
+	if secret == nil || secret.Data == nil {
+		return "", fmt.Errorf("vault: get default issuer: not configured")
 	}
 
-	return vaultResp.Data.Default, nil
+	// Extract default issuer
+	defaultIssuer, _ := secret.Data["default"].(string)
+	return defaultIssuer, nil
 }
 
 // Helper functions

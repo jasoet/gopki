@@ -14,9 +14,10 @@ import (
 
 // GenerateKeyOptions contains parameters for generating a key in Vault.
 type GenerateKeyOptions struct {
-	KeyName string // Name for the key
-	KeyType string // "rsa", "ec", "ed25519"
-	KeyBits int    // For RSA: 2048, 3072, 4096; For EC: 224, 256, 384, 521
+	KeyName  string // Name for the key
+	KeyType  string // "rsa", "ec", "ed25519"
+	KeyBits  int    // For RSA: 2048, 3072, 4096; For EC: 224, 256, 384, 521
+	Exported bool   // If true, private key is returned; if false, key stays in Vault
 }
 
 // ImportKeyOptions contains parameters for importing a key to Vault.
@@ -92,24 +93,44 @@ func (c *Client) GenerateKey(ctx context.Context, opts *GenerateKeyOptions) (*Ke
 		reqBody["key_bits"] = opts.KeyBits
 	}
 
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/keys/generate/%s", c.config.Mount, opts.KeyType)
-	resp, err := c.doRequest(ctx, "POST", path, reqBody)
+	// Determine export type
+	exportType := "internal" // Default: key stays in Vault
+	if opts.Exported {
+		exportType = "exported" // Key is returned in response
+	}
+
+	// Use SDK to generate key
+	// Path: /pki/keys/generate/{internal|exported}
+	path := fmt.Sprintf("%s/keys/generate/%s", c.config.Mount, exportType)
+	secret, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("vault: generate key: %w", err)
 	}
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("vault: generate key: empty response")
+	}
 
-	// Parse response
-	var vaultResp vaultKeyResponse
-	if err := c.parseResponse(resp, &vaultResp); err != nil {
-		return nil, fmt.Errorf("vault: generate key: %w", err)
+	// Extract key data
+	keyID, _ := secret.Data["key_id"].(string)
+	keyName, _ := secret.Data["key_name"].(string)
+	keyType, _ := secret.Data["key_type"].(string)
+
+	// KeyBits might be int or json.Number, handle both
+	var keyBits int
+	switch v := secret.Data["key_bits"].(type) {
+	case int:
+		keyBits = v
+	case float64:
+		keyBits = int(v)
+	case int64:
+		keyBits = int(v)
 	}
 
 	return &KeyInfo{
-		KeyID:   vaultResp.Data.KeyID,
-		KeyName: vaultResp.Data.KeyName,
-		KeyType: vaultResp.Data.KeyType,
-		KeyBits: vaultResp.Data.KeyBits,
+		KeyID:   keyID,
+		KeyName: keyName,
+		KeyType: keyType,
+		KeyBits: keyBits,
 	}, nil
 }
 
@@ -171,22 +192,23 @@ func (c *Client) ImportKey(ctx context.Context, keyPair interface{}, opts *Impor
 		reqBody["key_name"] = opts.KeyName
 	}
 
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/keys/import", c.config.Mount)
-	resp, err := c.doRequest(ctx, "POST", path, reqBody)
+	// Use SDK to import key
+	path := fmt.Sprintf("%s/keys/import", c.config.Mount)
+	secret, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("vault: import key: %w", err)
 	}
-
-	// Parse response
-	var vaultResp vaultKeyImportResponse
-	if err := c.parseResponse(resp, &vaultResp); err != nil {
-		return nil, fmt.Errorf("vault: import key: %w", err)
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("vault: import key: empty response")
 	}
 
+	// Extract key data
+	keyID, _ := secret.Data["key_id"].(string)
+	keyName, _ := secret.Data["key_name"].(string)
+
 	return &KeyInfo{
-		KeyID:   vaultResp.Data.KeyID,
-		KeyName: vaultResp.Data.KeyName,
+		KeyID:   keyID,
+		KeyName: keyName,
 		KeyType: keyType,
 		KeyBits: keyBits,
 	}, nil
@@ -201,20 +223,31 @@ func (c *Client) ImportKey(ctx context.Context, keyPair interface{}, opts *Impor
 //	    fmt.Println(keyID)
 //	}
 func (c *Client) ListKeys(ctx context.Context) ([]string, error) {
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/keys", c.config.Mount)
-	resp, err := c.doRequest(ctx, "LIST", path, nil)
+	// Use SDK to list keys
+	path := fmt.Sprintf("%s/keys", c.config.Mount)
+	secret, err := c.client.Logical().ListWithContext(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("vault: list keys: %w", err)
 	}
-
-	// Parse response
-	var vaultResp vaultListResponse
-	if err := c.parseResponse(resp, &vaultResp); err != nil {
-		return nil, fmt.Errorf("vault: list keys: %w", err)
+	if secret == nil || secret.Data == nil {
+		return []string{}, nil
 	}
 
-	return vaultResp.Data.Keys, nil
+	// Extract keys from response
+	keys, ok := secret.Data["keys"].([]interface{})
+	if !ok {
+		return []string{}, nil
+	}
+
+	// Convert to string slice
+	result := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if keyStr, ok := key.(string); ok {
+			result = append(result, keyStr)
+		}
+	}
+
+	return result, nil
 }
 
 // GetKey retrieves key information by ID or name.
@@ -228,24 +261,37 @@ func (c *Client) GetKey(ctx context.Context, keyRef string) (*KeyInfo, error) {
 		return nil, fmt.Errorf("vault: key reference is required")
 	}
 
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/key/%s", c.config.Mount, keyRef)
-	resp, err := c.doRequest(ctx, "GET", path, nil)
+	// Use SDK to get key
+	path := fmt.Sprintf("%s/key/%s", c.config.Mount, keyRef)
+	secret, err := c.client.Logical().ReadWithContext(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("vault: get key: %w", err)
 	}
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("vault: get key: not found")
+	}
 
-	// Parse response
-	var vaultResp vaultKeyResponse
-	if err := c.parseResponse(resp, &vaultResp); err != nil {
-		return nil, fmt.Errorf("vault: get key: %w", err)
+	// Extract key data
+	keyID, _ := secret.Data["key_id"].(string)
+	keyName, _ := secret.Data["key_name"].(string)
+	keyType, _ := secret.Data["key_type"].(string)
+
+	// KeyBits might be int or json.Number, handle both
+	var keyBits int
+	switch v := secret.Data["key_bits"].(type) {
+	case int:
+		keyBits = v
+	case float64:
+		keyBits = int(v)
+	case int64:
+		keyBits = int(v)
 	}
 
 	return &KeyInfo{
-		KeyID:   vaultResp.Data.KeyID,
-		KeyName: vaultResp.Data.KeyName,
-		KeyType: vaultResp.Data.KeyType,
-		KeyBits: vaultResp.Data.KeyBits,
+		KeyID:   keyID,
+		KeyName: keyName,
+		KeyType: keyType,
+		KeyBits: keyBits,
 	}, nil
 }
 
@@ -260,17 +306,11 @@ func (c *Client) DeleteKey(ctx context.Context, keyRef string) error {
 		return fmt.Errorf("vault: key reference is required")
 	}
 
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/key/%s", c.config.Mount, keyRef)
-	resp, err := c.doRequest(ctx, "DELETE", path, nil)
+	// Use SDK to delete key
+	path := fmt.Sprintf("%s/key/%s", c.config.Mount, keyRef)
+	_, err := c.client.Logical().DeleteWithContext(ctx, path)
 	if err != nil {
 		return fmt.Errorf("vault: delete key: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check response status
-	if resp.StatusCode != 200 && resp.StatusCode != 204 {
-		return fmt.Errorf("vault: delete key failed (status %d)", resp.StatusCode)
 	}
 
 	return nil
@@ -294,17 +334,11 @@ func (c *Client) UpdateKeyName(ctx context.Context, keyRef string, newName strin
 		"key_name": newName,
 	}
 
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/key/%s", c.config.Mount, keyRef)
-	resp, err := c.doRequest(ctx, "POST", path, reqBody)
+	// Use SDK to update key name
+	path := fmt.Sprintf("%s/key/%s", c.config.Mount, keyRef)
+	_, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
 	if err != nil {
 		return fmt.Errorf("vault: update key name: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check response status
-	if resp.StatusCode != 200 && resp.StatusCode != 204 {
-		return fmt.Errorf("vault: update key name failed (status %d)", resp.StatusCode)
 	}
 
 	return nil
@@ -335,27 +369,25 @@ func (c *Client) ExportKey(ctx context.Context, keyRef string) (interface{}, err
 		return nil, fmt.Errorf("vault: export key: %w", err)
 	}
 
-	// Make request to Vault export endpoint
+	// Use SDK to export key
 	// Note: This endpoint may not exist or may be disabled by policy
-	path := fmt.Sprintf("/v1/%s/key/%s/export", c.config.Mount, keyRef)
-	resp, err := c.doRequest(ctx, "GET", path, nil)
+	path := fmt.Sprintf("%s/key/%s/export", c.config.Mount, keyRef)
+	secret, err := c.client.Logical().ReadWithContext(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("vault: export key: %w (key may not be exportable)", err)
 	}
-
-	// Parse response
-	var vaultResp struct {
-		Data struct {
-			PrivateKey string `json:"private_key"`
-			KeyType    string `json:"key_type"`
-		} `json:"data"`
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("vault: export key: empty response")
 	}
-	if err := c.parseResponse(resp, &vaultResp); err != nil {
-		return nil, fmt.Errorf("vault: export key: %w", err)
+
+	// Extract private key data
+	privateKeyPEM, ok := secret.Data["private_key"].(string)
+	if !ok || privateKeyPEM == "" {
+		return nil, fmt.Errorf("vault: export key: no private key in response")
 	}
 
 	// Parse private key PEM
-	block, _ := pem.Decode([]byte(vaultResp.Data.PrivateKey))
+	block, _ := pem.Decode([]byte(privateKeyPEM))
 	if block == nil {
 		return nil, fmt.Errorf("vault: export key: failed to decode PEM")
 	}

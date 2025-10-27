@@ -2,6 +2,7 @@ package vault
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 )
 
@@ -91,17 +92,11 @@ func (c *Client) CreateRole(ctx context.Context, name string, opts *RoleOptions)
 	// Build request body
 	reqBody := buildRoleRequestBody(opts)
 
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/roles/%s", c.config.Mount, name)
-	resp, err := c.doRequest(ctx, "POST", path, reqBody)
+	// Use SDK to create role
+	path := fmt.Sprintf("%s/roles/%s", c.config.Mount, name)
+	_, err := c.client.Logical().WriteWithContext(ctx, path, reqBody)
 	if err != nil {
 		return fmt.Errorf("vault: create role: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check response status
-	if resp.StatusCode != 200 && resp.StatusCode != 204 {
-		return fmt.Errorf("vault: create role failed (status %d)", resp.StatusCode)
 	}
 
 	return nil
@@ -117,22 +112,253 @@ func (c *Client) GetRole(ctx context.Context, name string) (*Role, error) {
 		return nil, fmt.Errorf("vault: role name is required")
 	}
 
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/roles/%s", c.config.Mount, name)
-	resp, err := c.doRequest(ctx, "GET", path, nil)
+	// Use SDK to get role
+	path := fmt.Sprintf("%s/roles/%s", c.config.Mount, name)
+	secret, err := c.client.Logical().ReadWithContext(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("vault: get role: %w", err)
 	}
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("vault: get role: not found")
+	}
 
-	// Parse response
-	var vaultResp vaultRoleResponse
-	if err := c.parseResponse(resp, &vaultResp); err != nil {
-		return nil, fmt.Errorf("vault: get role: %w", err)
+	// Extract role data into RoleOptions
+	roleOpts := &RoleOptions{}
+
+	// Extract string fields
+	if v, ok := secret.Data["issuer_ref"].(string); ok {
+		roleOpts.IssuerRef = v
+	}
+	if v, ok := secret.Data["ttl"].(string); ok {
+		roleOpts.TTL = v
+	}
+	if v, ok := secret.Data["max_ttl"].(string); ok {
+		roleOpts.MaxTTL = v
+	}
+	if v, ok := secret.Data["key_type"].(string); ok {
+		roleOpts.KeyType = v
+	}
+	if v, ok := secret.Data["not_before_duration"].(string); ok {
+		roleOpts.NotBeforeDuration = v
+	}
+
+	// Extract boolean fields
+	if v, ok := secret.Data["allow_localhost"].(bool); ok {
+		roleOpts.AllowLocalhost = v
+	}
+	if v, ok := secret.Data["allowed_domains_template"].(bool); ok {
+		roleOpts.AllowedDomainsTemplate = v
+	}
+	if v, ok := secret.Data["allow_bare_domains"].(bool); ok {
+		roleOpts.AllowBareDomains = v
+	}
+	if v, ok := secret.Data["allow_subdomains"].(bool); ok {
+		roleOpts.AllowSubdomains = v
+	}
+	if v, ok := secret.Data["allow_glob_domains"].(bool); ok {
+		roleOpts.AllowGlobDomains = v
+	}
+	if v, ok := secret.Data["allow_wildcard_certificates"].(bool); ok {
+		roleOpts.AllowWildcardCertificates = v
+	}
+	if v, ok := secret.Data["allow_any_name"].(bool); ok {
+		roleOpts.AllowAnyName = v
+	}
+	if v, ok := secret.Data["enforce_hostnames"].(bool); ok {
+		roleOpts.EnforceHostnames = v
+	}
+	if v, ok := secret.Data["allow_ip_sans"].(bool); ok {
+		roleOpts.AllowIPSANs = v
+	}
+	if v, ok := secret.Data["server_flag"].(bool); ok {
+		roleOpts.ServerFlag = v
+	}
+	if v, ok := secret.Data["client_flag"].(bool); ok {
+		roleOpts.ClientFlag = v
+	}
+	if v, ok := secret.Data["code_signing_flag"].(bool); ok {
+		roleOpts.CodeSigningFlag = v
+	}
+	if v, ok := secret.Data["email_protection_flag"].(bool); ok {
+		roleOpts.EmailProtectionFlag = v
+	}
+	if v, ok := secret.Data["use_pss"].(bool); ok {
+		roleOpts.UsePSS = v
+	}
+	if v, ok := secret.Data["use_csr_common_name"].(bool); ok {
+		roleOpts.UseCSRCommonName = v
+	}
+	if v, ok := secret.Data["use_csr_sans"].(bool); ok {
+		roleOpts.UseCSRSANs = v
+	}
+	if v, ok := secret.Data["generate_lease"].(bool); ok {
+		roleOpts.GenerateLease = v
+	}
+	if v, ok := secret.Data["no_store"].(bool); ok {
+		roleOpts.NoStore = v
+	}
+	if v, ok := secret.Data["require_cn"].(bool); ok {
+		roleOpts.RequireCN = v
+	}
+	if v, ok := secret.Data["basic_constraints_valid_for_non_ca"].(bool); ok {
+		roleOpts.BasicConstraintsValidForNonCA = v
+	}
+
+	// Extract int fields - handle json.Number, float64, int, and int64
+	if v, ok := secret.Data["key_bits"].(float64); ok {
+		roleOpts.KeyBits = int(v)
+	} else if v, ok := secret.Data["key_bits"].(int); ok {
+		roleOpts.KeyBits = v
+	} else if v, ok := secret.Data["key_bits"].(int64); ok {
+		roleOpts.KeyBits = int(v)
+	} else if v, ok := secret.Data["key_bits"].(json.Number); ok {
+		if intVal, err := v.Int64(); err == nil {
+			roleOpts.KeyBits = int(intVal)
+		}
+	}
+	if v, ok := secret.Data["signature_bits"].(float64); ok {
+		roleOpts.SignatureBits = int(v)
+	} else if v, ok := secret.Data["signature_bits"].(int); ok {
+		roleOpts.SignatureBits = v
+	} else if v, ok := secret.Data["signature_bits"].(int64); ok {
+		roleOpts.SignatureBits = int(v)
+	} else if v, ok := secret.Data["signature_bits"].(json.Number); ok {
+		if intVal, err := v.Int64(); err == nil {
+			roleOpts.SignatureBits = int(intVal)
+		}
+	}
+
+	// Extract array fields
+	if v, ok := secret.Data["allowed_domains"].([]interface{}); ok {
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				roleOpts.AllowedDomains = append(roleOpts.AllowedDomains, str)
+			}
+		}
+	}
+	if v, ok := secret.Data["allowed_ip_sans"].([]interface{}); ok {
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				roleOpts.AllowedIPSANs = append(roleOpts.AllowedIPSANs, str)
+			}
+		}
+	}
+	if v, ok := secret.Data["allowed_uri_sans"].([]interface{}); ok {
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				roleOpts.AllowedURISANs = append(roleOpts.AllowedURISANs, str)
+			}
+		}
+	}
+	if v, ok := secret.Data["allowed_other_sans"].([]interface{}); ok {
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				roleOpts.AllowedOtherSANs = append(roleOpts.AllowedOtherSANs, str)
+			}
+		}
+	}
+	if v, ok := secret.Data["allowed_serial_numbers"].([]interface{}); ok {
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				roleOpts.AllowedSerialNumbers = append(roleOpts.AllowedSerialNumbers, str)
+			}
+		}
+	}
+	if v, ok := secret.Data["key_usage"].([]interface{}); ok {
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				roleOpts.KeyUsage = append(roleOpts.KeyUsage, str)
+			}
+		}
+	}
+	if v, ok := secret.Data["ext_key_usage"].([]interface{}); ok {
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				roleOpts.ExtKeyUsage = append(roleOpts.ExtKeyUsage, str)
+			}
+		}
+	}
+	if v, ok := secret.Data["ext_key_usage_oids"].([]interface{}); ok {
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				roleOpts.ExtKeyUsageOIDs = append(roleOpts.ExtKeyUsageOIDs, str)
+			}
+		}
+	}
+	if v, ok := secret.Data["ou"].([]interface{}); ok {
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				roleOpts.OrganizationUnit = append(roleOpts.OrganizationUnit, str)
+			}
+		}
+	}
+	if v, ok := secret.Data["organization"].([]interface{}); ok {
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				roleOpts.Organization = append(roleOpts.Organization, str)
+			}
+		}
+	}
+	if v, ok := secret.Data["country"].([]interface{}); ok {
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				roleOpts.Country = append(roleOpts.Country, str)
+			}
+		}
+	}
+	if v, ok := secret.Data["locality"].([]interface{}); ok {
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				roleOpts.Locality = append(roleOpts.Locality, str)
+			}
+		}
+	}
+	if v, ok := secret.Data["province"].([]interface{}); ok {
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				roleOpts.Province = append(roleOpts.Province, str)
+			}
+		}
+	}
+	if v, ok := secret.Data["street_address"].([]interface{}); ok {
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				roleOpts.StreetAddress = append(roleOpts.StreetAddress, str)
+			}
+		}
+	}
+	if v, ok := secret.Data["postal_code"].([]interface{}); ok {
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				roleOpts.PostalCode = append(roleOpts.PostalCode, str)
+			}
+		}
+	}
+	if v, ok := secret.Data["policy_identifiers"].([]interface{}); ok {
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				roleOpts.PolicyIdentifiers = append(roleOpts.PolicyIdentifiers, str)
+			}
+		}
+	}
+	if v, ok := secret.Data["cn_validations"].([]interface{}); ok {
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				roleOpts.CNValidations = append(roleOpts.CNValidations, str)
+			}
+		}
+	}
+	if v, ok := secret.Data["allowed_user_ids"].([]interface{}); ok {
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				roleOpts.AllowedUserIDs = append(roleOpts.AllowedUserIDs, str)
+			}
+		}
 	}
 
 	return &Role{
 		Name:        name,
-		RoleOptions: &vaultResp.Data,
+		RoleOptions: roleOpts,
 	}, nil
 }
 
@@ -145,20 +371,31 @@ func (c *Client) GetRole(ctx context.Context, name string) (*Role, error) {
 //	    fmt.Println(roleName)
 //	}
 func (c *Client) ListRoles(ctx context.Context) ([]string, error) {
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/roles", c.config.Mount)
-	resp, err := c.doRequest(ctx, "LIST", path, nil)
+	// Use SDK to list roles
+	path := fmt.Sprintf("%s/roles", c.config.Mount)
+	secret, err := c.client.Logical().ListWithContext(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("vault: list roles: %w", err)
 	}
-
-	// Parse response
-	var vaultResp vaultListResponse
-	if err := c.parseResponse(resp, &vaultResp); err != nil {
-		return nil, fmt.Errorf("vault: list roles: %w", err)
+	if secret == nil || secret.Data == nil {
+		return []string{}, nil
 	}
 
-	return vaultResp.Data.Keys, nil
+	// Extract keys from response
+	keys, ok := secret.Data["keys"].([]interface{})
+	if !ok {
+		return []string{}, nil
+	}
+
+	// Convert to string slice
+	result := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if keyStr, ok := key.(string); ok {
+			result = append(result, keyStr)
+		}
+	}
+
+	return result, nil
 }
 
 // DeleteRole deletes a role from Vault.
@@ -171,17 +408,11 @@ func (c *Client) DeleteRole(ctx context.Context, name string) error {
 		return fmt.Errorf("vault: role name is required")
 	}
 
-	// Make request to Vault
-	path := fmt.Sprintf("/v1/%s/roles/%s", c.config.Mount, name)
-	resp, err := c.doRequest(ctx, "DELETE", path, nil)
+	// Use SDK to delete role
+	path := fmt.Sprintf("%s/roles/%s", c.config.Mount, name)
+	_, err := c.client.Logical().DeleteWithContext(ctx, path)
 	if err != nil {
 		return fmt.Errorf("vault: delete role: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check response status
-	if resp.StatusCode != 200 && resp.StatusCode != 204 {
-		return fmt.Errorf("vault: delete role failed (status %d)", resp.StatusCode)
 	}
 
 	return nil

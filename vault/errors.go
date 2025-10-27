@@ -29,6 +29,9 @@ var (
 	ErrNoDefaultIssuer = errors.New("vault: no default issuer configured")
 	ErrIssuerInvalid   = errors.New("vault: issuer certificate invalid")
 
+	// Mount errors
+	ErrMountNotFound = errors.New("vault: PKI mount not found")
+
 	// Connection errors
 	ErrHealthCheckFailed = errors.New("vault: health check failed")
 	ErrInvalidResponse   = errors.New("vault: invalid response from server")
@@ -86,7 +89,8 @@ func IsNotFoundError(err error) bool {
 	if errors.Is(err, ErrCertificateNotFound) ||
 		errors.Is(err, ErrKeyNotFound) ||
 		errors.Is(err, ErrIssuerNotFound) ||
-		errors.Is(err, ErrRoleNotFound) {
+		errors.Is(err, ErrRoleNotFound) ||
+		errors.Is(err, ErrMountNotFound) {
 		return true
 	}
 
