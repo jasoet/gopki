@@ -161,7 +161,7 @@ func (cc *CertificateClient[K]) RevokeWithKey(ctx context.Context) error {
 	if !cc.HasKeyPair() {
 		return fmt.Errorf("bao: key pair not available for revocation")
 	}
-	return cc.client.RevokeWithKey(ctx, cc.certificate, cc.keyPair)
+	return cc.client.revokeWithKey(ctx, cc.certificate, cc.keyPair)
 }
 
 // ============================================================================
@@ -256,14 +256,9 @@ func (c *Client) RevokeCertificate(ctx context.Context, serial string) error {
 	return nil
 }
 
-// RevokeWithKey revokes a certificate using its private key.
-//
-// Example:
-//
-//	keyPair, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
-//	certificate, _ := client.IssueRSACertificate(ctx, "web-server", keyPair, &GenerateCertificateOptions{...})
-//	err := client.RevokeWithKey(ctx, certificate, keyPair)
-func (c *Client) RevokeWithKey(ctx context.Context, certificate *cert.Certificate, keyPair interface{}) error {
+// revokeWithKey revokes a certificate using its private key.
+// This is a private method. Use CertificateClient.RevokeWithKey() instead.
+func (c *Client) revokeWithKey(ctx context.Context, certificate *cert.Certificate, keyPair interface{}) error {
 	if certificate == nil {
 		return fmt.Errorf("bao: certificate is required")
 	}
