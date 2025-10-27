@@ -45,7 +45,7 @@ func TestIssueCertificateWithKeyPair(t *testing.T) {
 		name       string
 		role       string
 		keyPair    interface{}
-		opts       *IssueOptions
+		opts       *GenerateCertificateOptions
 		statusCode int
 		response   string
 		wantErr    bool
@@ -54,7 +54,7 @@ func TestIssueCertificateWithKeyPair(t *testing.T) {
 			name:    "RSA key pair success",
 			role:    "test-role",
 			keyPair: func() interface{} { kp, _ := algo.GenerateRSAKeyPair(algo.KeySize2048); return kp }(),
-			opts: &IssueOptions{
+			opts: &GenerateCertificateOptions{
 				CommonName: "app.example.com",
 				AltNames:   []string{"www.app.example.com"},
 				TTL:        "720h",
@@ -75,7 +75,7 @@ func TestIssueCertificateWithKeyPair(t *testing.T) {
 			name:    "ECDSA key pair success",
 			role:    "test-role",
 			keyPair: func() interface{} { kp, _ := algo.GenerateECDSAKeyPair(algo.P256); return kp }(),
-			opts: &IssueOptions{
+			opts: &GenerateCertificateOptions{
 				CommonName: "ecdsa.example.com",
 				TTL:        "8760h",
 			},
@@ -95,7 +95,7 @@ func TestIssueCertificateWithKeyPair(t *testing.T) {
 			name:    "Ed25519 key pair success",
 			role:    "test-role",
 			keyPair: func() interface{} { kp, _ := algo.GenerateEd25519KeyPair(); return kp }(),
-			opts: &IssueOptions{
+			opts: &GenerateCertificateOptions{
 				CommonName: "ed25519.example.com",
 				TTL:        "8760h",
 			},
@@ -115,7 +115,7 @@ func TestIssueCertificateWithKeyPair(t *testing.T) {
 			name:       "Missing role",
 			role:       "", // Empty role should trigger validation error
 			keyPair:    func() interface{} { kp, _ := algo.GenerateRSAKeyPair(algo.KeySize2048); return kp }(),
-			opts:       &IssueOptions{CommonName: "test.com"},
+			opts:       &GenerateCertificateOptions{CommonName: "test.com"},
 			statusCode: 200,
 			wantErr:    true, // Will fail validation before HTTP request
 		},
@@ -123,7 +123,7 @@ func TestIssueCertificateWithKeyPair(t *testing.T) {
 			name:       "Vault error response",
 			role:       "test-role",
 			keyPair:    func() interface{} { kp, _ := algo.GenerateRSAKeyPair(algo.KeySize2048); return kp }(),
-			opts:       &IssueOptions{CommonName: "test.com"},
+			opts:       &GenerateCertificateOptions{CommonName: "test.com"},
 			statusCode: 403,
 			response:   `{"errors":["permission denied"]}`,
 			wantErr:    true,
@@ -161,10 +161,35 @@ func TestIssueCertificateWithKeyPair(t *testing.T) {
 			client := createTestClient(t, server.URL)
 			ctx := context.Background()
 
-			certificate, err := client.IssueCertificateWithKeyPair(ctx, tt.role, tt.keyPair, tt.opts)
+			// Use the new type-specific methods
+			var certificate *cert.Certificate
+			var err error
+
+			switch kp := tt.keyPair.(type) {
+			case *algo.RSAKeyPair:
+				certClient, e := client.IssueRSACertificate(ctx, tt.role, kp, tt.opts)
+				if e == nil && certClient != nil {
+					certificate = certClient.Certificate()
+				}
+				err = e
+			case *algo.ECDSAKeyPair:
+				certClient, e := client.IssueECDSACertificate(ctx, tt.role, kp, tt.opts)
+				if e == nil && certClient != nil {
+					certificate = certClient.Certificate()
+				}
+				err = e
+			case *algo.Ed25519KeyPair:
+				certClient, e := client.IssueEd25519Certificate(ctx, tt.role, kp, tt.opts)
+				if e == nil && certClient != nil {
+					certificate = certClient.Certificate()
+				}
+				err = e
+			default:
+				t.Fatalf("Unsupported key type: %T", kp)
+			}
 
 			if (err != nil) != tt.wantErr {
-				t.Errorf("IssueCertificateWithKeyPair() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("IssueCertificate() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
@@ -213,7 +238,7 @@ func TestSignCSR(t *testing.T) {
 		name       string
 		role       string
 		csr        *cert.CertificateSigningRequest
-		opts       *SignOptions
+		opts       *SignCertificateOptions
 		statusCode int
 		response   string
 		wantErr    bool
@@ -222,7 +247,7 @@ func TestSignCSR(t *testing.T) {
 			name: "Successful CSR signing",
 			role: "web-server",
 			csr:  csr,
-			opts: &SignOptions{
+			opts: &SignCertificateOptions{
 				TTL: "8760h",
 			},
 			statusCode: 200,
@@ -241,21 +266,21 @@ func TestSignCSR(t *testing.T) {
 			name:    "Missing role",
 			role:    "",
 			csr:     csr,
-			opts:    &SignOptions{},
+			opts:    &SignCertificateOptions{},
 			wantErr: true,
 		},
 		{
 			name:    "Nil CSR",
 			role:    "web-server",
 			csr:     nil,
-			opts:    &SignOptions{},
+			opts:    &SignCertificateOptions{},
 			wantErr: true,
 		},
 		{
-			name: "Vault error",
-			role: "web-server",
-			csr:  csr,
-			opts: &SignOptions{},
+			name:       "Vault error",
+			role:       "web-server",
+			csr:        csr,
+			opts:       &SignCertificateOptions{},
 			statusCode: 404,
 			response:   `{"errors":["role not found"]}`,
 			wantErr:    true,
@@ -514,9 +539,9 @@ func TestRevokeCertificate(t *testing.T) {
 
 func TestParseIPAddresses(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    []string
-		wantLen  int
+		name    string
+		input   []string
+		wantLen int
 	}{
 		{
 			name:    "Valid IPv4 addresses",

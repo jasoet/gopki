@@ -314,7 +314,6 @@ func (c *Container) enableSecretsEngine(ctx context.Context, mountPath, engineTy
 	return nil
 }
 
-
 // WaitForHealthy waits for OpenBao to become healthy with exponential backoff.
 // Returns error if OpenBao doesn't become healthy within timeout.
 func (c *Container) WaitForHealthy(ctx context.Context, timeout time.Duration) error {

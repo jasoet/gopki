@@ -9,51 +9,51 @@ import (
 
 // CAOptions contains parameters for generating a CA certificate.
 type CAOptions struct {
-	Type              string   // "internal" (Vault generates key) or "exported" (returns CSR)
-	CommonName        string   // Required
-	Organization      []string // Optional
-	Country           []string // Optional
-	Locality          []string // Optional
-	Province          []string // Optional
-	StreetAddress     []string // Optional
-	PostalCode        []string // Optional
-	TTL               string   // Time to live (e.g., "8760h" for 1 year)
-	KeyType           string   // "rsa", "ec", "ed25519"
-	KeyBits           int      // Key size (RSA: 2048/3072/4096, EC: 224/256/384/521)
-	MaxPathLength     int      // Max depth of intermediate CAs (-1 = no limit, 0 = can only sign end-entity certs)
-	ExcludeCNFromSANs bool     // Exclude CN from SANs
+	Type                string   // "internal" (Vault generates key) or "exported" (returns CSR)
+	CommonName          string   // Required
+	Organization        []string // Optional
+	Country             []string // Optional
+	Locality            []string // Optional
+	Province            []string // Optional
+	StreetAddress       []string // Optional
+	PostalCode          []string // Optional
+	TTL                 string   // Time to live (e.g., "8760h" for 1 year)
+	KeyType             string   // "rsa", "ec", "ed25519"
+	KeyBits             int      // Key size (RSA: 2048/3072/4096, EC: 224/256/384/521)
+	MaxPathLength       int      // Max depth of intermediate CAs (-1 = no limit, 0 = can only sign end-entity certs)
+	ExcludeCNFromSANs   bool     // Exclude CN from SANs
 	PermittedDNSDomains []string // Permitted DNS domains
-	URISANs           []string // URI SANs
-	IPSANs            []string // IP SANs
-	AltNames          []string // DNS SANs
-	IssuerName        string   // Name for the issuer
-	KeyName           string   // Name for the key
-	ManagedKeyName    string   // Name of managed key to use
-	ManagedKeyID      string   // ID of managed key to use
+	URISANs             []string // URI SANs
+	IPSANs              []string // IP SANs
+	AltNames            []string // DNS SANs
+	IssuerName          string   // Name for the issuer
+	KeyName             string   // Name for the key
+	ManagedKeyName      string   // Name of managed key to use
+	ManagedKeyID        string   // ID of managed key to use
 }
 
 // IntermediateCAOptions contains parameters for generating an intermediate CA.
 type IntermediateCAOptions struct {
-	Type              string   // "internal" or "exported"
-	CommonName        string   // Required
-	Organization      []string // Optional
-	Country           []string // Optional
-	Locality          []string // Optional
-	Province          []string // Optional
-	StreetAddress     []string // Optional
-	PostalCode        []string // Optional
-	TTL               string   // Time to live
-	KeyType           string   // "rsa", "ec", "ed25519"
-	KeyBits           int      // Key size
-	MaxPathLength     int      // Max depth of intermediate CAs
-	ExcludeCNFromSANs bool     // Exclude CN from SANs
+	Type                string   // "internal" or "exported"
+	CommonName          string   // Required
+	Organization        []string // Optional
+	Country             []string // Optional
+	Locality            []string // Optional
+	Province            []string // Optional
+	StreetAddress       []string // Optional
+	PostalCode          []string // Optional
+	TTL                 string   // Time to live
+	KeyType             string   // "rsa", "ec", "ed25519"
+	KeyBits             int      // Key size
+	MaxPathLength       int      // Max depth of intermediate CAs
+	ExcludeCNFromSANs   bool     // Exclude CN from SANs
 	PermittedDNSDomains []string // Permitted DNS domains
-	URISANs           []string // URI SANs
-	IPSANs            []string // IP SANs
-	AltNames          []string // DNS SANs
-	IssuerName        string   // Name for the issuer
-	KeyName           string   // Name for the key
-	AddBasicConstraints bool   // Add basic constraints
+	URISANs             []string // URI SANs
+	IPSANs              []string // IP SANs
+	AltNames            []string // DNS SANs
+	IssuerName          string   // Name for the issuer
+	KeyName             string   // Name for the key
+	AddBasicConstraints bool     // Add basic constraints
 }
 
 // IssuerConfig contains configuration for updating an issuer.
@@ -76,15 +76,15 @@ type CABundle struct {
 
 // GenerateCAResponse contains the response from generating a CA.
 type GenerateCAResponse struct {
-	Certificate  *cert.Certificate // Generated certificate
-	IssuingCA    string            // Issuing CA certificate (PEM)
-	CAChain      []string          // CA chain (PEM)
-	SerialNumber string            // Certificate serial number
-	IssuerID     string            // Issuer UUID
-	KeyID        string            // Key UUID
-	PrivateKey   string            // Private key (only for "exported" type)
-	PrivateKeyType string          // Private key type
-	CSR          string            // CSR (only for "exported" intermediate)
+	Certificate    *cert.Certificate // Generated certificate
+	IssuingCA      string            // Issuing CA certificate (PEM)
+	CAChain        []string          // CA chain (PEM)
+	SerialNumber   string            // Certificate serial number
+	IssuerID       string            // Issuer UUID
+	KeyID          string            // Key UUID
+	PrivateKey     string            // Private key (only for "exported" type)
+	PrivateKeyType string            // Private key type
+	CSR            string            // CSR (only for "exported" intermediate)
 }
 
 // vaultGenerateCAResponse represents Vault's response from generate endpoints.

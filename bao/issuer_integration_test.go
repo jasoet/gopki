@@ -260,7 +260,7 @@ func TestIntegration_ImportCA(t *testing.T) {
 	// Create client
 	client := vaultContainer.CreateTestClient(t)
 	vaultContainer.WaitForVaultReady(ctx, t, client)
-	
+
 	// Enable a SEPARATE PKI mount for import test
 	// (to avoid conflicts with existing issuers)
 	t.Log("Enabling separate PKI mount for import test...")
@@ -268,11 +268,11 @@ func TestIntegration_ImportCA(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to enable PKI at custom path: %v", err)
 	}
-	
+
 	// Create a new client config for the import mount
 	importConfig := client.config
 	importConfig.Mount = "pki-import"
-	
+
 	// Create new client with import mount
 	importClient, err := NewClient(importConfig)
 	if err != nil {
@@ -329,6 +329,6 @@ func TestIntegration_ImportCA(t *testing.T) {
 	if issuer.IssuerID != importedIssuer.IssuerID {
 		t.Errorf("Expected issuer ID %s, got %s", importedIssuer.IssuerID, issuer.IssuerID)
 	}
-	
+
 	t.Logf("Successfully imported CA with issuer ID: %s", importedIssuer.IssuerID)
 }

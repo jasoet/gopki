@@ -327,10 +327,10 @@ func TestClient_Health_Cancellation(t *testing.T) {
 
 func TestClient_ValidateConnection(t *testing.T) {
 	tests := []struct {
-		name       string
-		setupMock  func(*httptest.Server) http.HandlerFunc
-		wantErr    bool
-		errCheck   func(error) bool
+		name      string
+		setupMock func(*httptest.Server) http.HandlerFunc
+		wantErr   bool
+		errCheck  func(error) bool
 	}{
 		{
 			name: "Successful validation",

@@ -635,9 +635,9 @@ func TestImportRSAKey_TypeSafe(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "Import without name",
-			keyPair: keyPair,
-			opts:    &ImportKeyOptions{},
+			name:       "Import without name",
+			keyPair:    keyPair,
+			opts:       &ImportKeyOptions{},
 			statusCode: 200,
 			response: createJSONResponse(map[string]interface{}{
 				"key_id":   "key-imp-456",

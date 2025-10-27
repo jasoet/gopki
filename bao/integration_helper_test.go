@@ -130,4 +130,3 @@ func SetupVaultContainer(ctx context.Context, t *testing.T) *VaultContainer {
 		client:    client,
 	}
 }
-

@@ -107,7 +107,7 @@ func TestConfig_Validate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.config.Validate()
-			
+
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("Validate() should return error")
@@ -120,7 +120,7 @@ func TestConfig_Validate(t *testing.T) {
 				if err != nil {
 					t.Errorf("Validate() unexpected error = %v", err)
 				}
-				
+
 				// Check defaults are set
 				if tt.config.Mount == "" {
 					t.Error("Validate() should set default mount")
