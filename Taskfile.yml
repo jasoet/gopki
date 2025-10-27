@@ -53,6 +53,19 @@ tasks:
       - go tool cover -func=output/coverage.out | tail -1
       - 'echo "✅ Tests completed with coverage: output/coverage.html"'
     silent: false
+  # Testing Tasks
+  test:integration:
+    desc: Run main tests with verbose output and coverage (excludes compatibility)
+    env:
+      CGO_ENABLED: 1
+    cmds:
+      - mkdir -p output/
+      - go test $(go list ./... | grep -v '/compatibility') -tags integration -race -v -coverprofile=output/coverage.out
+      - go tool cover -html=output/coverage.out -o output/coverage.html
+      - go tool cover -func=output/coverage.out | tail -1
+      - 'echo "✅ Tests completed with coverage: output/coverage.html"'
+    silent: false
+
 
   test:compatibility:
     desc: Run OpenSSL compatibility tests

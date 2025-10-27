@@ -2,6 +2,9 @@ package bao
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -32,6 +35,8 @@ type GenerateCertificateOptions struct {
 	PrivateKeyFormat  string   // Private key format ("", "pkcs8")
 	ExcludeCNFromSANs bool     // Exclude CN from Subject Alternative Names
 	NotAfter          string   // Explicit expiration time (RFC3339 format)
+	KeyType           string   // Key type ("rsa", "ec", "ed25519") - auto-set by GenerateXXXCertificate methods
+	KeyBits           int      // Key bits for RSA and ECDSA keys - auto-set by GenerateXXXCertificate methods
 }
 
 // SignCertificateOptions contains parameters for signing a CSR.
@@ -437,6 +442,26 @@ func generateCertificate[K keypair.KeyPair](ctx context.Context, client *Client,
 		return nil, fmt.Errorf("bao: common name is required")
 	}
 
+	// Auto-set key_type and key_bits based on generic type K if not already set
+	if opts.KeyType == "" {
+		var zero K
+		switch any(zero).(type) {
+		case *algo.RSAKeyPair:
+			opts.KeyType = "rsa"
+			if opts.KeyBits == 0 {
+				opts.KeyBits = 2048 // Default RSA key size
+			}
+		case *algo.ECDSAKeyPair:
+			opts.KeyType = "ec"
+			if opts.KeyBits == 0 {
+				opts.KeyBits = 256 // Default ECDSA key size (P-256)
+			}
+		case *algo.Ed25519KeyPair:
+			opts.KeyType = "ed25519"
+			// Ed25519 has fixed key size, no key_bits needed
+		}
+	}
+
 	reqBody := buildCertificateRequestBody(opts)
 
 	path := fmt.Sprintf("%s/issue/%s", client.config.Mount, role)
@@ -598,6 +623,26 @@ func issueCertificateWithKeyRef[K keypair.KeyPair](ctx context.Context, client *
 	}
 	if opts.CommonName == "" {
 		return nil, fmt.Errorf("bao: common name is required")
+	}
+
+	// Auto-set key_type and key_bits based on generic type K if not already set
+	if opts.KeyType == "" {
+		var zero K
+		switch any(zero).(type) {
+		case *algo.RSAKeyPair:
+			opts.KeyType = "rsa"
+			if opts.KeyBits == 0 {
+				opts.KeyBits = 2048 // Default RSA key size
+			}
+		case *algo.ECDSAKeyPair:
+			opts.KeyType = "ec"
+			if opts.KeyBits == 0 {
+				opts.KeyBits = 256 // Default ECDSA key size (P-256)
+			}
+		case *algo.Ed25519KeyPair:
+			opts.KeyType = "ed25519"
+			// Ed25519 has fixed key size, no key_bits needed
+		}
 	}
 
 	// Build request body with type="existing" and key_ref
@@ -1007,6 +1052,12 @@ func buildCertificateRequestBody(opts *GenerateCertificateOptions) map[string]in
 	if opts.NotAfter != "" {
 		reqBody["not_after"] = opts.NotAfter
 	}
+	if opts.KeyType != "" {
+		reqBody["key_type"] = opts.KeyType
+	}
+	if opts.KeyBits > 0 {
+		reqBody["key_bits"] = opts.KeyBits
+	}
 
 	return reqBody
 }
@@ -1090,12 +1141,25 @@ func parsePrivateKeyPEM[K keypair.KeyPair](pemData string) (K, error) {
 
 	// Successfully parsed as PKCS8, determine type
 	switch key := privateKey.(type) {
-	case *algo.RSAKeyPair:
-		return any(key).(K), nil
-	case *algo.ECDSAKeyPair:
-		return any(key).(K), nil
-	case *algo.Ed25519KeyPair:
-		return any(key).(K), nil
+	case *rsa.PrivateKey:
+		keyPair := &algo.RSAKeyPair{
+			PrivateKey: key,
+			PublicKey:  &key.PublicKey,
+		}
+		return any(keyPair).(K), nil
+	case *ecdsa.PrivateKey:
+		keyPair := &algo.ECDSAKeyPair{
+			PrivateKey: key,
+			PublicKey:  &key.PublicKey,
+		}
+		return any(keyPair).(K), nil
+	case ed25519.PrivateKey:
+		publicKey := key.Public().(ed25519.PublicKey)
+		keyPair := &algo.Ed25519KeyPair{
+			PrivateKey: key,
+			PublicKey:  publicKey,
+		}
+		return any(keyPair).(K), nil
 	default:
 		return zero, fmt.Errorf("unsupported private key type: %T", key)
 	}
