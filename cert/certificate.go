@@ -612,3 +612,210 @@ func ConvertDERToPEM(derData []byte) ([]byte, error) {
 
 	return certPEM, nil
 }
+
+// CSR (Certificate Signing Request) Support
+
+// CSRRequest contains the parameters for creating a Certificate Signing Request (CSR).
+// A CSR is used to request a certificate from a Certificate Authority (CA).
+type CSRRequest struct {
+	Subject      pkix.Name // Certificate subject information (CN, O, OU, etc.)
+	DNSNames     []string  // Subject Alternative Names - DNS names
+	IPAddresses  []net.IP  // Subject Alternative Names - IP addresses
+	EmailAddress []string  // Subject Alternative Names - email addresses
+
+	// CA-specific fields (optional, for intermediate CA CSRs)
+	IsCA       bool // Set to true to request a CA certificate
+	MaxPathLen int  // Maximum depth of intermediate CAs (for CA CSRs)
+}
+
+// CertificateSigningRequest represents a parsed CSR with both PEM and DER formats.
+type CertificateSigningRequest struct {
+	Request *x509.CertificateRequest // The parsed certificate request
+	PEMData []byte                   // PEM-encoded CSR data
+	DERData []byte                   // DER-encoded CSR data
+}
+
+// CreateCSR creates a Certificate Signing Request (CSR) for the provided key pair.
+// The CSR can be submitted to a Certificate Authority to obtain a signed certificate.
+//
+// Type parameter T must be one of: *algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair.
+//
+// The returned CertificateSigningRequest contains both PEM and DER encoded data.
+//
+// Example:
+//
+//	keyPair := keypair.Generate(algo.RSA2048)
+//	csr, err := CreateCSR(keyPair, CSRRequest{
+//		Subject: pkix.Name{
+//			CommonName:   "server.example.com",
+//			Organization: []string{"Example Corp"},
+//			Country:      []string{"US"},
+//		},
+//		DNSNames: []string{"server.example.com", "www.example.com"},
+//	})
+func CreateCSR[T keypair.KeyPair](keyPair T, request CSRRequest) (*CertificateSigningRequest, error) {
+	var privateKey crypto.PrivateKey
+
+	switch kp := any(keyPair).(type) {
+	case *algo.RSAKeyPair:
+		privateKey = kp.PrivateKey
+	case *algo.ECDSAKeyPair:
+		privateKey = kp.PrivateKey
+	case *algo.Ed25519KeyPair:
+		privateKey = kp.PrivateKey
+	default:
+		return nil, fmt.Errorf("unsupported key pair type")
+	}
+
+	template := x509.CertificateRequest{
+		Subject:            request.Subject,
+		DNSNames:           request.DNSNames,
+		IPAddresses:        request.IPAddresses,
+		EmailAddresses:     request.EmailAddress,
+		SignatureAlgorithm: x509.UnknownSignatureAlgorithm, // Will be determined by x509.CreateCertificateRequest
+	}
+
+	csrDER, err := x509.CreateCertificateRequest(rand.Reader, &template, privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create certificate request: %w", err)
+	}
+
+	csr, err := x509.ParseCertificateRequest(csrDER)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse created CSR: %w", err)
+	}
+
+	csrPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE REQUEST",
+		Bytes: csrDER,
+	})
+
+	return &CertificateSigningRequest{
+		Request: csr,
+		PEMData: csrPEM,
+		DERData: csrDER,
+	}, nil
+}
+
+// CreateCACSR creates a Certificate Signing Request for a Certificate Authority certificate.
+// This is used when creating intermediate CA certificates that need to be signed by a root or parent CA.
+//
+// The CSR will indicate CA capabilities through the request parameters, which the signing CA
+// can use to set appropriate certificate extensions.
+//
+// Type parameter T must be one of: *algo.RSAKeyPair, *algo.ECDSAKeyPair, or *algo.Ed25519KeyPair.
+//
+// Example:
+//
+//	keyPair := keypair.Generate(algo.RSA4096)
+//	csr, err := CreateCACSR(keyPair, CSRRequest{
+//		Subject: pkix.Name{
+//			CommonName:   "Intermediate CA",
+//			Organization: []string{"Example Corp"},
+//		},
+//		IsCA:       true,
+//		MaxPathLen: 0, // Can only sign end-entity certificates
+//	})
+func CreateCACSR[T keypair.KeyPair](keyPair T, request CSRRequest) (*CertificateSigningRequest, error) {
+	// Mark as CA request
+	request.IsCA = true
+	return CreateCSR(keyPair, request)
+}
+
+// SaveToFile saves the CSR to a file in PEM format.
+// The file will be created with 0600 permissions (readable/writable by owner only).
+//
+// Example:
+//
+//	err := csr.SaveToFile("request.csr")
+func (c *CertificateSigningRequest) SaveToFile(filename string) error {
+	return os.WriteFile(filename, c.PEMData, 0o600)
+}
+
+// LoadCSRFromFile loads a CSR from a PEM-formatted file.
+//
+// Example:
+//
+//	csr, err := LoadCSRFromFile("request.csr")
+func LoadCSRFromFile(filename string) (*CertificateSigningRequest, error) {
+	pemData, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load PEM data: %w", err)
+	}
+
+	return ParseCSRFromPEM(pemData)
+}
+
+// ParseCSRFromPEM parses a CSR from PEM-encoded data.
+//
+// The PEM data should contain a "CERTIFICATE REQUEST" block:
+//
+//	-----BEGIN CERTIFICATE REQUEST-----
+//	...base64 encoded CSR data...
+//	-----END CERTIFICATE REQUEST-----
+//
+// Example:
+//
+//	csr, err := ParseCSRFromPEM(pemBytes)
+func ParseCSRFromPEM(pemData []byte) (*CertificateSigningRequest, error) {
+	block, _ := pem.Decode(pemData)
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode PEM block")
+	}
+
+	if block.Type != "CERTIFICATE REQUEST" && block.Type != "NEW CERTIFICATE REQUEST" {
+		return nil, fmt.Errorf("invalid PEM block type: %s, expected CERTIFICATE REQUEST", block.Type)
+	}
+
+	csr, err := x509.ParseCertificateRequest(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse certificate request: %w", err)
+	}
+
+	return &CertificateSigningRequest{
+		Request: csr,
+		PEMData: pemData,
+		DERData: block.Bytes,
+	}, nil
+}
+
+// SignCSR signs a Certificate Signing Request using a CA certificate and creates a new certificate.
+// This function processes a CSR and issues a certificate signed by the CA.
+//
+// Parameters:
+//   - caCert: The CA certificate used to sign the new certificate
+//   - caKeyPair: The CA's private key pair for signing
+//   - csr: The certificate signing request to be signed
+//   - request: Additional certificate parameters (validity, extensions, etc.)
+//
+// Example:
+//
+//	// CA signs a CSR
+//	cert, err := SignCSR(caCert, caKeyPair, csr, CertificateRequest{
+//		ValidFor: 365 * 24 * time.Hour,
+//	})
+func SignCSR[T keypair.KeyPair](caCert *Certificate, caKeyPair T, csr *CertificateSigningRequest, request CertificateRequest) (*Certificate, error) {
+	// Verify CSR signature
+	if err := csr.Request.CheckSignature(); err != nil {
+		return nil, fmt.Errorf("invalid CSR signature: %w", err)
+	}
+
+	// Use CSR subject if not provided in request
+	if request.Subject.CommonName == "" {
+		request.Subject = csr.Request.Subject
+	}
+
+	// Use CSR SANs if not provided
+	if len(request.DNSNames) == 0 {
+		request.DNSNames = csr.Request.DNSNames
+	}
+	if len(request.IPAddresses) == 0 {
+		request.IPAddresses = csr.Request.IPAddresses
+	}
+	if len(request.EmailAddress) == 0 {
+		request.EmailAddress = csr.Request.EmailAddresses
+	}
+
+	// Sign certificate using the CSR's public key
+	return SignCertificate(caCert, caKeyPair, request, csr.Request.PublicKey)
+}
