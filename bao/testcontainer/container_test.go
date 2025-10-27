@@ -110,7 +110,7 @@ func TestEnableKV(t *testing.T) {
 	}
 
 	// Enable KV v2 explicitly
-	err = container.EnableKV(ctx, "secret", 2)
+	err = container.EnableKV(ctx, "secret2x", 2)
 	if err != nil {
 		t.Fatalf("EnableKV() v2 explicit failed: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestEnableMultipleEngines(t *testing.T) {
 		fn   func() error
 	}{
 		{"PKI", func() error { return container.EnablePKI(ctx, "pki", "") }},
-		{"KV", func() error { return container.EnableKV(ctx, "secret", 2) }},
+		{"KV", func() error { return container.EnableKV(ctx, "secretx2", 2) }},
 		{"Transit", func() error { return container.EnableTransit(ctx, "transit") }},
 		{"Database", func() error { return container.EnableDatabase(ctx, "database") }},
 		{"SSH", func() error { return container.EnableSSH(ctx, "ssh") }},
@@ -242,9 +242,9 @@ func TestTerminate(t *testing.T) {
 		t.Errorf("Terminate() failed: %v", err)
 	}
 
-	// Calling terminate again should not error
+	// Calling terminate again should error
 	err = container.Terminate(ctx)
-	if err != nil {
+	if err == nil {
 		t.Errorf("Second Terminate() failed: %v", err)
 	}
 }

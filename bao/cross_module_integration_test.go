@@ -365,8 +365,21 @@ func TestRoleBasedCertificateManagement(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get updated role: %v", err)
 	}
-	if updatedRole.Options().TTL != "1440h" {
-		t.Errorf("Expected TTL=1440h, got %s", updatedRole.Options().TTL)
+
+	// Parse both TTL values as durations for comparison
+	// OpenBao may return "1440h" or "5184000s" (both are equivalent)
+	expectedDuration, err := time.ParseDuration("1440h")
+	if err != nil {
+		t.Fatalf("Failed to parse expected TTL: %v", err)
+	}
+	actualDuration, err := time.ParseDuration(updatedRole.Options().TTL)
+	if err != nil {
+		t.Fatalf("Failed to parse actual TTL %s: %v", updatedRole.Options().TTL, err)
+	}
+
+	if actualDuration != expectedDuration {
+		t.Errorf("Expected TTL=%v, got %v (as durations: expected=%s, actual=%s)",
+			expectedDuration, actualDuration, "1440h", updatedRole.Options().TTL)
 	}
 	t.Log("✓ Role TTL updated and verified")
 }

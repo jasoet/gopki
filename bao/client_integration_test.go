@@ -293,7 +293,7 @@ func TestIntegration_ClientLogical(t *testing.T) {
 
 	t.Run("Can use Logical for KV operations", func(t *testing.T) {
 		// Enable KV
-		if err := container.EnableKV(ctx, "secret", 2); err != nil {
+		if err := container.EnableKV(ctx, "secretx23s", 2); err != nil {
 			t.Fatalf("EnableKV failed: %v", err)
 		}
 

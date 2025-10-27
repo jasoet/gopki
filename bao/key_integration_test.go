@@ -235,19 +235,7 @@ func TestIntegration_TypeSafeGet(t *testing.T) {
 		}
 	})
 }
-func TestIntegration_KeyClient_Export(t *testing.T) {
-	t.Skip("OpenBao PKI does not support key export endpoint - keys can only be exported at generation time with type='exported'")
-	// NOTE: OpenBao PKI secrets engine does NOT provide a /key/:id/export endpoint.
-	// According to OpenBao documentation (https://openbao.org/api-docs/secret/pki/):
-	// - Keys can only be exported at GENERATION time using type="exported"
-	// - Once a key is created as "internal", it cannot be retrieved later
-	// - Imported keys also cannot be exported after import
-	//
-	// The Export() method is designed for future compatibility or third-party
-	// OpenBao extensions that may provide this functionality.
-	//
-	// For now, Export() is tested in unit tests with mocked responses.
-}
+
 func TestIntegration_KeyClient_Delete(t *testing.T) {
 	ctx := context.Background()
 	// Setup container

@@ -608,9 +608,27 @@ func parseRoleOptions(data map[string]interface{}) *RoleOptions {
 }
 
 // extractStringField extracts a string field from response data.
+// For TTL fields, OpenBao may return numeric seconds which we convert to duration string.
 func extractStringField(data map[string]interface{}, key string) string {
 	if v, ok := data[key].(string); ok {
 		return v
+	}
+	// Handle numeric TTL values (OpenBao returns seconds as int/float)
+	if key == "ttl" || key == "max_ttl" {
+		if v, ok := data[key].(float64); ok && v > 0 {
+			return fmt.Sprintf("%.0fs", v)
+		}
+		if v, ok := data[key].(int); ok && v > 0 {
+			return fmt.Sprintf("%ds", v)
+		}
+		if v, ok := data[key].(int64); ok && v > 0 {
+			return fmt.Sprintf("%ds", v)
+		}
+		if v, ok := data[key].(json.Number); ok {
+			if intVal, err := v.Int64(); err == nil && intVal > 0 {
+				return fmt.Sprintf("%ds", intVal)
+			}
+		}
 	}
 	return ""
 }
