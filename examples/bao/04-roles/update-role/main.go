@@ -18,7 +18,8 @@
 // - OpenBao server running
 //
 // Usage:
-//   go run main.go
+//
+//	go run main.go
 package main
 
 import (
@@ -28,11 +29,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 )
 
 func main() {
-	client, err := bao.NewClient(&bao.Config{
+	client, err := pki.NewClient(&pki.Config{
 		Address: getEnv("BAO_ADDR", "http://127.0.0.1:8200"),
 		Token:   getEnv("BAO_TOKEN", ""),
 	})
@@ -45,7 +46,7 @@ func main() {
 
 	// Step 1: Create root CA
 	fmt.Println("Setting up CA...")
-	caResp, err := client.GenerateRootCA(ctx, &bao.CAOptions{
+	caResp, err := client.GenerateRootCA(ctx, &pki.CAOptions{
 		Type:          "internal",
 		CommonName:    "Example Root CA",
 		KeyType:       "rsa",
@@ -65,7 +66,7 @@ func main() {
 
 	// Step 2: Create initial role with basic configuration
 	fmt.Println("\n=== Step 1: Creating Initial Role ===")
-	initialRole, err := issuer.CreateRole(ctx, "web-server", &bao.RoleOptions{
+	initialRole, err := issuer.CreateRole(ctx, "web-server", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",  // 30 days
@@ -88,7 +89,7 @@ func main() {
 	// Step 3: Issue certificate with initial role
 	fmt.Println("\nIssuing certificate with initial role...")
 	cert1, err := client.GenerateRSACertificate(ctx, "web-server",
-		&bao.GenerateCertificateOptions{
+		&pki.GenerateCertificateOptions{
 			CommonName: "app.example.com",
 			TTL:        "720h",
 		})
@@ -109,7 +110,7 @@ func main() {
 		log.Fatalf("Failed to get role: %v", err)
 	}
 
-	err = roleClient.Update(ctx, &bao.RoleOptions{
+	err = roleClient.Update(ctx, &pki.RoleOptions{
 		// Expanded domain list
 		AllowedDomains:  []string{"example.com", "example.org", "example.net"},
 		AllowSubdomains: true,
@@ -162,9 +163,9 @@ func main() {
 
 	// Now we can use new domains
 	cert2, err := client.GenerateRSACertificate(ctx, "web-server",
-		&bao.GenerateCertificateOptions{
+		&pki.GenerateCertificateOptions{
 			CommonName: "api.example.org", // New domain!
-			TTL:        "168h",             // New default TTL
+			TTL:        "168h",            // New default TTL
 		})
 	if err != nil {
 		log.Fatalf("Failed to issue certificate: %v", err)
@@ -185,7 +186,7 @@ func main() {
 	fmt.Println("\n=== Step 4: Rollback Scenario ===")
 	fmt.Println("Rolling back to more permissive settings...")
 
-	err = roleClient.Update(ctx, &bao.RoleOptions{
+	err = roleClient.Update(ctx, &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",

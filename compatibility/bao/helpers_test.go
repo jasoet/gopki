@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 	"github.com/jasoet/gopki/bao/testcontainer"
 	"github.com/jasoet/gopki/cert"
 )
@@ -16,7 +16,7 @@ import (
 // TestEnvironment holds the test environment for compatibility tests.
 type TestEnvironment struct {
 	Container *testcontainer.Container
-	Client    *bao.Client
+	Client    *pki.Client
 	Ctx       context.Context
 	Cleanup   func()
 }
@@ -48,7 +48,7 @@ func SetupBaoTest(t *testing.T) *TestEnvironment {
 	}
 
 	// Create bao client
-	client, err := bao.NewClient(&bao.Config{
+	client, err := pki.NewClient(&pki.Config{
 		Address: container.Address,
 		Token:   container.Token,
 		Mount:   "pki",
@@ -72,13 +72,13 @@ func SetupBaoTest(t *testing.T) *TestEnvironment {
 }
 
 // SetupBaoWithCA initializes OpenBao with a test CA.
-func SetupBaoWithCA(t *testing.T) (*TestEnvironment, *bao.IssuerClient) {
+func SetupBaoWithCA(t *testing.T) (*TestEnvironment, *pki.IssuerClient) {
 	t.Helper()
 
 	env := SetupBaoTest(t)
 
 	// Create root CA
-	caResp, err := env.Client.GenerateRootCA(env.Ctx, &bao.CAOptions{
+	caResp, err := env.Client.GenerateRootCA(env.Ctx, &pki.CAOptions{
 		Type:       "internal",
 		CommonName: "Test Root CA",
 		KeyType:    "rsa",
@@ -102,7 +102,7 @@ func SetupBaoWithCA(t *testing.T) (*TestEnvironment, *bao.IssuerClient) {
 }
 
 // SetupBaoWithCAAndRole initializes OpenBao with a test CA and role.
-func SetupBaoWithCAAndRole(t *testing.T, roleName string, roleOpts *bao.RoleOptions) (*TestEnvironment, *bao.IssuerClient) {
+func SetupBaoWithCAAndRole(t *testing.T, roleName string, roleOpts *pki.RoleOptions) (*TestEnvironment, *pki.IssuerClient) {
 	t.Helper()
 
 	env, issuer := SetupBaoWithCA(t)
@@ -118,8 +118,8 @@ func SetupBaoWithCAAndRole(t *testing.T, roleName string, roleOpts *bao.RoleOpti
 }
 
 // CreateTestRootCA creates a test root CA in OpenBao.
-func CreateTestRootCA(ctx context.Context, client *bao.Client, issuerName, keyType string, keyBits int) (*bao.IssuerClient, error) {
-	caResp, err := client.GenerateRootCA(ctx, &bao.CAOptions{
+func CreateTestRootCA(ctx context.Context, client *pki.Client, issuerName, keyType string, keyBits int) (*pki.IssuerClient, error) {
+	caResp, err := client.GenerateRootCA(ctx, &pki.CAOptions{
 		Type:          "internal",
 		CommonName:    "Test Root CA",
 		KeyType:       keyType,
@@ -142,9 +142,9 @@ func CreateTestRootCA(ctx context.Context, client *bao.Client, issuerName, keyTy
 }
 
 // CreateTestIntermediateCA creates a test intermediate CA in OpenBao.
-func CreateTestIntermediateCA(ctx context.Context, client *bao.Client, parentIssuer *bao.IssuerClient, issuerName, keyType string, keyBits int) (*bao.IssuerClient, error) {
+func CreateTestIntermediateCA(ctx context.Context, client *pki.Client, parentIssuer *pki.IssuerClient, issuerName, keyType string, keyBits int) (*pki.IssuerClient, error) {
 	// Generate intermediate CSR (exported to get private key)
-	intermediateResp, err := client.GenerateIntermediateCA(ctx, &bao.CAOptions{
+	intermediateResp, err := client.GenerateIntermediateCA(ctx, &pki.CAOptions{
 		Type:       "exported",
 		CommonName: "Test Intermediate CA",
 		KeyType:    keyType,
@@ -161,7 +161,7 @@ func CreateTestIntermediateCA(ctx context.Context, client *bao.Client, parentIss
 	}
 
 	// Sign intermediate with parent using client's SignIntermediateCSR
-	signedCert, err := client.SignIntermediateCSR(ctx, csrParsed, &bao.CAOptions{
+	signedCert, err := client.SignIntermediateCSR(ctx, csrParsed, &pki.CAOptions{
 		CommonName:    "Test Intermediate CA",
 		TTL:           "43800h", // 5 years
 		MaxPathLength: 0,
@@ -174,7 +174,7 @@ func CreateTestIntermediateCA(ctx context.Context, client *bao.Client, parentIss
 	pemBundle := string(signedCert.PEMData) + "\n" + intermediateResp.PrivateKey
 
 	// Import signed intermediate
-	importedIssuer, err := client.ImportCA(ctx, &bao.CABundle{
+	importedIssuer, err := client.ImportCA(ctx, &pki.CABundle{
 		PEMBundle: pemBundle,
 	})
 	if err != nil {
@@ -185,8 +185,8 @@ func CreateTestIntermediateCA(ctx context.Context, client *bao.Client, parentIss
 }
 
 // CreateStandardTestRole creates a standard test role with common settings.
-func CreateStandardTestRole(ctx context.Context, issuer *bao.IssuerClient, roleName string) error {
-	_, err := issuer.CreateRole(ctx, roleName, &bao.RoleOptions{
+func CreateStandardTestRole(ctx context.Context, issuer *pki.IssuerClient, roleName string) error {
+	_, err := issuer.CreateRole(ctx, roleName, &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com", "test.local"},
 		AllowSubdomains: true,
 		TTL:             "720h",

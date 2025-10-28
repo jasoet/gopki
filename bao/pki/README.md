@@ -3,8 +3,8 @@
 **Type-safe PKI operations with OpenBao and HashiCorp Vault**
 
 [![Go Version](https://img.shields.io/badge/Go-1.24.5+-00ADD8?style=flat&logo=go)](https://go.dev/)
-[![Test Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen)](.)
-[![Integration Tests](https://img.shields.io/badge/integration-passing-success)](.)
+[![Test Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen)](..)
+[![Integration Tests](https://img.shields.io/badge/integration-passing-success)](..)
 
 ---
 

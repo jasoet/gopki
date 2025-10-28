@@ -15,7 +15,8 @@
 // - PKI secrets engine enabled
 //
 // Usage:
-//   go run main.go
+//
+//	go run main.go
 package main
 
 import (
@@ -25,11 +26,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 )
 
 func main() {
-	client, err := bao.NewClient(&bao.Config{
+	client, err := pki.NewClient(&pki.Config{
 		Address: getEnv("BAO_ADDR", "http://127.0.0.1:8200"),
 		Token:   getEnv("BAO_TOKEN", ""),
 	})
@@ -46,7 +47,7 @@ func main() {
 	fmt.Println("  Key Type: RSA 4096")
 	fmt.Println("  TTL: 10 years")
 
-	caResp, err := client.GenerateRootCA(ctx, &bao.CAOptions{
+	caResp, err := client.GenerateRootCA(ctx, &pki.CAOptions{
 		Type:          "internal", // Private key stays in OpenBao
 		CommonName:    "Example Root CA",
 		Organization:  []string{"Example Corp"},

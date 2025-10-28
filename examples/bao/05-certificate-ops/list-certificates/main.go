@@ -18,7 +18,8 @@
 // - OpenBao server running
 //
 // Usage:
-//   go run main.go
+//
+//	go run main.go
 package main
 
 import (
@@ -28,11 +29,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 )
 
 func main() {
-	client, err := bao.NewClient(&bao.Config{
+	client, err := pki.NewClient(&pki.Config{
 		Address: getEnv("BAO_ADDR", "http://127.0.0.1:8200"),
 		Token:   getEnv("BAO_TOKEN", ""),
 	})
@@ -45,7 +46,7 @@ func main() {
 
 	// Setup CA and role
 	fmt.Println("Setting up CA and role...")
-	_, err = client.GenerateRootCA(ctx, &bao.CAOptions{
+	_, err = client.GenerateRootCA(ctx, &pki.CAOptions{
 		Type:       "internal",
 		CommonName: "Example Root CA",
 		KeyType:    "rsa",
@@ -56,7 +57,7 @@ func main() {
 		log.Fatalf("Failed to create CA: %v", err)
 	}
 
-	err = client.CreateRole(ctx, "web-server", &bao.RoleOptions{
+	err = client.CreateRole(ctx, "web-server", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -82,7 +83,7 @@ func main() {
 
 	for _, cn := range certNames {
 		cert, err := client.GenerateRSACertificate(ctx, "web-server",
-			&bao.GenerateCertificateOptions{
+			&pki.GenerateCertificateOptions{
 				CommonName: cn,
 				TTL:        "720h",
 			})

@@ -18,7 +18,8 @@
 // - OpenBao server running
 //
 // Usage:
-//   go run main.go
+//
+//	go run main.go
 package main
 
 import (
@@ -28,11 +29,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 )
 
 func main() {
-	client, err := bao.NewClient(&bao.Config{
+	client, err := pki.NewClient(&pki.Config{
 		Address: getEnv("BAO_ADDR", "http://127.0.0.1:8200"),
 		Token:   getEnv("BAO_TOKEN", ""),
 	})
@@ -45,7 +46,7 @@ func main() {
 
 	// Setup: Create CA and role
 	fmt.Println("Setup: Creating CA and role...")
-	caResp, err := client.GenerateRootCA(ctx, &bao.CAOptions{
+	caResp, err := client.GenerateRootCA(ctx, &pki.CAOptions{
 		Type:       "internal",
 		CommonName: "Revocation Test CA",
 		KeyType:    "rsa",
@@ -61,7 +62,7 @@ func main() {
 		log.Fatalf("Failed to get issuer: %v", err)
 	}
 
-	_, err = issuer.CreateRole(ctx, "test-role", &bao.RoleOptions{
+	_, err = issuer.CreateRole(ctx, "test-role", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -76,7 +77,7 @@ func main() {
 	fmt.Println("\n=== Step 1: Issuing Certificates ===")
 
 	cert1, err := client.GenerateRSACertificate(ctx, "test-role",
-		&bao.GenerateCertificateOptions{
+		&pki.GenerateCertificateOptions{
 			CommonName: "server1.example.com",
 			TTL:        "720h",
 		})
@@ -88,7 +89,7 @@ func main() {
 	fmt.Printf("  CN: %s\n", cert1.Certificate().Certificate.Subject.CommonName)
 
 	cert2, err := client.GenerateRSACertificate(ctx, "test-role",
-		&bao.GenerateCertificateOptions{
+		&pki.GenerateCertificateOptions{
 			CommonName: "server2.example.com",
 			TTL:        "720h",
 		})
@@ -100,7 +101,7 @@ func main() {
 	fmt.Printf("  CN: %s\n", cert2.Certificate().Certificate.Subject.CommonName)
 
 	cert3, err := client.GenerateRSACertificate(ctx, "test-role",
-		&bao.GenerateCertificateOptions{
+		&pki.GenerateCertificateOptions{
 			CommonName: "server3.example.com",
 			TTL:        "720h",
 		})

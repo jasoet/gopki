@@ -16,7 +16,8 @@
 // - OpenBao server running
 //
 // Usage:
-//   go run main.go
+//
+//	go run main.go
 package main
 
 import (
@@ -28,11 +29,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 )
 
 func main() {
-	client, err := bao.NewClient(&bao.Config{
+	client, err := pki.NewClient(&pki.Config{
 		Address: getEnv("BAO_ADDR", "http://127.0.0.1:8200"),
 		Token:   getEnv("BAO_TOKEN", ""),
 	})
@@ -45,7 +46,7 @@ func main() {
 
 	// Step 1: Create CA for web servers
 	fmt.Println("=== Step 1: Creating Web Server CA ===")
-	caResp, err := client.GenerateRootCA(ctx, &bao.CAOptions{
+	caResp, err := client.GenerateRootCA(ctx, &pki.CAOptions{
 		Type:          "internal",
 		CommonName:    "Web Server Root CA",
 		Organization:  []string{"Example Corp"},
@@ -67,11 +68,11 @@ func main() {
 
 	// Step 2: Create TLS role
 	fmt.Println("\n=== Step 2: Creating TLS Server Role ===")
-	_, err = issuer.CreateRole(ctx, "web-tls", &bao.RoleOptions{
+	_, err = issuer.CreateRole(ctx, "web-tls", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com", "localhost"},
 		AllowSubdomains: true,
 		AllowLocalhost:  true,
-		AllowIPSANs:     true, // Allow IP addresses in SANs
+		AllowIPSANs:     true,   // Allow IP addresses in SANs
 		TTL:             "720h", // 30 days
 		MaxTTL:          "8760h",
 		ServerFlag:      true,
@@ -86,7 +87,7 @@ func main() {
 	// Step 3: Issue web server certificate
 	fmt.Println("\n=== Step 3: Issuing Web Server Certificate ===")
 	certClient, err := client.GenerateRSACertificate(ctx, "web-tls",
-		&bao.GenerateCertificateOptions{
+		&pki.GenerateCertificateOptions{
 			CommonName: "localhost",
 			IPSANs:     []string{"127.0.0.1", "::1"}, // IP addresses go in IPSANs only
 			TTL:        "720h",

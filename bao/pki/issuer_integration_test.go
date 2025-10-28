@@ -1,6 +1,6 @@
 //go:build integration
 
-package bao
+package pki
 
 import (
 	"context"

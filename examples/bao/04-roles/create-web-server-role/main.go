@@ -19,7 +19,8 @@
 // - OpenBao server running
 //
 // Usage:
-//   go run main.go
+//
+//	go run main.go
 package main
 
 import (
@@ -29,11 +30,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 )
 
 func main() {
-	client, err := bao.NewClient(&bao.Config{
+	client, err := pki.NewClient(&pki.Config{
 		Address: getEnv("BAO_ADDR", "http://127.0.0.1:8200"),
 		Token:   getEnv("BAO_TOKEN", ""),
 	})
@@ -46,7 +47,7 @@ func main() {
 
 	// Step 1: Create root CA for web servers
 	fmt.Println("Creating root CA for web servers...")
-	caResp, err := client.GenerateRootCA(ctx, &bao.CAOptions{
+	caResp, err := client.GenerateRootCA(ctx, &pki.CAOptions{
 		Type:          "internal",
 		CommonName:    "Web Server Root CA",
 		Organization:  []string{"Example Corp"},
@@ -67,13 +68,13 @@ func main() {
 
 	// Step 2: Create web server role
 	fmt.Println("\nCreating web server role...")
-	role, err := issuer.CreateRole(ctx, "web-server", &bao.RoleOptions{
+	role, err := issuer.CreateRole(ctx, "web-server", &pki.RoleOptions{
 		// Domain restrictions
-		AllowedDomains:    []string{"example.com", "example.org"},
-		AllowSubdomains:   true,
-		AllowBareDomains:  true,
-		AllowLocalhost:    false,
-		AllowIPSANs:       true, // Allow IP addresses in SANs
+		AllowedDomains:            []string{"example.com", "example.org"},
+		AllowSubdomains:           true,
+		AllowBareDomains:          true,
+		AllowLocalhost:            false,
+		AllowIPSANs:               true,  // Allow IP addresses in SANs
 		AllowWildcardCertificates: false, // Disable wildcard certs for security
 
 		// Certificate validity
@@ -124,7 +125,7 @@ func main() {
 	// Example 1: Web server certificate
 	fmt.Println("\n1. Issuing certificate for web.example.com...")
 	cert1, err := client.GenerateRSACertificate(ctx, "web-server",
-		&bao.GenerateCertificateOptions{
+		&pki.GenerateCertificateOptions{
 			CommonName: "web.example.com",
 			AltNames:   []string{"www.example.com"},
 			TTL:        "720h",
@@ -139,7 +140,7 @@ func main() {
 	// Example 2: API server certificate
 	fmt.Println("\n2. Issuing certificate for api.example.com...")
 	cert2, err := client.GenerateRSACertificate(ctx, "web-server",
-		&bao.GenerateCertificateOptions{
+		&pki.GenerateCertificateOptions{
 			CommonName: "api.example.com",
 			AltNames:   []string{"api-v1.example.com", "api-v2.example.com"},
 			TTL:        "720h",
@@ -153,7 +154,7 @@ func main() {
 	// Example 3: Certificate with IP SAN
 	fmt.Println("\n3. Issuing certificate with IP address...")
 	cert3, err := client.GenerateRSACertificate(ctx, "web-server",
-		&bao.GenerateCertificateOptions{
+		&pki.GenerateCertificateOptions{
 			CommonName: "server.example.com",
 			IPSANs:     []string{"192.168.1.100"},
 			TTL:        "720h",

@@ -18,7 +18,8 @@
 // - OpenBao server running
 //
 // Usage:
-//   go run main.go
+//
+//	go run main.go
 package main
 
 import (
@@ -28,12 +29,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 	"github.com/jasoet/gopki/keypair/algo"
 )
 
 func main() {
-	client, err := bao.NewClient(&bao.Config{
+	client, err := pki.NewClient(&pki.Config{
 		Address: getEnv("BAO_ADDR", "http://127.0.0.1:8200"),
 		Token:   getEnv("BAO_TOKEN", ""),
 	})
@@ -55,7 +56,7 @@ func main() {
 	fmt.Println("✓ RSA key pair generated locally")
 
 	fmt.Println("Importing RSA key to OpenBao...")
-	rsaKeyClient, err := client.ImportRSAKey(ctx, rsaKeyPair, &bao.ImportKeyOptions{
+	rsaKeyClient, err := client.ImportRSAKey(ctx, rsaKeyPair, &pki.ImportKeyOptions{
 		KeyName: "imported-rsa-key",
 	})
 	if err != nil {
@@ -77,7 +78,7 @@ func main() {
 	fmt.Println("✓ ECDSA key pair generated locally")
 
 	fmt.Println("Importing ECDSA key to OpenBao...")
-	ecdsaKeyClient, err := client.ImportECDSAKey(ctx, ecdsaKeyPair, &bao.ImportKeyOptions{
+	ecdsaKeyClient, err := client.ImportECDSAKey(ctx, ecdsaKeyPair, &pki.ImportKeyOptions{
 		KeyName: "imported-ecdsa-key",
 	})
 	if err != nil {
@@ -98,7 +99,7 @@ func main() {
 	fmt.Println("✓ Ed25519 key pair generated locally")
 
 	fmt.Println("Importing Ed25519 key to OpenBao...")
-	ed25519KeyClient, err := client.ImportEd25519Key(ctx, ed25519KeyPair, &bao.ImportKeyOptions{
+	ed25519KeyClient, err := client.ImportEd25519Key(ctx, ed25519KeyPair, &pki.ImportKeyOptions{
 		KeyName: "imported-ed25519-key",
 	})
 	if err != nil {

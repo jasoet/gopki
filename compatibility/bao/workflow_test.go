@@ -6,7 +6,7 @@ import (
 	"crypto/x509/pkix"
 	"testing"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 	"github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/keypair/algo"
 )
@@ -26,7 +26,7 @@ func testCompleteCAWorkflow(t *testing.T) {
 
 	// Step 1: Generate Root CA
 	t.Log("Step 1: Generating Root CA...")
-	caResp, err := env.Client.GenerateRootCA(env.Ctx, &bao.CAOptions{
+	caResp, err := env.Client.GenerateRootCA(env.Ctx, &pki.CAOptions{
 		Type:          "internal",
 		CommonName:    "Test Root CA",
 		Organization:  []string{"Test Org"},
@@ -61,7 +61,7 @@ func testCompleteCAWorkflow(t *testing.T) {
 
 	// Step 4: Create a role for certificate issuance
 	t.Log("Step 4: Creating role for web servers...")
-	_, err = issuer.CreateRole(env.Ctx, "web-server", &bao.RoleOptions{
+	_, err = issuer.CreateRole(env.Ctx, "web-server", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -75,7 +75,7 @@ func testCompleteCAWorkflow(t *testing.T) {
 
 	// Step 5: Generate a key in OpenBao
 	t.Log("Step 5: Generating RSA key in OpenBao...")
-	keyClient, err := env.Client.GenerateRSAKey(env.Ctx, &bao.GenerateKeyOptions{
+	keyClient, err := env.Client.GenerateRSAKey(env.Ctx, &pki.GenerateKeyOptions{
 		KeyName: "web-server-key",
 		KeyBits: 2048,
 	})
@@ -86,7 +86,7 @@ func testCompleteCAWorkflow(t *testing.T) {
 
 	// Step 6: Issue certificate using the key
 	t.Log("Step 6: Issuing certificate with OpenBao-managed key...")
-	certClient, err := keyClient.IssueCertificate(env.Ctx, "web-server", &bao.GenerateCertificateOptions{
+	certClient, err := keyClient.IssueCertificate(env.Ctx, "web-server", &pki.GenerateCertificateOptions{
 		CommonName: "app.example.com",
 		AltNames:   []string{"www.example.com", "api.example.com"},
 		TTL:        "720h",
@@ -130,7 +130,7 @@ func testKeyRotationWorkflow(t *testing.T) {
 	defer env.Cleanup()
 
 	// Setup: Create role
-	_, err := issuer.CreateRole(env.Ctx, "rotation-role", &bao.RoleOptions{
+	_, err := issuer.CreateRole(env.Ctx, "rotation-role", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -142,7 +142,7 @@ func testKeyRotationWorkflow(t *testing.T) {
 
 	// Step 1: Generate first key
 	t.Log("Step 1: Generating first key...")
-	key1, err := env.Client.GenerateRSAKey(env.Ctx, &bao.GenerateKeyOptions{
+	key1, err := env.Client.GenerateRSAKey(env.Ctx, &pki.GenerateKeyOptions{
 		KeyName: "rotation-key-1",
 		KeyBits: 2048,
 	})
@@ -153,7 +153,7 @@ func testKeyRotationWorkflow(t *testing.T) {
 
 	// Step 2: Issue certificate with first key
 	t.Log("Step 2: Issuing certificate with first key...")
-	cert1, err := key1.IssueCertificate(env.Ctx, "rotation-role", &bao.GenerateCertificateOptions{
+	cert1, err := key1.IssueCertificate(env.Ctx, "rotation-role", &pki.GenerateCertificateOptions{
 		CommonName: "app.example.com",
 		TTL:        "720h",
 	})
@@ -165,7 +165,7 @@ func testKeyRotationWorkflow(t *testing.T) {
 
 	// Step 3: Generate second key (rotation)
 	t.Log("Step 3: Generating second key (rotation)...")
-	key2, err := env.Client.GenerateRSAKey(env.Ctx, &bao.GenerateKeyOptions{
+	key2, err := env.Client.GenerateRSAKey(env.Ctx, &pki.GenerateKeyOptions{
 		KeyName: "rotation-key-2",
 		KeyBits: 2048,
 	})
@@ -176,7 +176,7 @@ func testKeyRotationWorkflow(t *testing.T) {
 
 	// Step 4: Issue certificate with second key
 	t.Log("Step 4: Issuing certificate with second key...")
-	cert2, err := key2.IssueCertificate(env.Ctx, "rotation-role", &bao.GenerateCertificateOptions{
+	cert2, err := key2.IssueCertificate(env.Ctx, "rotation-role", &pki.GenerateCertificateOptions{
 		CommonName: "app.example.com",
 		TTL:        "720h",
 	})
@@ -219,7 +219,7 @@ func testHybridGoPKIBaoWorkflow(t *testing.T) {
 	defer env.Cleanup()
 
 	// Step 1: Create role
-	_, err := issuer.CreateRole(env.Ctx, "hybrid-role", &bao.RoleOptions{
+	_, err := issuer.CreateRole(env.Ctx, "hybrid-role", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -255,7 +255,7 @@ func testHybridGoPKIBaoWorkflow(t *testing.T) {
 
 	// Step 4: Sign CSR with Bao
 	t.Log("Step 4: Signing CSR with OpenBao...")
-	signedCert, err := issuer.SignCSR(env.Ctx, csr, &bao.SignCertificateOptions{
+	signedCert, err := issuer.SignCSR(env.Ctx, csr, &pki.SignCertificateOptions{
 		CommonName: "hybrid.example.com",
 		TTL:        "720h",
 	})
@@ -278,7 +278,7 @@ func testHybridGoPKIBaoWorkflow(t *testing.T) {
 
 	// Step 6: Import key to Bao
 	t.Log("Step 6: Importing GoPKI key to OpenBao...")
-	importedKey, err := env.Client.ImportRSAKey(env.Ctx, localKey, &bao.ImportKeyOptions{})
+	importedKey, err := env.Client.ImportRSAKey(env.Ctx, localKey, &pki.ImportKeyOptions{})
 	if err != nil {
 		t.Fatalf("Failed to import key to Bao: %v", err)
 	}
@@ -286,7 +286,7 @@ func testHybridGoPKIBaoWorkflow(t *testing.T) {
 
 	// Step 7: Issue another certificate using imported key
 	t.Log("Step 7: Issuing certificate with imported key...")
-	certClient, err := importedKey.IssueCertificate(env.Ctx, "hybrid-role", &bao.GenerateCertificateOptions{
+	certClient, err := importedKey.IssueCertificate(env.Ctx, "hybrid-role", &pki.GenerateCertificateOptions{
 		CommonName: "app.hybrid.example.com",
 		TTL:        "720h",
 	})
