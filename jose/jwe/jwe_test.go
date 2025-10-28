@@ -38,9 +38,9 @@ func TestCompactRSAEncryptDecrypt(t *testing.T) {
 }
 
 func TestCompactECDSAEncryptDecrypt(t *testing.T) {
-	// TODO: ECDSA encryption requires ephemeral key handling
-	// which needs additional implementation. Skip for Phase 3 MVP.
-	t.Skip("ECDH-ES requires ephemeral key handling - implement in future version")
+	// Skip: ECDH-ES algorithm with ephemeral key handling not yet implemented for JWE
+	// Note: ECDH is available in encryption/asymmetric package but not yet integrated into JWE
+	t.Skip("ECDH-ES algorithm requires ephemeral key handling - not yet implemented for JWE compact serialization")
 
 	// Generate ECDSA key pair
 	keyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
