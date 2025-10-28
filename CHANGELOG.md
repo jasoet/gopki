@@ -1,3 +1,16 @@
+## [1.19.1](https://github.com/jasoet/gopki/compare/v1.19.0...v1.19.1) (2025-10-28)
+
+
+### 🐛 Bug Fixes
+
+* **bao:** Restructure to bao/pki package for future transit support ([#6](https://github.com/jasoet/gopki/issues/6)) ([2e15f1a](https://github.com/jasoet/gopki/commit/2e15f1aa8fc5904c373232785f01de9c823dd3a4))
+
+
+### 🔧 Miscellaneous
+
+* **crypto:** Remove experimental Ed25519 PKCS7 debug and test files ([442f90d](https://github.com/jasoet/gopki/commit/442f90d1948d8c8793f6c793f790a3990c2ee1a5))
+* **examples:** Add 22 comprehensive OpenBao PKI examples ([#5](https://github.com/jasoet/gopki/issues/5)) ([b3ce953](https://github.com/jasoet/gopki/commit/b3ce9533b0b0ce7cf78559a47aeef696cc15fcd0))
+
 ## [1.19.0](https://github.com/jasoet/gopki/compare/v1.18.0...v1.19.0) (2025-10-27)
 
 
