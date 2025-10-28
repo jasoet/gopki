@@ -79,6 +79,20 @@ tasks:
       - 'echo "✅ OpenSSL compatibility tests completed"'
     silent: false
 
+  test:compatibility:bao:
+    desc: Run GoPKI ↔ OpenBao compatibility tests
+    env:
+      CGO_ENABLED: 1
+    cmds:
+      - mkdir -p output/
+      - |
+        echo "🔗 Running GoPKI ↔ OpenBao Compatibility Tests..."
+        echo "   This tests interoperability between GoPKI modules and OpenBao"
+        echo "   Requires Docker for OpenBao testcontainers"
+      - go test ./compatibility/bao -v -tags=compatibility -race -timeout=10m
+      - 'echo "✅ GoPKI ↔ OpenBao compatibility tests completed"'
+    silent: false
+
   # Code Quality
   format:
     desc: Format all Go code and organize imports
