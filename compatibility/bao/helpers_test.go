@@ -120,12 +120,13 @@ func SetupBaoWithCAAndRole(t *testing.T, roleName string, roleOpts *bao.RoleOpti
 // CreateTestRootCA creates a test root CA in OpenBao.
 func CreateTestRootCA(ctx context.Context, client *bao.Client, issuerName, keyType string, keyBits int) (*bao.IssuerClient, error) {
 	caResp, err := client.GenerateRootCA(ctx, &bao.CAOptions{
-		Type:       "internal",
-		CommonName: "Test Root CA",
-		KeyType:    keyType,
-		KeyBits:    keyBits,
-		IssuerName: issuerName,
-		TTL:        "87600h",
+		Type:          "internal",
+		CommonName:    "Test Root CA",
+		KeyType:       keyType,
+		KeyBits:       keyBits,
+		IssuerName:    issuerName,
+		TTL:           "87600h",
+		MaxPathLength: -1, // Allow unlimited intermediate CAs
 	})
 	if err != nil {
 		return nil, err

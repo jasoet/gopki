@@ -308,7 +308,7 @@ func testECDSAKeyBaoToGoPKI(t *testing.T, curveSize int) {
 
 // testBaoIssueCertWithGoPKIECDSAKey tests issuing a certificate from Bao using GoPKI-generated ECDSA key.
 func testBaoIssueCertWithGoPKIECDSAKey(t *testing.T, curveSize int) {
-	env, issuer := SetupBaoWithCA(t)
+	env := SetupBaoTest(t)
 	defer env.Cleanup()
 
 	var curveName string
@@ -327,18 +327,26 @@ func testBaoIssueCertWithGoPKIECDSAKey(t *testing.T, curveSize int) {
 		t.Fatalf("Unsupported curve size: %d", curveSize)
 	}
 
+	// Create root CA with ECDSA key matching the curve
+	issuer, err := CreateTestRootCA(env.Ctx, env.Client, "test-ec-ca", "ec", curveSize)
+	if err != nil {
+		t.Fatalf("Failed to create ECDSA CA: %v", err)
+	}
+
 	// Generate key with GoPKI
 	keyPair, err := algo.GenerateECDSAKeyPair(curve)
 	if err != nil {
 		t.Fatalf("Failed to generate ECDSA key: %v", err)
 	}
 
-	// Create role
+	// Create role with ECDSA key type
 	_, err = issuer.CreateRole(env.Ctx, "web-server", &bao.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
 		ServerFlag:      true,
+		KeyType:         "ec",
+		KeyBits:         curveSize,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create role: %v", err)
@@ -432,8 +440,14 @@ func testEd25519KeyBaoToGoPKI(t *testing.T) {
 
 // testBaoIssueCertWithGoPKIEd25519Key tests issuing a certificate from Bao using GoPKI-generated Ed25519 key.
 func testBaoIssueCertWithGoPKIEd25519Key(t *testing.T) {
-	env, issuer := SetupBaoWithCA(t)
+	env := SetupBaoTest(t)
 	defer env.Cleanup()
+
+	// Create root CA with Ed25519 key
+	issuer, err := CreateTestRootCA(env.Ctx, env.Client, "test-ed25519-ca", "ed25519", 0)
+	if err != nil {
+		t.Fatalf("Failed to create Ed25519 CA: %v", err)
+	}
 
 	// Generate key with GoPKI
 	keyPair, err := algo.GenerateEd25519KeyPair()
@@ -441,12 +455,13 @@ func testBaoIssueCertWithGoPKIEd25519Key(t *testing.T) {
 		t.Fatalf("Failed to generate Ed25519 key: %v", err)
 	}
 
-	// Create role
+	// Create role with Ed25519 key type
 	_, err = issuer.CreateRole(env.Ctx, "web-server", &bao.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
 		ServerFlag:      true,
+		KeyType:         "ed25519",
 	})
 	if err != nil {
 		t.Fatalf("Failed to create role: %v", err)
