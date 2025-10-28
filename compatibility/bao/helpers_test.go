@@ -11,7 +11,6 @@ import (
 	"github.com/jasoet/gopki/bao"
 	"github.com/jasoet/gopki/bao/testcontainer"
 	"github.com/jasoet/gopki/cert"
-	"github.com/jasoet/gopki/keypair"
 )
 
 // TestEnvironment holds the test environment for compatibility tests.

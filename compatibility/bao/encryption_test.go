@@ -9,7 +9,6 @@ import (
 	"github.com/jasoet/gopki/bao"
 	"github.com/jasoet/gopki/encryption"
 	"github.com/jasoet/gopki/encryption/asymmetric"
-	"github.com/jasoet/gopki/encryption/certificate"
 	"github.com/jasoet/gopki/keypair/algo"
 )
 

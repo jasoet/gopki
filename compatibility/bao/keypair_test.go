@@ -161,8 +161,21 @@ func testBaoIssueCertWithGoPKIRSAKey(t *testing.T, keyBits int) {
 	env, issuer := SetupBaoWithCA(t)
 	defer env.Cleanup()
 
+	// Convert int to algo.KeySize
+	var keySize algo.KeySize
+	switch keyBits {
+	case 2048:
+		keySize = algo.KeySize2048
+	case 3072:
+		keySize = algo.KeySize3072
+	case 4096:
+		keySize = algo.KeySize4096
+	default:
+		t.Fatalf("Unsupported key size: %d", keyBits)
+	}
+
 	// Generate key with GoPKI
-	keyPair, err := algo.GenerateRSAKeyPair(keyBits)
+	keyPair, err := algo.GenerateRSAKeyPair(keySize)
 	if err != nil {
 		t.Fatalf("Failed to generate RSA key: %v", err)
 	}
@@ -205,19 +218,23 @@ func testECDSAKeyGoPKIToBao(t *testing.T, curveSize int) {
 	defer env.Cleanup()
 
 	var curveName string
+	var curve algo.ECDSACurve
 	switch curveSize {
 	case 256:
 		curveName = "P256"
+		curve = algo.P256
 	case 384:
 		curveName = "P384"
+		curve = algo.P384
 	case 521:
 		curveName = "P521"
+		curve = algo.P521
 	default:
 		t.Fatalf("Unsupported curve size: %d", curveSize)
 	}
 
 	// Generate key with GoPKI
-	keyPair, err := algo.GenerateECDSAKeyPair(curveName)
+	keyPair, err := algo.GenerateECDSAKeyPair(curve)
 	if err != nil {
 		t.Fatalf("Failed to generate ECDSA key: %v", err)
 	}
@@ -258,7 +275,7 @@ func testECDSAKeyBaoToGoPKI(t *testing.T, curveSize int) {
 	// Generate key with Bao (exported)
 	keyClient, err := env.Client.GenerateECDSAKey(env.Ctx, &bao.GenerateKeyOptions{
 		KeyName: "test-ecdsa-key-2",
-		Curve:   curveName,
+		KeyBits: curveSize,
 	})
 	if err != nil {
 		t.Fatalf("Failed to generate key: %v", err)
@@ -295,19 +312,23 @@ func testBaoIssueCertWithGoPKIECDSAKey(t *testing.T, curveSize int) {
 	defer env.Cleanup()
 
 	var curveName string
+	var curve algo.ECDSACurve
 	switch curveSize {
 	case 256:
 		curveName = "P256"
+		curve = algo.P256
 	case 384:
 		curveName = "P384"
+		curve = algo.P384
 	case 521:
 		curveName = "P521"
+		curve = algo.P521
 	default:
 		t.Fatalf("Unsupported curve size: %d", curveSize)
 	}
 
 	// Generate key with GoPKI
-	keyPair, err := algo.GenerateECDSAKeyPair(curveName)
+	keyPair, err := algo.GenerateECDSAKeyPair(curve)
 	if err != nil {
 		t.Fatalf("Failed to generate ECDSA key: %v", err)
 	}
