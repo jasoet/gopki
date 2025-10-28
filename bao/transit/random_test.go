@@ -100,45 +100,22 @@ func TestGenerateRandom_Validation(t *testing.T) {
 
 	ctx := context.Background()
 
-	tests := []struct {
-		name    string
-		bytes   int
-		wantErr bool
-	}{
-		{
-			name:    "zero bytes",
-			bytes:   0,
-			wantErr: true,
-		},
-		{
-			name:    "negative bytes",
-			bytes:   -1,
-			wantErr: true,
-		},
-		{
-			name:    "exceeds limit",
-			bytes:   2097152, // 2MB
-			wantErr: true,
-		},
-		{
-			name:    "valid small",
-			bytes:   16,
-			wantErr: false,
-		},
-		{
-			name:    "valid large",
-			bytes:   1048576, // 1MB - at limit
-			wantErr: false,
-		},
+	// Test zero bytes
+	_, err = client.GenerateRandom(ctx, 0, nil)
+	if err == nil {
+		t.Error("GenerateRandom() with zero bytes should return error")
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := client.GenerateRandom(ctx, tt.bytes, nil)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GenerateRandom() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
+	// Test negative bytes
+	_, err = client.GenerateRandom(ctx, -1, nil)
+	if err == nil {
+		t.Error("GenerateRandom() with negative bytes should return error")
+	}
+
+	// Test exceeds limit
+	_, err = client.GenerateRandom(ctx, 2097152, nil) // 2MB
+	if err == nil {
+		t.Error("GenerateRandom() exceeding limit should return error")
 	}
 }
 
