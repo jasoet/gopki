@@ -20,7 +20,8 @@
 // - OpenBao server running
 //
 // Usage:
-//   go run main.go
+//
+//	go run main.go
 package main
 
 import (
@@ -30,11 +31,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 )
 
 func main() {
-	client, err := bao.NewClient(&bao.Config{
+	client, err := pki.NewClient(&pki.Config{
 		Address: getEnv("BAO_ADDR", "http://127.0.0.1:8200"),
 		Token:   getEnv("BAO_TOKEN", ""),
 	})
@@ -51,7 +52,7 @@ func main() {
 	fmt.Println("Step 1: Creating Production Root CA")
 	fmt.Println("  (In production: Generate offline and import)")
 
-	rootResp, err := client.GenerateRootCA(ctx, &bao.CAOptions{
+	rootResp, err := client.GenerateRootCA(ctx, &pki.CAOptions{
 		Type:          "internal",
 		CommonName:    "Example Corp Production Root CA 2024",
 		Organization:  []string{"Example Corporation"},
@@ -76,12 +77,12 @@ func main() {
 	fmt.Println("\nStep 2: Creating Production Roles")
 
 	// Web server role
-	_, err = rootIssuer.CreateRole(ctx, "prod-web-server", &bao.RoleOptions{
+	_, err = rootIssuer.CreateRole(ctx, "prod-web-server", &pki.RoleOptions{
 		AllowedDomains:            []string{"example.com", "example.net"},
 		AllowSubdomains:           true,
 		AllowBareDomains:          true,
-		AllowWildcardCertificates: false, // Security: Disable wildcards
-		TTL:                       "720h", // 30 days - short for security
+		AllowWildcardCertificates: false,   // Security: Disable wildcards
+		TTL:                       "720h",  // 30 days - short for security
 		MaxTTL:                    "2160h", // 90 days maximum
 		ServerFlag:                true,
 		KeyType:                   "rsa",
@@ -97,10 +98,10 @@ func main() {
 	fmt.Println("✓ Web server role created (30-day TTL)")
 
 	// API server role
-	_, err = rootIssuer.CreateRole(ctx, "prod-api-server", &bao.RoleOptions{
+	_, err = rootIssuer.CreateRole(ctx, "prod-api-server", &pki.RoleOptions{
 		AllowedDomains:   []string{"api.example.com"},
 		AllowSubdomains:  true,
-		AllowBareDomains: true, // Allow bare domain itself
+		AllowBareDomains: true,   // Allow bare domain itself
 		TTL:              "168h", // 7 days - very short for APIs
 		MaxTTL:           "720h",
 		ServerFlag:       true,
@@ -118,7 +119,7 @@ func main() {
 	fmt.Println("\nStep 3: Issuing Production Certificates")
 
 	webCert, err := client.GenerateRSACertificate(ctx, "prod-web-server",
-		&bao.GenerateCertificateOptions{
+		&pki.GenerateCertificateOptions{
 			CommonName: "www.example.com",
 			AltNames:   []string{"example.com"},
 			TTL:        "720h",
@@ -129,7 +130,7 @@ func main() {
 	fmt.Printf("✓ Web certificate issued: %s\n", webCert.CertificateInfo().SerialNumber)
 
 	apiCert, err := client.GenerateRSACertificate(ctx, "prod-api-server",
-		&bao.GenerateCertificateOptions{
+		&pki.GenerateCertificateOptions{
 			CommonName: "api.example.com",
 			TTL:        "168h",
 		})

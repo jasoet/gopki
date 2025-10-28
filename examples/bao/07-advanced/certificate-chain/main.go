@@ -18,7 +18,8 @@
 // - OpenBao server running
 //
 // Usage:
-//   go run main.go
+//
+//	go run main.go
 package main
 
 import (
@@ -28,12 +29,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 	"github.com/jasoet/gopki/cert"
 )
 
 func main() {
-	client, err := bao.NewClient(&bao.Config{
+	client, err := pki.NewClient(&pki.Config{
 		Address: getEnv("BAO_ADDR", "http://127.0.0.1:8200"),
 		Token:   getEnv("BAO_TOKEN", ""),
 	})
@@ -46,7 +47,7 @@ func main() {
 
 	// Step 1: Create root CA
 	fmt.Println("=== Step 1: Creating Root CA ===")
-	rootResp, err := client.GenerateRootCA(ctx, &bao.CAOptions{
+	rootResp, err := client.GenerateRootCA(ctx, &pki.CAOptions{
 		Type:          "internal",
 		CommonName:    "Chain Test Root CA",
 		KeyType:       "rsa",
@@ -63,7 +64,7 @@ func main() {
 
 	// Step 2: Create intermediate CA
 	fmt.Println("\n=== Step 2: Creating Intermediate CA ===")
-	intermediateResp, err := client.GenerateIntermediateCA(ctx, &bao.CAOptions{
+	intermediateResp, err := client.GenerateIntermediateCA(ctx, &pki.CAOptions{
 		Type:       "exported",
 		CommonName: "Chain Test Intermediate CA",
 		KeyType:    "rsa",
@@ -82,7 +83,7 @@ func main() {
 	client.SetDefaultIssuer(ctx, rootResp.IssuerID)
 
 	// Sign intermediate CSR using client
-	intermediateCert, err := client.SignIntermediateCSR(ctx, intermediateCSR, &bao.CAOptions{
+	intermediateCert, err := client.SignIntermediateCSR(ctx, intermediateCSR, &pki.CAOptions{
 		CommonName:    "Chain Test Intermediate CA",
 		TTL:           "43800h",
 		MaxPathLength: 1,
@@ -94,7 +95,7 @@ func main() {
 
 	// Import intermediate CA with private key
 	pemBundle := string(intermediateCert.ToPEM()) + "\n" + intermediateResp.PrivateKey
-	intermediateIssuer, err := client.ImportCA(ctx, &bao.CABundle{
+	intermediateIssuer, err := client.ImportCA(ctx, &pki.CABundle{
 		PEMBundle: pemBundle,
 	})
 	if err != nil {
@@ -102,7 +103,7 @@ func main() {
 	}
 
 	// Step 3: Create role on intermediate CA
-	_, err = intermediateIssuer.CreateRole(ctx, "chain-test", &bao.RoleOptions{
+	_, err = intermediateIssuer.CreateRole(ctx, "chain-test", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -115,7 +116,7 @@ func main() {
 	// Step 4: Issue end-entity certificate
 	fmt.Println("\n=== Step 3: Issuing End-Entity Certificate ===")
 	endCert, err := client.GenerateRSACertificate(ctx, "chain-test",
-		&bao.GenerateCertificateOptions{
+		&pki.GenerateCertificateOptions{
 			CommonName: "www.example.com",
 			TTL:        "720h",
 		})

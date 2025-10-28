@@ -7,7 +7,7 @@ import (
 	"crypto/x509/pkix"
 	"testing"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 	"github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/keypair/algo"
 )
@@ -73,7 +73,7 @@ func testGoPKICSRBaoSign(t *testing.T) {
 	}
 
 	// Create role in Bao
-	_, err = issuer.CreateRole(env.Ctx, "web-server", &bao.RoleOptions{
+	_, err = issuer.CreateRole(env.Ctx, "web-server", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -84,7 +84,7 @@ func testGoPKICSRBaoSign(t *testing.T) {
 	}
 
 	// Sign CSR with Bao
-	certificate, err := issuer.SignCSR(env.Ctx, csr, &bao.SignCertificateOptions{
+	certificate, err := issuer.SignCSR(env.Ctx, csr, &pki.SignCertificateOptions{
 		TTL: "720h",
 	})
 	if err != nil {
@@ -128,7 +128,7 @@ func testCSRExtensionsPreservation(t *testing.T) {
 	}
 
 	// Create role
-	_, err = issuer.CreateRole(env.Ctx, "web-server", &bao.RoleOptions{
+	_, err = issuer.CreateRole(env.Ctx, "web-server", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -139,7 +139,7 @@ func testCSRExtensionsPreservation(t *testing.T) {
 	}
 
 	// Sign CSR
-	certificate, err := issuer.SignCSR(env.Ctx, csr, &bao.SignCertificateOptions{
+	certificate, err := issuer.SignCSR(env.Ctx, csr, &pki.SignCertificateOptions{
 		TTL: "720h",
 	})
 	if err != nil {
@@ -183,7 +183,7 @@ func testCSRSubjectInfoPreservation(t *testing.T) {
 	}
 
 	// Create role
-	_, err = issuer.CreateRole(env.Ctx, "web-server", &bao.RoleOptions{
+	_, err = issuer.CreateRole(env.Ctx, "web-server", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -194,7 +194,7 @@ func testCSRSubjectInfoPreservation(t *testing.T) {
 	}
 
 	// Sign CSR
-	certificate, err := issuer.SignCSR(env.Ctx, csr, &bao.SignCertificateOptions{
+	certificate, err := issuer.SignCSR(env.Ctx, csr, &pki.SignCertificateOptions{
 		TTL: "720h",
 	})
 	if err != nil {
@@ -229,7 +229,7 @@ func testCSRSANPreservation(t *testing.T) {
 		Subject: pkix.Name{
 			CommonName: "app.example.com",
 		},
-		DNSNames:       []string{"app.example.com", "www.example.com", "api.example.com"},
+		DNSNames:     []string{"app.example.com", "www.example.com", "api.example.com"},
 		EmailAddress: []string{"admin@example.com"},
 	}
 
@@ -239,7 +239,7 @@ func testCSRSANPreservation(t *testing.T) {
 	}
 
 	// Create role
-	_, err = issuer.CreateRole(env.Ctx, "web-server", &bao.RoleOptions{
+	_, err = issuer.CreateRole(env.Ctx, "web-server", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -250,7 +250,7 @@ func testCSRSANPreservation(t *testing.T) {
 	}
 
 	// Sign CSR
-	certificate, err := issuer.SignCSR(env.Ctx, csr, &bao.SignCertificateOptions{
+	certificate, err := issuer.SignCSR(env.Ctx, csr, &pki.SignCertificateOptions{
 		TTL: "720h",
 	})
 	if err != nil {
@@ -275,7 +275,7 @@ func testBaoRootCAVerify(t *testing.T) {
 	defer env.Cleanup()
 
 	// Generate root CA
-	caResp, err := env.Client.GenerateRootCA(env.Ctx, &bao.CAOptions{
+	caResp, err := env.Client.GenerateRootCA(env.Ctx, &pki.CAOptions{
 		Type:       "internal",
 		CommonName: "Test Root CA",
 		KeyType:    "rsa",
@@ -385,7 +385,7 @@ func testBaoCAGoPKISignEndEntity(t *testing.T) {
 	}
 
 	// Create role and sign
-	_, err = issuer.CreateRole(env.Ctx, "end-entity", &bao.RoleOptions{
+	_, err = issuer.CreateRole(env.Ctx, "end-entity", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -394,7 +394,7 @@ func testBaoCAGoPKISignEndEntity(t *testing.T) {
 		t.Fatalf("Failed to create role: %v", err)
 	}
 
-	endEntityCert, err := issuer.SignCSR(env.Ctx, csr, &bao.SignCertificateOptions{
+	endEntityCert, err := issuer.SignCSR(env.Ctx, csr, &pki.SignCertificateOptions{
 		TTL: "720h",
 	})
 	if err != nil {
@@ -419,7 +419,7 @@ func testBaoCertGoPKIParse(t *testing.T) {
 	}
 
 	// Create role
-	_, err = issuer.CreateRole(env.Ctx, "web-server", &bao.RoleOptions{
+	_, err = issuer.CreateRole(env.Ctx, "web-server", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -430,7 +430,7 @@ func testBaoCertGoPKIParse(t *testing.T) {
 	}
 
 	// Issue certificate
-	certClient, err := env.Client.IssueRSACertificate(env.Ctx, "web-server", keyPair, &bao.GenerateCertificateOptions{
+	certClient, err := env.Client.IssueRSACertificate(env.Ctx, "web-server", keyPair, &pki.GenerateCertificateOptions{
 		CommonName: "app.example.com",
 		TTL:        "720h",
 	})
@@ -474,7 +474,7 @@ func testBaoCertGoPKIVerify(t *testing.T) {
 	}
 
 	// Create role and issue cert
-	_, err = issuer.CreateRole(env.Ctx, "web-server", &bao.RoleOptions{
+	_, err = issuer.CreateRole(env.Ctx, "web-server", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -484,7 +484,7 @@ func testBaoCertGoPKIVerify(t *testing.T) {
 		t.Fatalf("Failed to create role: %v", err)
 	}
 
-	certClient, err := env.Client.IssueRSACertificate(env.Ctx, "web-server", keyPair, &bao.GenerateCertificateOptions{
+	certClient, err := env.Client.IssueRSACertificate(env.Ctx, "web-server", keyPair, &pki.GenerateCertificateOptions{
 		CommonName: "app.example.com",
 		TTL:        "720h",
 	})
@@ -539,7 +539,7 @@ func testCertificateChainValidation(t *testing.T) {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
 
-	_, err = intermediateCA.CreateRole(env.Ctx, "end-entity", &bao.RoleOptions{
+	_, err = intermediateCA.CreateRole(env.Ctx, "end-entity", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -548,7 +548,7 @@ func testCertificateChainValidation(t *testing.T) {
 		t.Fatalf("Failed to create role: %v", err)
 	}
 
-	certClient, err := env.Client.IssueRSACertificate(env.Ctx, "end-entity", keyPair, &bao.GenerateCertificateOptions{
+	certClient, err := env.Client.IssueRSACertificate(env.Ctx, "end-entity", keyPair, &pki.GenerateCertificateOptions{
 		CommonName: "end-entity.example.com",
 		TTL:        "720h",
 	})
@@ -584,7 +584,7 @@ func testWorkflow1BaoGeneratesEverything(t *testing.T) {
 	defer env.Cleanup()
 
 	// Create role
-	_, err := issuer.CreateRole(env.Ctx, "web-server", &bao.RoleOptions{
+	_, err := issuer.CreateRole(env.Ctx, "web-server", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -595,7 +595,7 @@ func testWorkflow1BaoGeneratesEverything(t *testing.T) {
 	}
 
 	// Bao generates key and certificate
-	certClient, err := env.Client.GenerateRSACertificate(env.Ctx, "web-server", &bao.GenerateCertificateOptions{
+	certClient, err := env.Client.GenerateRSACertificate(env.Ctx, "web-server", &pki.GenerateCertificateOptions{
 		CommonName: "app.example.com",
 		AltNames:   []string{"www.example.com"},
 		TTL:        "720h",
@@ -645,7 +645,7 @@ func testWorkflow2LocalKeyBaoSigns(t *testing.T) {
 	}
 
 	// Create role
-	_, err = issuer.CreateRole(env.Ctx, "web-server", &bao.RoleOptions{
+	_, err = issuer.CreateRole(env.Ctx, "web-server", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -656,7 +656,7 @@ func testWorkflow2LocalKeyBaoSigns(t *testing.T) {
 	}
 
 	// Issue certificate with local key (only CSR sent to Bao)
-	certClient, err := env.Client.IssueRSACertificate(env.Ctx, "web-server", keyPair, &bao.GenerateCertificateOptions{
+	certClient, err := env.Client.IssueRSACertificate(env.Ctx, "web-server", keyPair, &pki.GenerateCertificateOptions{
 		CommonName: "app.example.com",
 		TTL:        "720h",
 	})
@@ -683,7 +683,7 @@ func testWorkflow3BaoManagedKey(t *testing.T) {
 	defer env.Cleanup()
 
 	// Create key in Bao (internal, not exported)
-	keyClient, err := env.Client.CreateRSAKey(env.Ctx, &bao.GenerateKeyOptions{
+	keyClient, err := env.Client.CreateRSAKey(env.Ctx, &pki.GenerateKeyOptions{
 		KeyName: "managed-key",
 		KeyBits: 2048,
 	})
@@ -694,7 +694,7 @@ func testWorkflow3BaoManagedKey(t *testing.T) {
 	keyInfo := keyClient.KeyInfo()
 
 	// Create role
-	_, err = issuer.CreateRole(env.Ctx, "web-server", &bao.RoleOptions{
+	_, err = issuer.CreateRole(env.Ctx, "web-server", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -705,7 +705,7 @@ func testWorkflow3BaoManagedKey(t *testing.T) {
 	}
 
 	// Issue certificate using Bao-managed key
-	certClient, err := env.Client.IssueRSACertificateWithKeyRef(env.Ctx, "web-server", keyInfo.KeyID, &bao.GenerateCertificateOptions{
+	certClient, err := env.Client.IssueRSACertificateWithKeyRef(env.Ctx, "web-server", keyInfo.KeyID, &pki.GenerateCertificateOptions{
 		CommonName: "app.example.com",
 		TTL:        "720h",
 	})
@@ -749,7 +749,7 @@ func testWorkflow4SignCSR(t *testing.T) {
 	}
 
 	// Create role
-	_, err = issuer.CreateRole(env.Ctx, "web-server", &bao.RoleOptions{
+	_, err = issuer.CreateRole(env.Ctx, "web-server", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -760,7 +760,7 @@ func testWorkflow4SignCSR(t *testing.T) {
 	}
 
 	// Sign with Bao
-	certificate, err := issuer.SignCSR(env.Ctx, csr, &bao.SignCertificateOptions{
+	certificate, err := issuer.SignCSR(env.Ctx, csr, &pki.SignCertificateOptions{
 		TTL: "720h",
 	})
 	if err != nil {

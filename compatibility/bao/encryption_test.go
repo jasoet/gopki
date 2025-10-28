@@ -6,7 +6,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 	"github.com/jasoet/gopki/encryption"
 	"github.com/jasoet/gopki/encryption/asymmetric"
 	"github.com/jasoet/gopki/keypair/algo"
@@ -39,7 +39,7 @@ func testRSAOAEPBaoKeyGoPKI(t *testing.T) {
 	defer env.Cleanup()
 
 	// Generate key with Bao (exported)
-	keyClient, err := env.Client.GenerateRSAKey(env.Ctx, &bao.GenerateKeyOptions{
+	keyClient, err := env.Client.GenerateRSAKey(env.Ctx, &pki.GenerateKeyOptions{
 		KeyName: "encryption-key",
 		KeyBits: 2048,
 	})
@@ -89,16 +89,16 @@ func testRSAOAEPGoPKIKeyBaoCert(t *testing.T) {
 	}
 
 	// Create role and issue certificate
-	_, err = issuer.CreateRole(env.Ctx, "encryption", &bao.RoleOptions{
-		AllowedDomains:       []string{"example.com"},
-		AllowSubdomains:      true,
-		TTL:                  "720h",
+	_, err = issuer.CreateRole(env.Ctx, "encryption", &pki.RoleOptions{
+		AllowedDomains:  []string{"example.com"},
+		AllowSubdomains: true,
+		TTL:             "720h",
 	})
 	if err != nil {
 		t.Fatalf("Failed to create role: %v", err)
 	}
 
-	certClient, err := env.Client.IssueRSACertificate(env.Ctx, "encryption", keyPair, &bao.GenerateCertificateOptions{
+	certClient, err := env.Client.IssueRSACertificate(env.Ctx, "encryption", keyPair, &pki.GenerateCertificateOptions{
 		CommonName: "encryption.example.com",
 		TTL:        "720h",
 	})
@@ -142,7 +142,7 @@ func testECDHBaoKey(t *testing.T) {
 	defer env.Cleanup()
 
 	// Generate first key with Bao
-	keyClient1, err := env.Client.GenerateECDSAKey(env.Ctx, &bao.GenerateKeyOptions{
+	keyClient1, err := env.Client.GenerateECDSAKey(env.Ctx, &pki.GenerateKeyOptions{
 		KeyName: "ecdh-key-1",
 		KeyBits: 256,
 	})
@@ -156,7 +156,7 @@ func testECDHBaoKey(t *testing.T) {
 	}
 
 	// Generate second key with Bao
-	keyClient2, err := env.Client.GenerateECDSAKey(env.Ctx, &bao.GenerateKeyOptions{
+	keyClient2, err := env.Client.GenerateECDSAKey(env.Ctx, &pki.GenerateKeyOptions{
 		KeyName: "ecdh-key-2",
 		KeyBits: 256,
 	})
@@ -205,7 +205,7 @@ func testECDHGoPKIBaoKeyAgreement(t *testing.T) {
 	}
 
 	// Generate key with Bao
-	baoKeyClient, err := env.Client.GenerateECDSAKey(env.Ctx, &bao.GenerateKeyOptions{
+	baoKeyClient, err := env.Client.GenerateECDSAKey(env.Ctx, &pki.GenerateKeyOptions{
 		KeyName: "ecdh-key",
 		KeyBits: 256,
 	})
@@ -255,16 +255,16 @@ func testCertificateBasedEncryption(t *testing.T) {
 	}
 
 	// Create role and issue certificate
-	_, err = issuer.CreateRole(env.Ctx, "encryption", &bao.RoleOptions{
-		AllowedDomains:       []string{"example.com"},
-		AllowSubdomains:      true,
-		TTL:                  "720h",
+	_, err = issuer.CreateRole(env.Ctx, "encryption", &pki.RoleOptions{
+		AllowedDomains:  []string{"example.com"},
+		AllowSubdomains: true,
+		TTL:             "720h",
 	})
 	if err != nil {
 		t.Fatalf("Failed to create role: %v", err)
 	}
 
-	certClient, err := env.Client.IssueRSACertificate(env.Ctx, "encryption", keyPair, &bao.GenerateCertificateOptions{
+	certClient, err := env.Client.IssueRSACertificate(env.Ctx, "encryption", keyPair, &pki.GenerateCertificateOptions{
 		CommonName: "encryption.example.com",
 		TTL:        "720h",
 	})

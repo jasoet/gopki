@@ -13,13 +13,15 @@
 // - PKI secrets engine enabled
 //
 // Usage:
-//   go run main.go
+//
+//	go run main.go
 //
 // Expected Output:
-//   ✓ Certificate issued successfully
-//   Serial: ...
-//   CN: app.example.com
-//   SANs: [app.example.com www.example.com api.example.com]
+//
+//	✓ Certificate issued successfully
+//	Serial: ...
+//	CN: app.example.com
+//	SANs: [app.example.com www.example.com api.example.com]
 package main
 
 import (
@@ -29,11 +31,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 )
 
 func main() {
-	client, err := bao.NewClient(&bao.Config{
+	client, err := pki.NewClient(&pki.Config{
 		Address: getEnv("BAO_ADDR", "http://127.0.0.1:8200"),
 		Token:   getEnv("BAO_TOKEN", ""),
 	})
@@ -46,7 +48,7 @@ func main() {
 
 	// Step 1: Create root CA
 	fmt.Println("Creating root CA...")
-	caResp, err := client.GenerateRootCA(ctx, &bao.CAOptions{
+	caResp, err := client.GenerateRootCA(ctx, &pki.CAOptions{
 		Type:          "internal",
 		CommonName:    "Example Root CA",
 		KeyType:       "rsa",
@@ -67,7 +69,7 @@ func main() {
 	// Step 2: Create a role for web servers
 	// Roles define policies for certificate issuance
 	fmt.Println("\nCreating role for web servers...")
-	_, err = issuer.CreateRole(ctx, "web-server", &bao.RoleOptions{
+	_, err = issuer.CreateRole(ctx, "web-server", &pki.RoleOptions{
 		// Domain constraints
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
@@ -91,7 +93,7 @@ func main() {
 	// Step 3: Issue a certificate
 	fmt.Println("\nIssuing certificate for app.example.com...")
 	certClient, err := client.GenerateRSACertificate(ctx, "web-server",
-		&bao.GenerateCertificateOptions{
+		&pki.GenerateCertificateOptions{
 			CommonName: "app.example.com",
 
 			// Subject Alternative Names (SANs)

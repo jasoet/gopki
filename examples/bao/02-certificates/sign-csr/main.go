@@ -18,7 +18,8 @@
 // - GoPKI modules installed
 //
 // Usage:
-//   go run main.go
+//
+//	go run main.go
 package main
 
 import (
@@ -29,13 +30,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 	"github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/keypair/algo"
 )
 
 func main() {
-	client, err := bao.NewClient(&bao.Config{
+	client, err := pki.NewClient(&pki.Config{
 		Address: getEnv("BAO_ADDR", "http://127.0.0.1:8200"),
 		Token:   getEnv("BAO_TOKEN", ""),
 	})
@@ -48,7 +49,7 @@ func main() {
 
 	// Step 1: Create root CA in OpenBao
 	fmt.Println("Creating root CA in OpenBao...")
-	caResp, err := client.GenerateRootCA(ctx, &bao.CAOptions{
+	caResp, err := client.GenerateRootCA(ctx, &pki.CAOptions{
 		Type:          "internal",
 		CommonName:    "Example Root CA",
 		KeyType:       "rsa",
@@ -102,7 +103,7 @@ func main() {
 
 	// Step 4: Sign the CSR with OpenBao CA
 	fmt.Println("\nSigning CSR with OpenBao CA...")
-	certificate, err := issuer.SignCSR(ctx, csr, &bao.SignCertificateOptions{
+	certificate, err := issuer.SignCSR(ctx, csr, &pki.SignCertificateOptions{
 		CommonName: "service.example.com",
 		TTL:        "720h",
 		// Optional: Add additional SANs if not in CSR

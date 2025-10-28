@@ -10,15 +10,17 @@
 // - Issue end-entity certificates from intermediate CA
 //
 // CA Hierarchy:
-//   Root CA
-//     └── Intermediate CA
-//           └── End-entity certificates
+//
+//	Root CA
+//	  └── Intermediate CA
+//	        └── End-entity certificates
 //
 // Prerequisites:
 // - OpenBao server running
 //
 // Usage:
-//   go run main.go
+//
+//	go run main.go
 package main
 
 import (
@@ -28,12 +30,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 	"github.com/jasoet/gopki/cert"
 )
 
 func main() {
-	client, err := bao.NewClient(&bao.Config{
+	client, err := pki.NewClient(&pki.Config{
 		Address: getEnv("BAO_ADDR", "http://127.0.0.1:8200"),
 		Token:   getEnv("BAO_TOKEN", ""),
 	})
@@ -46,14 +48,14 @@ func main() {
 
 	// Step 1: Create root CA
 	fmt.Println("Step 1: Creating root CA...")
-	rootResp, err := client.GenerateRootCA(ctx, &bao.CAOptions{
+	rootResp, err := client.GenerateRootCA(ctx, &pki.CAOptions{
 		Type:          "internal",
 		CommonName:    "Example Root CA",
 		Organization:  []string{"Example Corp"},
 		KeyType:       "rsa",
 		KeyBits:       4096,
-		TTL:           "87600h",       // 10 years
-		MaxPathLength: -1,             // Allow unlimited intermediate CAs
+		TTL:           "87600h", // 10 years
+		MaxPathLength: -1,       // Allow unlimited intermediate CAs
 		IssuerName:    "root-ca-2024",
 	})
 	if err != nil {
@@ -68,7 +70,7 @@ func main() {
 
 	// Step 2: Generate intermediate CA CSR
 	fmt.Println("\nStep 2: Generating intermediate CA CSR...")
-	intermediateResp, err := client.GenerateIntermediateCA(ctx, &bao.CAOptions{
+	intermediateResp, err := client.GenerateIntermediateCA(ctx, &pki.CAOptions{
 		Type:         "exported", // Export to get CSR
 		CommonName:   "Example Intermediate CA",
 		Organization: []string{"Example Corp"},
@@ -91,7 +93,7 @@ func main() {
 	client.SetDefaultIssuer(ctx, rootResp.IssuerID)
 
 	// Sign intermediate CSR using client
-	signedCert, err := client.SignIntermediateCSR(ctx, intermediateCSR, &bao.CAOptions{
+	signedCert, err := client.SignIntermediateCSR(ctx, intermediateCSR, &pki.CAOptions{
 		CommonName:    "Example Intermediate CA",
 		TTL:           "43800h", // 5 years
 		MaxPathLength: 0,        // Can only sign end-entity certs
@@ -107,7 +109,7 @@ func main() {
 	// Combine the signed certificate with the private key
 	pemBundle := string(signedCert.ToPEM()) + "\n" + intermediateResp.PrivateKey
 
-	intermediateIssuer, err := client.ImportCA(ctx, &bao.CABundle{
+	intermediateIssuer, err := client.ImportCA(ctx, &pki.CABundle{
 		PEMBundle: pemBundle,
 	})
 	if err != nil {
@@ -117,7 +119,7 @@ func main() {
 
 	// Step 5: Create role on intermediate CA
 	fmt.Println("\nStep 5: Creating role on intermediate CA...")
-	_, err = intermediateIssuer.CreateRole(ctx, "web-server", &bao.RoleOptions{
+	_, err = intermediateIssuer.CreateRole(ctx, "web-server", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -131,7 +133,7 @@ func main() {
 	// Step 6: Issue end-entity certificate from intermediate CA
 	fmt.Println("\nStep 6: Issuing end-entity certificate...")
 	certClient, err := client.GenerateRSACertificate(ctx, "web-server",
-		&bao.GenerateCertificateOptions{
+		&pki.GenerateCertificateOptions{
 			CommonName: "app.example.com",
 			TTL:        "720h",
 		})

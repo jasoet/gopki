@@ -20,7 +20,8 @@
 // - OpenBao server running
 //
 // Usage:
-//   go run main.go
+//
+//	go run main.go
 package main
 
 import (
@@ -30,11 +31,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 )
 
 func main() {
-	client, err := bao.NewClient(&bao.Config{
+	client, err := pki.NewClient(&pki.Config{
 		Address: getEnv("BAO_ADDR", "http://127.0.0.1:8200"),
 		Token:   getEnv("BAO_TOKEN", ""),
 	})
@@ -47,7 +48,7 @@ func main() {
 
 	// Step 1: Create production CA
 	fmt.Println("=== Step 1: Creating Production CA ===")
-	prodCA, err := client.GenerateRootCA(ctx, &bao.CAOptions{
+	prodCA, err := client.GenerateRootCA(ctx, &pki.CAOptions{
 		Type:         "internal",
 		CommonName:   "Production Root CA",
 		Organization: []string{"Example Corp"},
@@ -63,7 +64,7 @@ func main() {
 
 	// Step 2: Create development CA
 	fmt.Println("\n=== Step 2: Creating Development CA ===")
-	devCA, err := client.GenerateRootCA(ctx, &bao.CAOptions{
+	devCA, err := client.GenerateRootCA(ctx, &pki.CAOptions{
 		Type:         "internal",
 		CommonName:   "Development Root CA",
 		Organization: []string{"Example Corp - Dev"},
@@ -79,7 +80,7 @@ func main() {
 
 	// Step 3: Create staging CA
 	fmt.Println("\n=== Step 3: Creating Staging CA ===")
-	stagingCA, err := client.GenerateRootCA(ctx, &bao.CAOptions{
+	stagingCA, err := client.GenerateRootCA(ctx, &pki.CAOptions{
 		Type:         "internal",
 		CommonName:   "Staging Root CA",
 		Organization: []string{"Example Corp - Staging"},
@@ -117,7 +118,7 @@ func main() {
 	fmt.Println("\n=== Step 6: Creating Environment-Specific Roles ===")
 
 	prodIssuer, _ := client.GetIssuer(ctx, prodCA.IssuerID)
-	_, err = prodIssuer.CreateRole(ctx, "prod-web", &bao.RoleOptions{
+	_, err = prodIssuer.CreateRole(ctx, "prod-web", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -129,7 +130,7 @@ func main() {
 	fmt.Println("✓ Production role created")
 
 	devIssuer, _ := client.GetIssuer(ctx, devCA.IssuerID)
-	_, err = devIssuer.CreateRole(ctx, "dev-web", &bao.RoleOptions{
+	_, err = devIssuer.CreateRole(ctx, "dev-web", &pki.RoleOptions{
 		AllowedDomains:  []string{"dev.example.com"},
 		AllowSubdomains: true,
 		TTL:             "168h",
@@ -144,7 +145,7 @@ func main() {
 	fmt.Println("\n=== Step 7: Issuing Certificates from Different Issuers ===")
 
 	prodCert, err := client.GenerateRSACertificate(ctx, "prod-web",
-		&bao.GenerateCertificateOptions{
+		&pki.GenerateCertificateOptions{
 			CommonName: "app.example.com",
 			TTL:        "720h",
 		})
@@ -155,7 +156,7 @@ func main() {
 	fmt.Printf("  Issuer: %s\n", prodCert.Certificate().Certificate.Issuer.CommonName)
 
 	devCert, err := client.GenerateRSACertificate(ctx, "dev-web",
-		&bao.GenerateCertificateOptions{
+		&pki.GenerateCertificateOptions{
 			CommonName: "app.dev.example.com",
 			TTL:        "168h",
 		})

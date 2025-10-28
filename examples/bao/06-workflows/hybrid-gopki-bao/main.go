@@ -19,7 +19,8 @@
 // - OpenBao server running
 //
 // Usage:
-//   go run main.go
+//
+//	go run main.go
 package main
 
 import (
@@ -30,13 +31,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 	"github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/keypair/algo"
 )
 
 func main() {
-	client, err := bao.NewClient(&bao.Config{
+	client, err := pki.NewClient(&pki.Config{
 		Address: getEnv("BAO_ADDR", "http://127.0.0.1:8200"),
 		Token:   getEnv("BAO_TOKEN", ""),
 	})
@@ -49,7 +50,7 @@ func main() {
 
 	// Step 1: Create CA in OpenBao
 	fmt.Println("=== Step 1: Creating CA in OpenBao ===")
-	caResp, err := client.GenerateRootCA(ctx, &bao.CAOptions{
+	caResp, err := client.GenerateRootCA(ctx, &pki.CAOptions{
 		Type:       "internal",
 		CommonName: "Hybrid Root CA",
 		KeyType:    "rsa",
@@ -135,7 +136,7 @@ func main() {
 	fmt.Println("\n=== Step 4: Signing CSRs (OpenBao) ===")
 
 	// Sign first CSR
-	cert1, err := issuer.SignCSR(ctx, rsaCSR, &bao.SignCertificateOptions{
+	cert1, err := issuer.SignCSR(ctx, rsaCSR, &pki.SignCertificateOptions{
 		CommonName: "service1.example.com",
 		TTL:        "720h",
 	})
@@ -145,7 +146,7 @@ func main() {
 	fmt.Printf("✓ Certificate signed: %s\n", cert1.Certificate.Subject.CommonName)
 
 	// Sign second CSR
-	cert2, err := issuer.SignCSR(ctx, rsaCSR2, &bao.SignCertificateOptions{
+	cert2, err := issuer.SignCSR(ctx, rsaCSR2, &pki.SignCertificateOptions{
 		CommonName: "service2.example.com",
 		TTL:        "720h",
 	})
@@ -155,7 +156,7 @@ func main() {
 	fmt.Printf("✓ Certificate signed: %s\n", cert2.Certificate.Subject.CommonName)
 
 	// Sign third CSR
-	cert3, err := issuer.SignCSR(ctx, rsaCSR3, &bao.SignCertificateOptions{
+	cert3, err := issuer.SignCSR(ctx, rsaCSR3, &pki.SignCertificateOptions{
 		CommonName: "service3.example.com",
 		TTL:        "720h",
 	})

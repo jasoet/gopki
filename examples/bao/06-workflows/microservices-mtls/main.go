@@ -18,7 +18,8 @@
 // - OpenBao server running
 //
 // Usage:
-//   go run main.go
+//
+//	go run main.go
 package main
 
 import (
@@ -30,11 +31,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 )
 
 func main() {
-	client, err := bao.NewClient(&bao.Config{
+	client, err := pki.NewClient(&pki.Config{
 		Address: getEnv("BAO_ADDR", "http://127.0.0.1:8200"),
 		Token:   getEnv("BAO_TOKEN", ""),
 	})
@@ -47,7 +48,7 @@ func main() {
 
 	// Step 1: Create Root CA
 	fmt.Println("=== Step 1: Creating Root CA for mTLS ===")
-	caResp, err := client.GenerateRootCA(ctx, &bao.CAOptions{
+	caResp, err := client.GenerateRootCA(ctx, &pki.CAOptions{
 		Type:       "internal",
 		CommonName: "mTLS Root CA",
 		KeyType:    "rsa",
@@ -72,7 +73,7 @@ func main() {
 
 	// Step 2: Create server role
 	fmt.Println("\n=== Step 2: Creating Server Role ===")
-	_, err = issuer.CreateRole(ctx, "mtls-server", &bao.RoleOptions{
+	_, err = issuer.CreateRole(ctx, "mtls-server", &pki.RoleOptions{
 		AllowedDomains:  []string{"services.example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -87,7 +88,7 @@ func main() {
 
 	// Step 3: Create client role
 	fmt.Println("\n=== Step 3: Creating Client Role ===")
-	_, err = issuer.CreateRole(ctx, "mtls-client", &bao.RoleOptions{
+	_, err = issuer.CreateRole(ctx, "mtls-client", &pki.RoleOptions{
 		AllowedDomains:  []string{"clients.example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -103,7 +104,7 @@ func main() {
 	// Step 4: Issue server certificate
 	fmt.Println("\n=== Step 4: Issuing Server Certificate ===")
 	serverCert, err := client.GenerateRSACertificate(ctx, "mtls-server",
-		&bao.GenerateCertificateOptions{
+		&pki.GenerateCertificateOptions{
 			CommonName: "api.services.example.com",
 			TTL:        "720h",
 		})
@@ -115,7 +116,7 @@ func main() {
 	// Step 5: Issue client certificate
 	fmt.Println("\n=== Step 5: Issuing Client Certificate ===")
 	clientCert, err := client.GenerateRSACertificate(ctx, "mtls-client",
-		&bao.GenerateCertificateOptions{
+		&pki.GenerateCertificateOptions{
 			CommonName: "service-a.clients.example.com",
 			TTL:        "720h",
 		})

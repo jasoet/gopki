@@ -19,7 +19,8 @@
 // - OpenBao server running
 //
 // Usage:
-//   go run main.go
+//
+//	go run main.go
 package main
 
 import (
@@ -29,11 +30,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 )
 
 func main() {
-	client, err := bao.NewClient(&bao.Config{
+	client, err := pki.NewClient(&pki.Config{
 		Address: getEnv("BAO_ADDR", "http://127.0.0.1:8200"),
 		Token:   getEnv("BAO_TOKEN", ""),
 	})
@@ -46,7 +47,7 @@ func main() {
 
 	// Setup: Create CA and role
 	fmt.Println("Setup: Creating CA and role...")
-	_, err = client.GenerateRootCA(ctx, &bao.CAOptions{
+	_, err = client.GenerateRootCA(ctx, &pki.CAOptions{
 		Type:       "internal",
 		CommonName: "Rotation Test CA",
 		KeyType:    "rsa",
@@ -57,7 +58,7 @@ func main() {
 		log.Fatalf("Failed to generate root CA: %v", err)
 	}
 
-	err = client.CreateRole(ctx, "rotation-role", &bao.RoleOptions{
+	err = client.CreateRole(ctx, "rotation-role", &pki.RoleOptions{
 		AllowedDomains:  []string{"example.com"},
 		AllowSubdomains: true,
 		TTL:             "720h",
@@ -73,7 +74,7 @@ func main() {
 	fmt.Println("\n=== Step 1: Generate Initial Key ===")
 	fmt.Println("Generating first key...")
 
-	key1, err := client.GenerateRSAKey(ctx, &bao.GenerateKeyOptions{
+	key1, err := client.GenerateRSAKey(ctx, &pki.GenerateKeyOptions{
 		KeyName: "rotation-key-1",
 		KeyBits: 2048,
 	})
@@ -88,7 +89,7 @@ func main() {
 	// Step 2: Issue certificate with first key
 	fmt.Println("\n=== Step 2: Issue Certificate with First Key ===")
 
-	cert1, err := key1.IssueCertificate(ctx, "rotation-role", &bao.GenerateCertificateOptions{
+	cert1, err := key1.IssueCertificate(ctx, "rotation-role", &pki.GenerateCertificateOptions{
 		CommonName: "app.example.com",
 		TTL:        "720h",
 	})
@@ -110,7 +111,7 @@ func main() {
 	fmt.Println("\n=== Step 3: Key Rotation - Generate New Key ===")
 	fmt.Println("Generating second key (rotation)...")
 
-	key2, err := client.GenerateRSAKey(ctx, &bao.GenerateKeyOptions{
+	key2, err := client.GenerateRSAKey(ctx, &pki.GenerateKeyOptions{
 		KeyName: "rotation-key-2",
 		KeyBits: 2048,
 	})
@@ -125,7 +126,7 @@ func main() {
 	// Step 4: Issue certificate with second key
 	fmt.Println("\n=== Step 4: Issue Certificate with New Key ===")
 
-	cert2, err := key2.IssueCertificate(ctx, "rotation-role", &bao.GenerateCertificateOptions{
+	cert2, err := key2.IssueCertificate(ctx, "rotation-role", &pki.GenerateCertificateOptions{
 		CommonName: "app.example.com",
 		TTL:        "720h",
 	})

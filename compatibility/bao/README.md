@@ -357,7 +357,7 @@ compatibility/bao/
 
 ## Related Documentation
 
-- [Bao Package Documentation](../../bao/README.md) - OpenBao client implementation
+- [Bao Package Documentation](../../bao/pki/README.md) - OpenBao client implementation
 - [OpenBao Documentation](https://openbao.org/docs/) - Official OpenBao docs
 - [GoPKI Main README](../../README.md) - Overall project documentation
 - [Integration Tests](../../bao/cross_module_integration_test.go) - Full integration test examples

@@ -1,11 +1,55 @@
 //go:build integration
 
-package bao
+package pki
 
 import (
 	"context"
 	"testing"
+	"time"
 )
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+// parseDuration parses a duration string that can be in either Go duration format (e.g., "720h")
+// or seconds format (e.g., "2592000s"). Returns the duration in seconds for comparison.
+func parseDuration(s string) (int64, error) {
+	if s == "" {
+		return 0, nil
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, err
+	}
+	return int64(d.Seconds()), nil
+}
+
+// assertTTLEqual checks if two TTL strings represent the same duration,
+// accounting for different formats (hours vs seconds).
+func assertTTLEqual(t *testing.T, name, expected, actual string) {
+	t.Helper()
+
+	if actual == "" {
+		// Empty is acceptable if we're okay with defaults
+		return
+	}
+
+	expectedSec, err := parseDuration(expected)
+	if err != nil {
+		t.Fatalf("Failed to parse expected TTL '%s': %v", expected, err)
+	}
+
+	actualSec, err := parseDuration(actual)
+	if err != nil {
+		t.Fatalf("Failed to parse actual TTL '%s': %v", actual, err)
+	}
+
+	if expectedSec != actualSec {
+		t.Errorf("Expected %s '%s' (%d seconds), got '%s' (%d seconds)",
+			name, expected, expectedSec, actual, actualSec)
+	}
+}
 
 // ============================================================================
 // Integration Tests for Role Operations
@@ -41,13 +85,9 @@ func TestIntegration_RoleCreateAndGet(t *testing.T) {
 			t.Errorf("Expected name 'test-role', got '%s'", roleClient.Name())
 		}
 		roleOpts := roleClient.Options()
-		// Note: OpenBao may not return TTL if default is used
-		if roleOpts.TTL != "" && roleOpts.TTL != "720h" {
-			t.Errorf("Expected TTL '720h' or empty, got '%s'", roleOpts.TTL)
-		}
-		if roleOpts.MaxTTL != "" && roleOpts.MaxTTL != "8760h" {
-			t.Errorf("Expected MaxTTL '8760h' or empty, got '%s'", roleOpts.MaxTTL)
-		}
+		// Note: OpenBao may return TTL in different formats (e.g., "720h" or "2592000s")
+		assertTTLEqual(t, "TTL", "720h", roleOpts.TTL)
+		assertTTLEqual(t, "MaxTTL", "8760h", roleOpts.MaxTTL)
 		if !roleOpts.ServerFlag {
 			t.Error("Expected ServerFlag to be true")
 		}

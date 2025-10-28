@@ -19,7 +19,8 @@
 // - OpenBao server running
 //
 // Usage:
-//   go run main.go
+//
+//	go run main.go
 package main
 
 import (
@@ -29,11 +30,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 )
 
 func main() {
-	client, err := bao.NewClient(&bao.Config{
+	client, err := pki.NewClient(&pki.Config{
 		Address: getEnv("BAO_ADDR", "http://127.0.0.1:8200"),
 		Token:   getEnv("BAO_TOKEN", ""),
 	})
@@ -48,7 +49,7 @@ func main() {
 	fmt.Println("=== Example 1: Export RSA Key ===")
 	fmt.Println("Generating RSA key with export capability...")
 
-	rsaKeyClient, err := client.GenerateRSAKey(ctx, &bao.GenerateKeyOptions{
+	rsaKeyClient, err := client.GenerateRSAKey(ctx, &pki.GenerateKeyOptions{
 		KeyName: "exportable-rsa-key",
 		KeyBits: 2048,
 	})
@@ -73,7 +74,7 @@ func main() {
 	fmt.Println("\n=== Example 2: Export ECDSA Key ===")
 	fmt.Println("Generating ECDSA P-256 key with export capability...")
 
-	ecdsaKeyClient, err := client.GenerateECDSAKey(ctx, &bao.GenerateKeyOptions{
+	ecdsaKeyClient, err := client.GenerateECDSAKey(ctx, &pki.GenerateKeyOptions{
 		KeyName: "exportable-ecdsa-key",
 		KeyBits: 256, // P-256
 	})
@@ -97,7 +98,7 @@ func main() {
 	fmt.Println("\n=== Example 3: Export Ed25519 Key ===")
 	fmt.Println("Generating Ed25519 key with export capability...")
 
-	ed25519KeyClient, err := client.GenerateEd25519Key(ctx, &bao.GenerateKeyOptions{
+	ed25519KeyClient, err := client.GenerateEd25519Key(ctx, &pki.GenerateKeyOptions{
 		KeyName: "exportable-ed25519-key",
 	})
 	if err != nil {

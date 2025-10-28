@@ -13,7 +13,8 @@
 // - Valid authentication token
 //
 // Usage:
-//   BAO_ADDR=http://localhost:8200 BAO_TOKEN=your-token go run main.go
+//
+//	BAO_ADDR=http://localhost:8200 BAO_TOKEN=your-token go run main.go
 package main
 
 import (
@@ -23,7 +24,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 )
 
 func main() {
@@ -38,7 +39,7 @@ func main() {
 
 	// Create client connection
 	fmt.Printf("Connecting to OpenBao at %s...\n", address)
-	client, err := bao.NewClient(&bao.Config{
+	client, err := pki.NewClient(&pki.Config{
 		Address: address,
 		Token:   token,
 		Mount:   mount,

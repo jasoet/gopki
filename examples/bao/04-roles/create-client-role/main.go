@@ -18,7 +18,8 @@
 // - OpenBao server running
 //
 // Usage:
-//   go run main.go
+//
+//	go run main.go
 package main
 
 import (
@@ -28,11 +29,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/jasoet/gopki/bao"
+	"github.com/jasoet/gopki/bao/pki"
 )
 
 func main() {
-	client, err := bao.NewClient(&bao.Config{
+	client, err := pki.NewClient(&pki.Config{
 		Address: getEnv("BAO_ADDR", "http://127.0.0.1:8200"),
 		Token:   getEnv("BAO_TOKEN", ""),
 	})
@@ -45,7 +46,7 @@ func main() {
 
 	// Step 1: Create root CA for client authentication
 	fmt.Println("Creating client authentication CA...")
-	caResp, err := client.GenerateRootCA(ctx, &bao.CAOptions{
+	caResp, err := client.GenerateRootCA(ctx, &pki.CAOptions{
 		Type:          "internal",
 		CommonName:    "Client Authentication CA",
 		Organization:  []string{"Example Corp"},
@@ -66,19 +67,19 @@ func main() {
 
 	// Step 2: Create client authentication role
 	fmt.Println("\nCreating client authentication role...")
-	role, err := issuer.CreateRole(ctx, "client-auth", &bao.RoleOptions{
+	role, err := issuer.CreateRole(ctx, "client-auth", &pki.RoleOptions{
 		// Domain restrictions (for client CN validation)
-		AllowedDomains:    []string{"users.example.com", "services.example.com"},
-		AllowSubdomains:   true,
-		AllowBareDomains:  false,
-		AllowLocalhost:    false,
-		AllowIPSANs:       false, // Typically not needed for client certs
+		AllowedDomains:   []string{"users.example.com", "services.example.com"},
+		AllowSubdomains:  true,
+		AllowBareDomains: false,
+		AllowLocalhost:   false,
+		AllowIPSANs:      false, // Typically not needed for client certs
 
 		// Certificate parameters
-		TTL:            "720h",  // 30 days
-		MaxTTL:         "8760h", // 1 year
-		KeyType:        "rsa",
-		KeyBits:        2048,
+		TTL:     "720h",  // 30 days
+		MaxTTL:  "8760h", // 1 year
+		KeyType: "rsa",
+		KeyBits: 2048,
 
 		// Key usage flags for client authentication
 		ServerFlag:          false, // Disable server authentication
@@ -92,9 +93,9 @@ func main() {
 		AllowAnyName:     false,
 
 		// Organization defaults
-		Organization:       []string{"Example Corp"},
+		Organization:     []string{"Example Corp"},
 		OrganizationUnit: []string{"Engineering"},
-		Country:            []string{"US"},
+		Country:          []string{"US"},
 	})
 	if err != nil {
 		log.Fatalf("Failed to create role: %v", err)
@@ -115,7 +116,7 @@ func main() {
 
 	// User certificate
 	userCert, err := client.GenerateRSACertificate(ctx, "client-auth",
-		&bao.GenerateCertificateOptions{
+		&pki.GenerateCertificateOptions{
 			CommonName: "john.doe.users.example.com",
 			TTL:        "720h",
 		})
@@ -127,7 +128,7 @@ func main() {
 
 	// Service certificate
 	serviceCert, err := client.GenerateRSACertificate(ctx, "client-auth",
-		&bao.GenerateCertificateOptions{
+		&pki.GenerateCertificateOptions{
 			CommonName: "api-gateway.services.example.com",
 			TTL:        "720h",
 		})
