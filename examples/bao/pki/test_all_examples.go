@@ -110,7 +110,7 @@ func main() {
 	for i, example := range examples {
 		fmt.Printf("[%2d/%2d] Testing %s/%s...\n", i+1, len(examples), example.Category, example.Name)
 
-		examplePath := filepath.Join("examples", "bao", example.Path)
+		examplePath := filepath.Join("examples", "bao", "pki", example.Path)
 
 		// Run the example with timeout
 		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)

@@ -136,11 +136,10 @@ func main() {
 
 	// Clean up
 	fmt.Println("\nCleaning up...")
-	keyClient, _ := client.GetKey(ctx, keyName)
-	keyClient.Update(ctx, &transit.UpdateKeyOptions{
+	client.UpdateKeyConfig(ctx, keyName, &transit.UpdateKeyOptions{
 		DeletionAllowed: func() *bool { b := true; return &b }(),
 	})
-	keyClient.Delete(ctx)
+	client.DeleteKey(ctx, keyName)
 	fmt.Printf("✓ Key '%s' deleted\n", keyName)
 
 	fmt.Println("\n✓ Batch operations example completed!")

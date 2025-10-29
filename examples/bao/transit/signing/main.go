@@ -166,11 +166,10 @@ func main() {
 	// Clean up
 	fmt.Println("Cleaning up...")
 	for _, name := range []string{rsaKeyName, ecdsaKeyName, ed25519KeyName, hmacKeyName} {
-		keyClient, _ := client.GetKey(ctx, name)
-		keyClient.Update(ctx, &transit.UpdateKeyOptions{
+		client.UpdateKeyConfig(ctx, name, &transit.UpdateKeyOptions{
 			DeletionAllowed: func() *bool { b := true; return &b }(),
 		})
-		keyClient.Delete(ctx)
+		client.DeleteKey(ctx, name)
 	}
 	fmt.Println("✓ All keys deleted")
 
