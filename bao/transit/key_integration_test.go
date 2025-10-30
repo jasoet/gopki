@@ -1,4 +1,4 @@
-// +build integration
+//go:build integration
 
 package transit_test
 

@@ -28,7 +28,7 @@ var examples = []ExampleTest{
 }
 
 func main() {
-	fmt.Println("=== OpenBao Transit Examples Integration Test ===\n")
+	fmt.Println("=== OpenBao Transit Examples Integration Test ===")
 
 	// Start OpenBao container
 	fmt.Println("Starting OpenBao testcontainer...")
@@ -60,7 +60,7 @@ func main() {
 	if err != nil && err.Error() != "existing mount at transit/" {
 		log.Printf("Warning: Failed to enable Transit (might already be enabled): %v", err)
 	}
-	fmt.Println("✓ Transit secrets engine enabled\n")
+	fmt.Println("✓ Transit secrets engine enabled")
 
 	// Set environment variables for examples
 	os.Setenv("OPENBAO_ADDR", container.Address)

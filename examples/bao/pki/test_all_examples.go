@@ -61,7 +61,7 @@ var examples = []ExampleTest{
 }
 
 func main() {
-	fmt.Println("=== OpenBao Examples Integration Test ===\n")
+	fmt.Println("=== OpenBao Examples Integration Test ===")
 
 	// Start OpenBao container
 	fmt.Println("Starting OpenBao testcontainer...")
@@ -96,7 +96,7 @@ func main() {
 	if err != nil && err.Error() != "existing mount at pki/" {
 		log.Printf("Warning: Failed to enable PKI (might already be enabled): %v", err)
 	}
-	fmt.Println("✓ PKI secrets engine enabled\n")
+	fmt.Println("✓ PKI secrets engine enabled")
 
 	// Set environment variables for examples
 	os.Setenv("BAO_ADDR", container.Address)
