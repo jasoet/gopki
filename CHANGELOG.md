@@ -1,3 +1,15 @@
+## [1.20.0](https://github.com/jasoet/gopki/compare/v1.19.1...v1.20.0) (2025-10-30)
+
+
+### ✨ Features
+
+* Complete OpenBao Transit Client Library  ([3fc16d6](https://github.com/jasoet/gopki/commit/3fc16d6353b5f3c0876e63666c30efbfa75afd1b)), closes [PKCS#1v15](https://github.com/jasoet/PKCS/issues/1v15)
+
+
+### ✅ Tests
+
+* remove TODO comments and skipped tests from compatibility suite ([df1f7f9](https://github.com/jasoet/gopki/commit/df1f7f99f45f075f9057d7f8e2efbfca92a7ce4a))
+
 ## [1.19.1](https://github.com/jasoet/gopki/compare/v1.19.0...v1.19.1) (2025-10-28)
 
 
