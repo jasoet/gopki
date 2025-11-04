@@ -143,6 +143,11 @@ func (cc *CertificateClient[K]) HasKeyPair() bool {
 	return v.IsValid() && !v.IsZero()
 }
 
+// Note: Manager() method cannot be provided due to generic type constraints.
+// Instead, use the SaveToFiles(), ExportPEM(), and other convenience methods
+// directly on CertificateClient, or get the KeyPair() and create a Manager manually
+// with the specific types.
+
 // Revoke revokes this certificate.
 //
 // Example:

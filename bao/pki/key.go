@@ -107,6 +107,11 @@ func (kc *KeyClient[K]) HasKeyPair() bool {
 	return v.IsValid() && !v.IsZero()
 }
 
+// Note: Manager() method cannot be provided due to generic type constraints.
+// Instead, use the SaveKeyPairToFiles(), ToSSH(), and ToDER() convenience methods
+// directly on KeyClient, or get the KeyPair() and create a Manager manually with
+// the specific types.
+
 // Delete deletes this key from OpenBao.
 //
 // Example:

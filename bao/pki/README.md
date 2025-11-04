@@ -769,6 +769,210 @@ fmt.Printf("Key is used by %d issuer(s)\n", len(issuers))
 
 ---
 
+## GoPKI Integration
+
+The `bao/pki` module is fully integrated with gopki's ecosystem, providing seamless compatibility with all gopki modules.
+
+### Manager Pattern Integration
+
+Access gopki's powerful Manager pattern for advanced key operations:
+
+```go
+// Generate key with Manager support
+keyClient, _ := client.GenerateRSAKey(ctx, &bao.GenerateKeyOptions{
+    KeyName: "my-key",
+    KeyBits: 2048,
+})
+
+// Get Manager for advanced operations
+manager, _ := keyClient.Manager()
+
+// Save with secure permissions (0600 for private, 0644 for public)
+manager.SaveToPEM("private.pem", "public.pem")
+
+// Convert to SSH format
+sshPriv, sshPub, _ := manager.ToSSH("user@host", "")
+
+// Convert to DER format
+privateDER, publicDER, _ := manager.ToDER()
+```
+
+### Import from gopki Manager
+
+Seamlessly import keys managed by gopki:
+
+```go
+// Generate with gopki's Manager
+import (
+    "github.com/jasoet/gopki/keypair"
+    "github.com/jasoet/gopki/keypair/algo"
+)
+
+manager, _ := keypair.Generate[algo.KeySize2048, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+
+// Import into OpenBao
+keyClient, err := client.ImportRSAKeyFromManager(ctx, manager, &bao.ImportKeyOptions{
+    KeyName: "gopki-managed-key",
+})
+```
+
+### Format Conversion
+
+Easy conversion between different formats:
+
+```go
+certClient, _ := client.GenerateRSACertificate(ctx, "web-server", &bao.GenerateCertificateOptions{
+    CommonName: "app.example.com",
+    TTL:        "720h",
+})
+
+// Export as PEM
+certPEM, keyPEM, _ := certClient.ExportPEM()
+
+// Save to files with secure permissions
+certClient.SaveToFiles("cert.pem", "key.pem")
+
+// Save certificate chain
+certClient.SaveCertificateChain("cert-chain.pem")
+
+// Convert certificate to DER
+derBytes, _ := certClient.ToDER()
+```
+
+### Signing Integration
+
+Direct integration with gopki's signing module:
+
+```go
+certClient, _ := client.GenerateRSACertificate(ctx, "web-server", &bao.GenerateCertificateOptions{
+    CommonName: "app.example.com",
+})
+
+// Sign document
+document := []byte("Important contract")
+signature, err := certClient.Sign(document, signing.DefaultSignOptions())
+
+// Create detached signature
+detachedSig, _ := certClient.SignDetached(document, signing.DefaultSignOptions())
+
+// Verify signature
+err = certClient.Verify(document, signature, signing.DefaultVerifyOptions())
+```
+
+### Encryption Integration
+
+Direct integration with gopki's encryption module:
+
+```go
+// Encrypt for a certificate's public key
+certClient, _ := client.GetRSACertificate(ctx, "serial-number")
+encrypted, _ := certClient.Encrypt([]byte("Secret message"), encryption.DefaultEncryptOptions())
+
+// Decrypt with private key (requires key pair available)
+certClient, _ := client.GenerateRSACertificate(ctx, "web-server", &bao.GenerateCertificateOptions{...})
+decrypted, _ := certClient.Decrypt(encrypted, encryption.DefaultDecryptOptions())
+```
+
+### CSR Creation
+
+Create CSRs for certificate renewal:
+
+```go
+certClient, _ := client.GenerateRSACertificate(ctx, "web-server", &bao.GenerateCertificateOptions{...})
+
+// Create CSR using existing certificate info
+csrReq := cert.CSRRequest{
+    Subject:  certClient.Certificate().Certificate.Subject,
+    DNSNames: []string{"app.example.com", "www.app.example.com"},
+}
+csr, err := certClient.CreateCSR(csrReq)
+
+// Sign the CSR with OpenBao
+newCert, _ := client.SignCSR(ctx, "web-server", csr, &bao.SignCertificateOptions{
+    TTL: "8760h",
+})
+```
+
+### Complete Workflow Example
+
+Combining OpenBao PKI with gopki modules:
+
+```go
+import (
+    "github.com/jasoet/gopki/bao/pki"
+    "github.com/jasoet/gopki/signing"
+    "github.com/jasoet/gopki/encryption"
+)
+
+// 1. Generate certificate with OpenBao
+certClient, _ := client.GenerateRSACertificate(ctx, "web-server", &pki.GenerateCertificateOptions{
+    CommonName: "app.example.com",
+    AltNames:   []string{"www.app.example.com"},
+    TTL:        "720h",
+})
+
+// 2. Get Manager for key operations
+manager, _ := certClient.Manager()
+
+// 3. Save in multiple formats
+manager.SaveToPEM("key.pem", "key.pub")
+sshPriv, sshPub, _ := manager.ToSSH("user@host", "")
+os.WriteFile("id_rsa", sshPriv, 0600)
+os.WriteFile("id_rsa.pub", sshPub, 0644)
+
+// 4. Save certificate
+certClient.SaveToFiles("cert.pem", "cert-key.pem")
+certClient.SaveCertificateChain("cert-chain.pem")
+
+// 5. Use for signing
+document := []byte("Contract v1.0")
+signature, _ := certClient.Sign(document, signing.DefaultSignOptions())
+
+// 6. Use for encryption
+secret := []byte("API Key: secret123")
+encrypted, _ := certClient.Encrypt(secret, encryption.DefaultEncryptOptions())
+
+// 7. Decrypt
+decrypted, _ := certClient.Decrypt(encrypted, encryption.DefaultDecryptOptions())
+
+fmt.Printf("Decrypted: %s\n", decrypted)
+```
+
+### Key Operations
+
+Advanced key management with gopki integration:
+
+```go
+keyClient, _ := client.GenerateRSAKey(ctx, &pki.GenerateKeyOptions{
+    KeyName: "advanced-key",
+    KeyBits: 4096,
+})
+
+// Get Manager
+manager, _ := keyClient.Manager()
+
+// Save in multiple formats simultaneously
+manager.SaveToPEM("private.pem", "public.pem")
+privateDER, publicDER, _ := manager.ToDER()
+sshPriv, sshPub, _ := manager.ToSSH("ops@company.com", "")
+
+// Or use convenience methods directly on KeyClient
+keyClient.SaveKeyPairToFiles("key-private.pem", "key-public.pem")
+sshPriv, sshPub, _ = keyClient.ToSSH("user@host", "")
+privateDER, publicDER, _ = keyClient.ToDER()
+```
+
+### Benefits of Integration
+
+1. **Consistent API**: Use familiar gopki patterns with OpenBao
+2. **No Boilerplate**: Direct method access without manual conversions
+3. **Type Safety**: Compile-time guarantees across all operations
+4. **Secure Defaults**: Automatic secure file permissions (0600 for keys)
+5. **Format Flexibility**: Easy conversion between PEM, DER, SSH, PKCS#12
+6. **Full Feature Access**: All gopki signing and encryption capabilities
+
+---
+
 ## Testing
 
 ### Unit Tests
