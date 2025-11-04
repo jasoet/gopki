@@ -1,3 +1,10 @@
+## [1.22.0](https://github.com/jasoet/gopki/compare/v1.21.0...v1.22.0) (2025-11-04)
+
+
+### ✨ Features
+
+* **bao/pki:** add gopki integration helpers and format conversion utilities ([d46c35a](https://github.com/jasoet/gopki/commit/d46c35ae5fe24d1f997f1f6c79bc40d9dd3d4542))
+
 ## [1.21.0](https://github.com/jasoet/gopki/compare/v1.20.0...v1.21.0) (2025-11-04)
 
 
