@@ -2,6 +2,8 @@
 
 A comprehensive Go client library for the [OpenBao](https://openbao.org/) Transit Secrets Engine, providing encryption-as-a-service (EaaS), signing, and key management capabilities.
 
+**✨ NEW: Seamless gopki Integration** - Import keypairs from gopki directly without manual format conversion!
+
 ## Features
 
 ### ✅ Core Infrastructure
@@ -98,6 +100,77 @@ func main() {
     decoded, _ := base64.StdEncoding.DecodeString(decrypted.Plaintext)
     fmt.Printf("Decrypted: %s\n", string(decoded))
 }
+```
+
+### 🚀 gopki Integration (Easy Key Import)
+
+Import keypairs from gopki **without manual PKCS#8 conversion**:
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+
+    "github.com/jasoet/gopki/bao/transit"
+    "github.com/jasoet/gopki/keypair/algo"
+)
+
+func main() {
+    client, _ := transit.NewClient(&transit.Config{
+        Address: "https://openbao.example.com",
+        Token:   "your-token",
+    })
+    defer client.Close()
+
+    ctx := context.Background()
+
+    // Generate RSA keypair using gopki
+    rsaKeyPair, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
+
+    // Import directly - NO manual conversion needed! 🎉
+    err := client.ImportRSAKeyPair(ctx, "my-signing-key", rsaKeyPair, &transit.ImportKeyOptions{
+        Exportable: true, // Key type auto-detected from keypair
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Use immediately for signing
+    signature, _ := client.Sign(ctx, "my-signing-key", []byte("message"), nil)
+    log.Printf("Signature: %s", signature.Signature)
+}
+```
+
+**Supported gopki key types:**
+- `ImportRSAKeyPair()` - Auto-detects 2048/3072/4096-bit keys
+- `ImportECDSAKeyPair()` - Auto-detects P-256/P-384/P-521 curves
+- `ImportEd25519KeyPair()` - Auto-detects Ed25519 keys
+- `ImportAESKey()` - Auto-detects AES-128/256 keys
+
+**Before gopki integration:**
+```go
+// Manual PKCS#8 conversion required
+keyBytes, err := x509.MarshalPKCS8PrivateKey(rsaKey)
+if err != nil {
+    log.Fatal(err)
+}
+defer secureZero(keyBytes)
+
+err = client.ImportKey(ctx, "my-key", keyBytes, &transit.ImportKeyOptions{
+    Type:         transit.KeyTypeRSA2048, // Manual type specification
+    HashFunction: "SHA256",
+    Exportable:   true,
+})
+```
+
+**After gopki integration:**
+```go
+// Direct import - type auto-detected!
+err := client.ImportRSAKeyPair(ctx, "my-key", rsaKeyPair, &transit.ImportKeyOptions{
+    Exportable: true, // That's it! 🎉
+})
 ```
 
 ### Digital Signatures
