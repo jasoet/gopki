@@ -46,7 +46,8 @@ func main() {
 
 	// Use the imported key for signing
 	message := []byte("Hello, World!")
-	signature, err := client.Sign(ctx, "my-rsa-signing-key", message, &transit.SignOptions{
+	messageB64 := base64.StdEncoding.EncodeToString(message)
+	signature, err := client.Sign(ctx, "my-rsa-signing-key", messageB64, &transit.SignOptions{
 		HashAlgorithm: "sha2-256",
 	})
 	if err != nil {
@@ -56,7 +57,7 @@ func main() {
 	fmt.Printf("RSA Signature: %s\n", signature.Signature[:50]+"...")
 
 	// Verify signature
-	verified, err := client.VerifySignature(ctx, "my-rsa-signing-key", message, signature.Signature, nil)
+	verified, err := client.Verify(ctx, "my-rsa-signing-key", messageB64, signature.Signature, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -82,8 +83,8 @@ func main() {
 	}
 
 	// Use for signing
-	ecdsaSignature, err := client.Sign(ctx, "my-ecdsa-signing-key", message, &transit.SignOptions{
-		HashAlgorithm:  "sha2-256",
+	ecdsaSignature, err := client.Sign(ctx, "my-ecdsa-signing-key", messageB64, &transit.SignOptions{
+		HashAlgorithm:      "sha2-256",
 		SignatureAlgorithm: "ecdsa",
 	})
 	if err != nil {
@@ -112,7 +113,7 @@ func main() {
 	}
 
 	// Use for signing
-	ed25519Signature, err := client.Sign(ctx, "my-ed25519-signing-key", message, nil)
+	ed25519Signature, err := client.Sign(ctx, "my-ed25519-signing-key", messageB64, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -148,11 +149,11 @@ func main() {
 	// ============================================
 	// Comparison: Before vs After
 	// ============================================
-	fmt.Println("\n=== Before vs After Comparison ===")
-
-	fmt.Println("\nBEFORE (Manual conversion):")
-	fmt.Println(`
-  rsaKeyPair, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
+	fmt.Println()
+	fmt.Println("=== Before vs After Comparison ===")
+	fmt.Println()
+	fmt.Println("BEFORE (Manual conversion):")
+	fmt.Print(`  rsaKeyPair, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
 
   // Manual conversion required!
   keyBytes, err := x509.MarshalPKCS8PrivateKey(rsaKeyPair.PrivateKey)
@@ -167,16 +168,18 @@ func main() {
       Exportable:   true,
   })
 `)
+	fmt.Println()
 
 	fmt.Println("AFTER (With gopki integration):")
-	fmt.Println(`
-  rsaKeyPair, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
+	fmt.Print(`  rsaKeyPair, _ := algo.GenerateRSAKeyPair(algo.KeySize2048)
 
   // Direct import - no conversion needed!
   err = client.ImportRSAKeyPair(ctx, "my-key", rsaKeyPair, &transit.ImportKeyOptions{
       Exportable: true, // Type auto-detected from key!
   })
 `)
+	fmt.Println()
 
-	fmt.Println("\n✅ All examples completed successfully!")
+	fmt.Println()
+	fmt.Println("✅ All examples completed successfully!")
 }

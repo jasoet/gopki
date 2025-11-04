@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
+	"encoding/base64"
 	"fmt"
 	"log"
 
@@ -28,7 +29,8 @@ func main() {
 
 	ctx := context.Background()
 
-	fmt.Println("=== Manager Support Examples ===\n")
+	fmt.Println("=== Manager Support Examples ===")
+	fmt.Println()
 
 	// ============================================
 	// Example 1: Generate with Manager, Import to Transit
@@ -55,7 +57,8 @@ func main() {
 
 	// Use in Transit
 	message := []byte("Important document")
-	signature, err := client.Sign(ctx, "managed-rsa-key", message, &transit.SignOptions{
+	messageB64 := base64.StdEncoding.EncodeToString(message)
+	signature, err := client.Sign(ctx, "managed-rsa-key", messageB64, &transit.SignOptions{
 		HashAlgorithm: "sha2-256",
 	})
 	if err != nil {
@@ -97,10 +100,11 @@ func main() {
 
 	// Compare original and exported
 	if rsaManager.ComparePrivateKeys(exportedManager) {
-		fmt.Println("✅ Round-trip successful - keys match!\n")
+		fmt.Println("✅ Round-trip successful - keys match!")
 	} else {
-		fmt.Println("⚠️  Keys don't match after round-trip\n")
+		fmt.Println("⚠️  Keys don't match after round-trip")
 	}
+	fmt.Println()
 
 	// ============================================
 	// Example 3: ECDSA Manager Support
@@ -125,7 +129,7 @@ func main() {
 	}
 
 	// Sign
-	ecdsaSignature, err := client.Sign(ctx, "managed-ecdsa-key", message, &transit.SignOptions{
+	ecdsaSignature, err := client.Sign(ctx, "managed-ecdsa-key", messageB64, &transit.SignOptions{
 		HashAlgorithm:      "sha2-256",
 		SignatureAlgorithm: "ecdsa",
 	})
@@ -169,7 +173,7 @@ func main() {
 	}
 
 	// Sign
-	ed25519Signature, err := client.Sign(ctx, "managed-ed25519-key", message, nil)
+	ed25519Signature, err := client.Sign(ctx, "managed-ed25519-key", messageB64, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
