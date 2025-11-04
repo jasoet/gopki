@@ -148,6 +148,7 @@ func main() {
 - `ImportECDSAKeyPair()` - Auto-detects P-256/P-384/P-521 curves
 - `ImportEd25519KeyPair()` - Auto-detects Ed25519 keys
 - `ImportAESKey()` - Auto-detects AES-128/256 keys
+- `ImportFromManager()` - Polymorphic import from any Manager type
 
 **Before gopki integration:**
 ```go
@@ -172,6 +173,44 @@ err := client.ImportRSAKeyPair(ctx, "my-key", rsaKeyPair, &transit.ImportKeyOpti
     Exportable: true, // That's it! 🎉
 })
 ```
+
+### 🎯 Manager Support (Advanced)
+
+Work with gopki's high-level `Manager` API for maximum flexibility:
+
+```go
+// Generate key using Manager API
+manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+
+// Import from Manager (auto-detects key type!)
+err = client.ImportFromManager(ctx, "my-key", manager, &transit.ImportKeyOptions{
+    Exportable: true,
+})
+
+// Use in Transit
+signature, _ := client.Sign(ctx, "my-key", []byte("data"), nil)
+
+// Export back to Manager
+exportedManager, err := client.ExportToRSAManager(ctx, "my-key", 1)
+
+// Use Manager's conversion features
+privatePEM, publicPEM, _ := exportedManager.ToPEM()
+err = exportedManager.SaveToPEM("private.pem", "public.pem")
+
+// Validate the exported key
+err = exportedManager.Validate()
+```
+
+**Manager export functions:**
+- `ExportToRSAManager()` - Export and wrap in RSA Manager
+- `ExportToECDSAManager()` - Export and wrap in ECDSA Manager
+- `ExportToEd25519Manager()` - Export and wrap in Ed25519 Manager
+
+**Manager benefits:**
+- ✅ PEM/DER/SSH format conversion
+- ✅ Key validation and comparison
+- ✅ Metadata extraction (algorithm, key size, curve)
+- ✅ Secure file I/O with proper permissions
 
 ### Digital Signatures
 

@@ -1,8 +1,14 @@
 package transit
 
 import (
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
 	"testing"
 
+	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
 )
 
@@ -194,5 +200,239 @@ func TestExportKeyType_GopkiConstants(t *testing.T) {
 				t.Errorf("KeyType = %v, want %v", tt.keyType, tt.expected)
 			}
 		})
+	}
+}
+
+// TestParsePrivateKeyFromBase64_RSA tests parsing RSA keys from base64
+func TestParsePrivateKeyFromBase64_RSA(t *testing.T) {
+	// Generate a test RSA key
+	rsaKeyPair, err := algo.GenerateRSAKeyPair(algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA key: %v", err)
+	}
+
+	// Convert to PKCS#8 DER
+	derBytes, err := x509.MarshalPKCS8PrivateKey(rsaKeyPair.PrivateKey)
+	if err != nil {
+		t.Fatalf("Failed to marshal RSA key: %v", err)
+	}
+
+	// Encode to base64 (simulating Transit export format)
+	base64Data := base64.StdEncoding.EncodeToString(derBytes)
+
+	// Parse back
+	parsedKey, err := parsePrivateKeyFromBase64(base64Data)
+	if err != nil {
+		t.Fatalf("Failed to parse private key: %v", err)
+	}
+
+	// Verify it's an RSA key
+	rsaKey, ok := parsedKey.(*rsa.PrivateKey)
+	if !ok {
+		t.Fatalf("Expected *rsa.PrivateKey, got %T", parsedKey)
+	}
+
+	// Verify key properties
+	if rsaKey.N.Cmp(rsaKeyPair.PrivateKey.N) != 0 {
+		t.Error("Parsed RSA key N doesn't match original")
+	}
+}
+
+// TestParsePrivateKeyFromBase64_ECDSA tests parsing ECDSA keys from base64
+func TestParsePrivateKeyFromBase64_ECDSA(t *testing.T) {
+	// Generate a test ECDSA key
+	ecdsaKeyPair, err := algo.GenerateECDSAKeyPair(algo.P256)
+	if err != nil {
+		t.Fatalf("Failed to generate ECDSA key: %v", err)
+	}
+
+	// Convert to PKCS#8 DER
+	derBytes, err := x509.MarshalPKCS8PrivateKey(ecdsaKeyPair.PrivateKey)
+	if err != nil {
+		t.Fatalf("Failed to marshal ECDSA key: %v", err)
+	}
+
+	// Encode to base64
+	base64Data := base64.StdEncoding.EncodeToString(derBytes)
+
+	// Parse back
+	parsedKey, err := parsePrivateKeyFromBase64(base64Data)
+	if err != nil {
+		t.Fatalf("Failed to parse private key: %v", err)
+	}
+
+	// Verify it's an ECDSA key
+	ecdsaKey, ok := parsedKey.(*ecdsa.PrivateKey)
+	if !ok {
+		t.Fatalf("Expected *ecdsa.PrivateKey, got %T", parsedKey)
+	}
+
+	// Verify key properties
+	if ecdsaKey.D.Cmp(ecdsaKeyPair.PrivateKey.D) != 0 {
+		t.Error("Parsed ECDSA key D doesn't match original")
+	}
+}
+
+// TestParsePrivateKeyFromBase64_Ed25519 tests parsing Ed25519 keys from base64
+func TestParsePrivateKeyFromBase64_Ed25519(t *testing.T) {
+	// Generate a test Ed25519 key
+	ed25519KeyPair, err := algo.GenerateEd25519KeyPair()
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key: %v", err)
+	}
+
+	// Convert to PKCS#8 DER
+	derBytes, err := x509.MarshalPKCS8PrivateKey(ed25519KeyPair.PrivateKey)
+	if err != nil {
+		t.Fatalf("Failed to marshal Ed25519 key: %v", err)
+	}
+
+	// Encode to base64
+	base64Data := base64.StdEncoding.EncodeToString(derBytes)
+
+	// Parse back
+	parsedKey, err := parsePrivateKeyFromBase64(base64Data)
+	if err != nil {
+		t.Fatalf("Failed to parse private key: %v", err)
+	}
+
+	// Verify it's an Ed25519 key
+	ed25519Key, ok := parsedKey.(ed25519.PrivateKey)
+	if !ok {
+		t.Fatalf("Expected ed25519.PrivateKey, got %T", parsedKey)
+	}
+
+	// Verify key properties
+	if !ed25519Key.Equal(ed25519KeyPair.PrivateKey) {
+		t.Error("Parsed Ed25519 key doesn't match original")
+	}
+}
+
+// TestParsePrivateKeyFromBase64_InvalidBase64 tests error handling for invalid base64
+func TestParsePrivateKeyFromBase64_InvalidBase64(t *testing.T) {
+	_, err := parsePrivateKeyFromBase64("invalid-base64!")
+	if err == nil {
+		t.Error("Expected error for invalid base64, got nil")
+	}
+}
+
+// TestParsePrivateKeyFromBase64_InvalidPKCS8 tests error handling for invalid PKCS#8
+func TestParsePrivateKeyFromBase64_InvalidPKCS8(t *testing.T) {
+	// Valid base64 but invalid PKCS#8 data
+	invalidData := base64.StdEncoding.EncodeToString([]byte("not-a-key"))
+	_, err := parsePrivateKeyFromBase64(invalidData)
+	if err == nil {
+		t.Error("Expected error for invalid PKCS#8 data, got nil")
+	}
+}
+
+// TestImportFromManager_RSA tests importing from RSA Manager
+func TestImportFromManager_RSA(t *testing.T) {
+	// Generate RSA manager
+	manager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA manager: %v", err)
+	}
+
+	// Verify manager is valid
+	if !manager.IsValid() {
+		t.Error("Generated manager is not valid")
+	}
+
+	// Test that we can extract the keypair
+	kp := manager.KeyPair()
+	if kp == nil {
+		t.Error("Failed to extract keypair from manager")
+	}
+
+	if kp.PrivateKey == nil {
+		t.Error("Manager keypair has nil private key")
+	}
+}
+
+// TestImportFromManager_ECDSA tests importing from ECDSA Manager
+func TestImportFromManager_ECDSA(t *testing.T) {
+	// Generate ECDSA manager
+	manager, err := keypair.Generate[algo.ECDSACurve, *algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey](algo.P256)
+	if err != nil {
+		t.Fatalf("Failed to generate ECDSA manager: %v", err)
+	}
+
+	// Verify manager is valid
+	if !manager.IsValid() {
+		t.Error("Generated manager is not valid")
+	}
+
+	// Test that we can extract the keypair
+	kp := manager.KeyPair()
+	if kp == nil {
+		t.Error("Failed to extract keypair from manager")
+	}
+}
+
+// TestImportFromManager_Ed25519 tests importing from Ed25519 Manager
+func TestImportFromManager_Ed25519(t *testing.T) {
+	// Generate Ed25519 manager
+	manager, err := keypair.Generate[algo.Ed25519Config, *algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey]("")
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 manager: %v", err)
+	}
+
+	// Verify manager is valid
+	if !manager.IsValid() {
+		t.Error("Generated manager is not valid")
+	}
+
+	// Test that we can extract the keypair
+	kp := manager.KeyPair()
+	if kp == nil {
+		t.Error("Failed to extract keypair from manager")
+	}
+}
+
+// TestManagerRoundTrip tests creating a manager, exporting, and importing back
+func TestManagerRoundTrip(t *testing.T) {
+	// Generate RSA manager
+	originalManager, err := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA manager: %v", err)
+	}
+
+	// Get the original keypair
+	originalKP := originalManager.KeyPair()
+
+	// Convert to DER (simulating export/import cycle)
+	derBytes, err := x509.MarshalPKCS8PrivateKey(originalKP.PrivateKey)
+	if err != nil {
+		t.Fatalf("Failed to marshal private key: %v", err)
+	}
+
+	// Parse back
+	parsedKey, err := x509.ParsePKCS8PrivateKey(derBytes)
+	if err != nil {
+		t.Fatalf("Failed to parse private key: %v", err)
+	}
+
+	rsaKey, ok := parsedKey.(*rsa.PrivateKey)
+	if !ok {
+		t.Fatalf("Expected *rsa.PrivateKey, got %T", parsedKey)
+	}
+
+	// Create new keypair
+	newKP := &algo.RSAKeyPair{
+		PrivateKey: rsaKey,
+		PublicKey:  &rsaKey.PublicKey,
+	}
+
+	// Create new manager
+	newManager := keypair.NewManager(newKP, newKP.PrivateKey, newKP.PublicKey)
+
+	// Verify keys are equivalent
+	if !originalManager.ComparePrivateKeys(newManager) {
+		t.Error("Private keys don't match after round trip")
+	}
+
+	if !originalManager.ComparePublicKeys(newManager) {
+		t.Error("Public keys don't match after round trip")
 	}
 }

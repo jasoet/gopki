@@ -7,6 +7,8 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
 	"fmt"
 
 	"github.com/jasoet/gopki/keypair"
@@ -286,10 +288,113 @@ func (c *Client) ExportToEd25519KeyPair(ctx context.Context, name string, versio
 	}, nil
 }
 
-// parsePrivateKeyFromBase64 is a helper to parse base64-encoded PKCS#8 private keys
+// ImportFromManager imports a keypair from a gopki Manager into Transit.
+// This helper automatically detects the key type from the Manager and imports it.
+//
+// Supports all Manager types:
+//   - Manager[*algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey]
+//   - Manager[*algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey]
+//   - Manager[*algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey]
+//
+// Example:
+//
+//	manager, _ := keypair.Generate[algo.KeySize, *algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey](algo.KeySize2048)
+//	err := client.ImportFromManager(ctx, "my-key", manager, &transit.ImportKeyOptions{
+//	    Exportable: true,
+//	})
+func (c *Client) ImportFromManager(ctx context.Context, name string, manager interface{}, opts *ImportKeyOptions) error {
+	// Try to extract the keypair from the manager and import based on type
+	switch m := manager.(type) {
+	case *keypair.Manager[*algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey]:
+		return c.ImportRSAKeyPair(ctx, name, m.KeyPair(), opts)
+	case *keypair.Manager[*algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey]:
+		return c.ImportECDSAKeyPair(ctx, name, m.KeyPair(), opts)
+	case *keypair.Manager[*algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey]:
+		return c.ImportEd25519KeyPair(ctx, name, m.KeyPair(), opts)
+	default:
+		return fmt.Errorf("unsupported manager type: %T", manager)
+	}
+}
+
+// ExportToRSAManager exports a Transit RSA key and wraps it in a gopki Manager.
+// The key must have been created with exportable=true.
+//
+// Example:
+//
+//	manager, err := client.ExportToRSAManager(ctx, "my-rsa-key", 1)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	// Use manager for PEM/DER/SSH conversion, validation, etc.
+func (c *Client) ExportToRSAManager(ctx context.Context, name string, version int) (*keypair.Manager[*algo.RSAKeyPair, *rsa.PrivateKey, *rsa.PublicKey], error) {
+	rsaKeyPair, err := c.ExportToRSAKeyPair(ctx, name, version)
+	if err != nil {
+		return nil, err
+	}
+
+	return keypair.NewManager(rsaKeyPair, rsaKeyPair.PrivateKey, rsaKeyPair.PublicKey), nil
+}
+
+// ExportToECDSAManager exports a Transit ECDSA key and wraps it in a gopki Manager.
+// The key must have been created with exportable=true.
+//
+// Example:
+//
+//	manager, err := client.ExportToECDSAManager(ctx, "my-ecdsa-key", 1)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+func (c *Client) ExportToECDSAManager(ctx context.Context, name string, version int) (*keypair.Manager[*algo.ECDSAKeyPair, *ecdsa.PrivateKey, *ecdsa.PublicKey], error) {
+	ecdsaKeyPair, err := c.ExportToECDSAKeyPair(ctx, name, version)
+	if err != nil {
+		return nil, err
+	}
+
+	return keypair.NewManager(ecdsaKeyPair, ecdsaKeyPair.PrivateKey, ecdsaKeyPair.PublicKey), nil
+}
+
+// ExportToEd25519Manager exports a Transit Ed25519 key and wraps it in a gopki Manager.
+// The key must have been created with exportable=true.
+//
+// Example:
+//
+//	manager, err := client.ExportToEd25519Manager(ctx, "my-ed25519-key", 1)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+func (c *Client) ExportToEd25519Manager(ctx context.Context, name string, version int) (*keypair.Manager[*algo.Ed25519KeyPair, ed25519.PrivateKey, ed25519.PublicKey], error) {
+	ed25519KeyPair, err := c.ExportToEd25519KeyPair(ctx, name, version)
+	if err != nil {
+		return nil, err
+	}
+
+	return keypair.NewManager(ed25519KeyPair, ed25519KeyPair.PrivateKey, ed25519KeyPair.PublicKey), nil
+}
+
+// parsePrivateKeyFromBase64 parses base64-encoded PKCS#8 private keys from Transit.
+// Transit exports keys as base64-encoded DER format (PKCS#8).
+//
+// This function:
+//  1. Decodes the base64 string to get raw DER bytes
+//  2. Parses the DER bytes as PKCS#8 private key
+//  3. Returns the native Go crypto private key type
+//
+// Supported key types:
+//   - *rsa.PrivateKey
+//   - *ecdsa.PrivateKey
+//   - ed25519.PrivateKey
 func parsePrivateKeyFromBase64(base64Data string) (interface{}, error) {
-	// Transit returns keys in base64-encoded format
-	// We need to decode and then parse as PKCS#8
-	// This is a placeholder - actual implementation needs to handle Transit's specific format
-	return nil, fmt.Errorf("not yet implemented - needs Transit format handling")
+	// Decode base64 to get DER bytes
+	derBytes, err := base64.StdEncoding.DecodeString(base64Data)
+	if err != nil {
+		return nil, fmt.Errorf("decode base64: %w", err)
+	}
+
+	// Parse PKCS#8 private key
+	privateKey, err := x509.ParsePKCS8PrivateKey(derBytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse PKCS#8 private key: %w", err)
+	}
+
+	return privateKey, nil
 }
