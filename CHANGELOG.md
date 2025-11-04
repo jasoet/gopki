@@ -1,3 +1,21 @@
+## [1.21.0](https://github.com/jasoet/gopki/compare/v1.20.0...v1.21.0) (2025-11-04)
+
+
+### ✨ Features
+
+* **transit:** add seamless gopki integration for key import ([29cc4ba](https://github.com/jasoet/gopki/commit/29cc4ba9216216270c490760efa2fce98ad6d3be)), closes [PKCS#8](https://github.com/jasoet/PKCS/issues/8)
+* **transit:** complete export functionality and add Manager support ([9c0c5ce](https://github.com/jasoet/gopki/commit/9c0c5ce7563e162cd1f9ce0b04162ca5dd2b3efb)), closes [#1](https://github.com/jasoet/gopki/issues/1) [#2](https://github.com/jasoet/gopki/issues/2)
+
+
+### 🐛 Bug Fixes
+
+* **examples:** correct Sign API usage and fix linting errors ([24a7e12](https://github.com/jasoet/gopki/commit/24a7e12335b4617ace99fd47c48efad2a872b14a))
+
+
+### 🔧 Miscellaneous
+
+* **transit:** remove unused planning documentation ([a1f51ef](https://github.com/jasoet/gopki/commit/a1f51eff221c461507175c909bc18fc3b92e5cee))
+
 ## [1.20.0](https://github.com/jasoet/gopki/compare/v1.19.1...v1.20.0) (2025-10-30)
 
 
