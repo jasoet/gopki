@@ -1,3 +1,10 @@
+## [1.22.1](https://github.com/jasoet/gopki/compare/v1.22.0...v1.22.1) (2025-11-07)
+
+
+### 🐛 Bug Fixes
+
+* **signing:** add raw cryptographic signing for compact signatures ([#8](https://github.com/jasoet/gopki/issues/8)) ([ca883ed](https://github.com/jasoet/gopki/commit/ca883ed2af8ab3b7845a78323bb81a7ee102fb81)), closes [PKCS#7](https://github.com/jasoet/PKCS/issues/7)
+
 ## [1.22.0](https://github.com/jasoet/gopki/compare/v1.21.0...v1.22.0) (2025-11-04)
 
 
