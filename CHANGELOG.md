@@ -1,3 +1,10 @@
+## [1.22.2](https://github.com/jasoet/gopki/compare/v1.22.1...v1.22.2) (2026-02-25)
+
+
+### 🐛 Bug Fixes
+
+* **test:** improve test naming and Taskfile consistency ([#9](https://github.com/jasoet/gopki/issues/9)) ([c1b0e5c](https://github.com/jasoet/gopki/commit/c1b0e5c91b34e7cf0aab749120c66cd9c09d9d90))
+
 ## [1.22.1](https://github.com/jasoet/gopki/compare/v1.22.0...v1.22.1) (2025-11-07)
 
 
