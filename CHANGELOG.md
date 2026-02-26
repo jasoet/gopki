@@ -1,3 +1,10 @@
+## [1.22.3](https://github.com/jasoet/gopki/compare/v1.22.2...v1.22.3) (2026-02-26)
+
+
+### 🐛 Bug Fixes
+
+* **compatibility:** handle OpenSSL Ed25519 pkeyutl limitation ([#10](https://github.com/jasoet/gopki/issues/10)) ([0635948](https://github.com/jasoet/gopki/commit/0635948b5678fc9f6a430e1d3310e639875a483f))
+
 ## [1.22.2](https://github.com/jasoet/gopki/compare/v1.22.1...v1.22.2) (2026-02-25)
 
 
