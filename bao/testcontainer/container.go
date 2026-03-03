@@ -109,6 +109,7 @@ func Start(ctx context.Context, cfg *Config) (*Container, error) {
 
 	// Start container
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ProviderType:     testcontainers.ProviderPodman,
 		ContainerRequest: req,
 		Started:          true,
 	})

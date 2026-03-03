@@ -55,7 +55,7 @@ tasks:
     silent: false
 
   test:integration:
-    desc: Run all tests including OpenBao integration (requires Docker)
+    desc: Run all tests including OpenBao integration (requires Podman)
     env:
       CGO_ENABLED: 1
     cmds:
@@ -89,7 +89,7 @@ tasks:
       - |
         echo "🔗 Running GoPKI ↔ OpenBao Compatibility Tests..."
         echo "   This tests interoperability between GoPKI modules and OpenBao"
-        echo "   Requires Docker for OpenBao testcontainers"
+        echo "   Requires Podman for OpenBao testcontainers"
       - go test ./compatibility/bao -v -tags=compatibility -race -timeout=10m -coverprofile=output/bao-compatibility-coverage.out
       - go tool cover -func=output/bao-compatibility-coverage.out | tail -1
       - 'echo "✅ GoPKI ↔ OpenBao compatibility tests completed"'
