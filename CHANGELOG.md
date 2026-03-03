@@ -1,3 +1,10 @@
+## [1.23.0](https://github.com/jasoet/gopki/compare/v1.22.3...v1.23.0) (2026-03-03)
+
+
+### ✨ Features
+
+* **testcontainer:** migrate container runtime from Docker to Podman ([1eb3aac](https://github.com/jasoet/gopki/commit/1eb3aaccb6e522498309d17acecf4e63d8538a00))
+
 ## [1.22.3](https://github.com/jasoet/gopki/compare/v1.22.2...v1.22.3) (2026-02-26)
 
 
