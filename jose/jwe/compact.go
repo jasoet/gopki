@@ -1,3 +1,4 @@
+// Package jwe provides JSON Web Encryption (JWE) support as defined in RFC 7516.
 package jwe
 
 import (

@@ -17,6 +17,7 @@ import (
 // Ed25519 has no configurable parameters, so this is used as a placeholder for generic constraints.
 type Ed25519Config string
 
+// Ed25519Default is the default Ed25519 configuration.
 const Ed25519Default = Ed25519Config("")
 
 // Ed25519KeyPair represents a generated Ed25519 key pair containing both private and public keys.

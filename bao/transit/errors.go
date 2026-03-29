@@ -42,10 +42,10 @@ var (
 	ErrEmptyBatch    = errors.New("bao: batch is empty")
 
 	// Configuration errors
-	ErrInvalidConfig     = errors.New("bao: invalid configuration")
-	ErrMissingAddress    = errors.New("bao: server address is required")
-	ErrMissingToken      = errors.New("bao: authentication token is required")
-	ErrInvalidBatchSize  = errors.New("bao: invalid batch size")
+	ErrInvalidConfig    = errors.New("bao: invalid configuration")
+	ErrMissingAddress   = errors.New("bao: server address is required")
+	ErrMissingToken     = errors.New("bao: authentication token is required")
+	ErrInvalidBatchSize = errors.New("bao: invalid batch size")
 )
 
 // IsAuthError checks if an error is authentication-related.

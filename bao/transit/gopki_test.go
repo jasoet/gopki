@@ -29,23 +29,23 @@ func TestImportKeyOptions_GopkiIntegration(t *testing.T) {
 // TestRSAKeySizeDetection tests automatic RSA key size detection
 func TestRSAKeySizeDetection(t *testing.T) {
 	tests := []struct {
-		name        string
-		keySize     algo.KeySize
+		name         string
+		keySize      algo.KeySize
 		expectedType string
 	}{
 		{
-			name:        "2048-bit RSA",
-			keySize:     algo.KeySize2048,
+			name:         "2048-bit RSA",
+			keySize:      algo.KeySize2048,
 			expectedType: KeyTypeRSA2048,
 		},
 		{
-			name:        "3072-bit RSA",
-			keySize:     algo.KeySize3072,
+			name:         "3072-bit RSA",
+			keySize:      algo.KeySize3072,
 			expectedType: KeyTypeRSA3072,
 		},
 		{
-			name:        "4096-bit RSA",
-			keySize:     algo.KeySize4096,
+			name:         "4096-bit RSA",
+			keySize:      algo.KeySize4096,
 			expectedType: KeyTypeRSA4096,
 		},
 	}

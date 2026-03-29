@@ -8,6 +8,11 @@ import (
 	"github.com/jasoet/gopki/keypair/algo"
 )
 
+const (
+	caTypeExported = "exported"
+	caTypeInternal = "internal"
+)
+
 // ============================================================================
 // Types & Structs
 // ============================================================================
@@ -341,7 +346,7 @@ func NewRootCABuilder(commonName string) *CAOptionsBuilder {
 	return &CAOptionsBuilder{
 		opts: &CAOptions{
 			CommonName: commonName,
-			Type:       "internal",
+			Type:       caTypeInternal,
 		},
 	}
 }
@@ -351,7 +356,7 @@ func NewIntermediateCABuilder(commonName string) *CAOptionsBuilder {
 	return &CAOptionsBuilder{
 		opts: &CAOptions{
 			CommonName:          commonName,
-			Type:                "internal",
+			Type:                caTypeInternal,
 			AddBasicConstraints: true,
 		},
 	}
@@ -426,58 +431,13 @@ func (b *CAOptionsBuilder) WithAltNames(names ...string) *CAOptionsBuilder {
 
 // AsExported sets the type to "exported" (returns private key).
 func (b *CAOptionsBuilder) AsExported() *CAOptionsBuilder {
-	b.opts.Type = "exported"
+	b.opts.Type = caTypeExported
 	return b
 }
 
 // Build returns the built CAOptions.
 func (b *CAOptionsBuilder) Build() *CAOptions {
 	return b.opts
-}
-
-// ============================================================================
-// Internal Types for API Responses
-// ============================================================================
-
-// vaultGenerateCAResponse represents OpenBao's response from generate endpoints.
-type vaultGenerateCAResponse struct {
-	Data struct {
-		Certificate    string   `json:"certificate"`
-		IssuingCA      string   `json:"issuing_ca"`
-		CAChain        []string `json:"ca_chain"`
-		SerialNumber   string   `json:"serial_number"`
-		IssuerID       string   `json:"issuer_id"`
-		KeyID          string   `json:"key_id"`
-		PrivateKey     string   `json:"private_key,omitempty"`
-		PrivateKeyType string   `json:"private_key_type,omitempty"`
-		CSR            string   `json:"csr,omitempty"`
-	} `json:"data"`
-}
-
-// vaultIssuerResponse represents OpenBao's response from issuer endpoints.
-type vaultIssuerResponse struct {
-	Data struct {
-		IssuerID                     string   `json:"issuer_id"`
-		IssuerName                   string   `json:"issuer_name"`
-		KeyID                        string   `json:"key_id"`
-		Certificate                  string   `json:"certificate"`
-		CAChain                      []string `json:"ca_chain"`
-		ManualChain                  []string `json:"manual_chain"`
-		LeafNotAfterBehavior         string   `json:"leaf_not_after_behavior"`
-		Usage                        string   `json:"usage"`
-		RevocationSignatureAlgorithm string   `json:"revocation_signature_algorithm"`
-		IssuingCertificates          []string `json:"issuing_certificates"`
-		CRLDistributionPoints        []string `json:"crl_distribution_points"`
-		OCSPServers                  []string `json:"ocsp_servers"`
-		EnableAIAURLTemplating       bool     `json:"enable_aia_url_templating"`
-	} `json:"data"`
-}
-
-// vaultListResponse represents Vault's response from list endpoints.
-type vaultListResponse struct {
-	Data struct {
-		Keys []string `json:"keys"`
-	} `json:"data"`
 }
 
 // GenerateRootCA generates a self-signed root CA certificate in Vault.
@@ -502,9 +462,9 @@ func (c *Client) GenerateRootCA(ctx context.Context, opts *CAOptions) (*Generate
 		return nil, fmt.Errorf("bao: common name is required")
 	}
 	if opts.Type == "" {
-		opts.Type = "internal" // Default to internal
+		opts.Type = caTypeInternal // Default to internal
 	}
-	if opts.Type != "internal" && opts.Type != "exported" {
+	if opts.Type != caTypeInternal && opts.Type != caTypeExported {
 		return nil, fmt.Errorf("bao: type must be 'internal' or 'exported', got '%s'", opts.Type)
 	}
 
@@ -583,9 +543,9 @@ func (c *Client) GenerateIntermediateCA(ctx context.Context, opts *CAOptions) (*
 		return nil, fmt.Errorf("bao: common name is required")
 	}
 	if opts.Type == "" {
-		opts.Type = "internal" // Default to internal
+		opts.Type = caTypeInternal // Default to internal
 	}
-	if opts.Type != "internal" && opts.Type != "exported" {
+	if opts.Type != caTypeInternal && opts.Type != caTypeExported {
 		return nil, fmt.Errorf("bao: type must be 'internal' or 'exported', got '%s'", opts.Type)
 	}
 
@@ -634,7 +594,7 @@ func (c *Client) GenerateIntermediateCA(ctx context.Context, opts *CAOptions) (*
 	}
 
 	// For exported type, CSR is returned instead of certificate
-	if opts.Type == "exported" {
+	if opts.Type == caTypeExported {
 		return response, nil
 	}
 
@@ -1028,6 +988,7 @@ func (c *Client) GetDefaultIssuer(ctx context.Context) (string, error) {
 
 // Helper functions
 
+//nolint:gocyclo
 func buildCARequestBody(opts *CAOptions) map[string]interface{} {
 	reqBody := map[string]interface{}{
 		"common_name": opts.CommonName,

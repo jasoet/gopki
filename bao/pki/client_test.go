@@ -321,7 +321,7 @@ func TestClient_Health_Cancellation(t *testing.T) {
 
 	err = client.Health(ctx)
 	if err == nil {
-		t.Error("Health() should fail with cancelled context")
+		t.Error("Health() should fail with canceled context")
 	}
 }
 

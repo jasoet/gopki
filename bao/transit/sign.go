@@ -8,6 +8,7 @@ import (
 // HashAlgorithm represents supported hash algorithms for signing.
 type HashAlgorithm string
 
+// Supported hash algorithms for signing operations.
 const (
 	HashSHA2_256 HashAlgorithm = "sha2-256"
 	HashSHA2_384 HashAlgorithm = "sha2-384"
@@ -21,6 +22,7 @@ const (
 // SignatureAlgorithm represents RSA signature algorithms.
 type SignatureAlgorithm string
 
+// Supported RSA signature algorithms.
 const (
 	SignatureAlgPSS      SignatureAlgorithm = "pss"      // RSA-PSS
 	SignatureAlgPKCS1v15 SignatureAlgorithm = "pkcs1v15" // RSASSA-PKCS1-v1_5
@@ -29,6 +31,7 @@ const (
 // MarshalingAlgorithm represents ECDSA signature marshaling formats.
 type MarshalingAlgorithm string
 
+// Supported ECDSA signature marshaling formats.
 const (
 	MarshalingASN1 MarshalingAlgorithm = "asn1" // ASN.1 DER encoding
 	MarshalingJWS  MarshalingAlgorithm = "jws"  // JWS format (concatenated R||S)

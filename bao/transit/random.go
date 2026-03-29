@@ -90,7 +90,6 @@ func (c *Client) GenerateRandom(ctx context.Context, bytes int, opts *RandomOpti
 
 	// Use write for POST request (OpenBao uses POST for random generation)
 	secret, err := c.write(ctx, path, data)
-
 	if err != nil {
 		return nil, fmt.Errorf("transit GenerateRandom: %w", err)
 	}

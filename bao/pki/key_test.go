@@ -594,7 +594,6 @@ func TestGenerateEd25519Key_TypeSafe(t *testing.T) {
 	result, err := client.CreateEd25519Key(context.Background(), &GenerateKeyOptions{
 		KeyName: "test-ed25519-key",
 	})
-
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -710,7 +709,6 @@ func TestImportECDSAKey_TypeSafe(t *testing.T) {
 	result, err := client.ImportECDSAKey(context.Background(), keyPair, &ImportKeyOptions{
 		KeyName: "imported-ec-key",
 	})
-
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -746,7 +744,6 @@ func TestImportEd25519Key_TypeSafe(t *testing.T) {
 	result, err := client.ImportEd25519Key(context.Background(), keyPair, &ImportKeyOptions{
 		KeyName: "imported-ed25519-key",
 	})
-
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -864,7 +861,6 @@ func TestGetECDSAKey_TypeSafe(t *testing.T) {
 	})
 
 	result, err := client.GetECDSAKey(context.Background(), "key-ec-123")
-
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -896,7 +892,6 @@ func TestGetEd25519Key_TypeSafe(t *testing.T) {
 	})
 
 	result, err := client.GetEd25519Key(context.Background(), "key-ed-123")
-
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

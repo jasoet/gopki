@@ -40,6 +40,7 @@ import (
 	"github.com/smallstep/pkcs7"
 )
 
+// CMS represents CMS (Cryptographic Message Syntax) encoded data.
 type CMS []byte
 
 // envelopeContainer is used to serialize the entire EncryptedData structure

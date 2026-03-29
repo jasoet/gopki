@@ -1,17 +1,10 @@
 package pki
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 )
-
-// createTestServer creates a test HTTP server with custom handler.
-func createTestServer(handler http.HandlerFunc) *httptest.Server {
-	return httptest.NewServer(handler)
-}
 
 // createTestClient creates a test client connected to a test server.
 func createTestClient(t *testing.T, serverURL string) *Client {

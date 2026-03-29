@@ -1,4 +1,4 @@
-// Package vault provides integration with Vault/OpenBao PKI secrets engine.
+// Package pki provides integration with Vault/OpenBao PKI secrets engine.
 // It enables seamless interaction between GoPKI's type-safe cryptographic operations
 // and centralized PKI management via Vault/OpenBao.
 package pki

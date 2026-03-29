@@ -113,6 +113,7 @@ import (
 // Algorithm EncryptionAlgorithm represents the algorithm used for encryption
 type Algorithm string
 
+// AlgorithmRSAOAEP and related constants define supported encryption algorithms.
 const (
 	AlgorithmRSAOAEP  Algorithm = "RSA-OAEP"
 	AlgorithmECDH     Algorithm = "ECDH"
@@ -125,6 +126,7 @@ const (
 // Currently only CMS (RFC 5652) format is supported
 type Format string
 
+// FormatCMS defines the CMS output format for encrypted data.
 const (
 	FormatCMS Format = "cms" // RFC 5652 Cryptographic Message Syntax
 )

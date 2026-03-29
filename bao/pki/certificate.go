@@ -515,7 +515,7 @@ func issueCertificateWithKeyPair[K keypair.KeyPair](ctx context.Context, client 
 	if role == "" {
 		return nil, fmt.Errorf("bao: role is required")
 	}
-	if any(keyPair) == nil {
+	if reflect.ValueOf(&keyPair).Elem().IsZero() {
 		return nil, fmt.Errorf("bao: key pair is required")
 	}
 	if opts == nil {

@@ -114,7 +114,7 @@ func (c *Client) Health(ctx context.Context) error {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 				return fmt.Errorf("bao: health check timeout: %w", ErrTimeout)
 			}
-			return fmt.Errorf("bao: health check cancelled: %w", ctx.Err())
+			return fmt.Errorf("bao: health check canceled: %w", ctx.Err())
 		}
 		return fmt.Errorf("bao: health check failed: %w", ErrHealthCheckFailed)
 	}

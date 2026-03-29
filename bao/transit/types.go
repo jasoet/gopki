@@ -45,23 +45,23 @@ import (
 
 // KeyInfo represents metadata about a Transit key.
 type KeyInfo struct {
-	Name                 string            // Key name
-	Type                 string            // Key type (aes256-gcm96, rsa-2048, etc.)
-	DeletionAllowed      bool              // Can key be deleted
-	Derived              bool              // Key derivation enabled
-	Exportable           bool              // Can key be exported
-	AllowPlaintextBackup bool              // Allow plaintext backup
-	LatestVersion        int               // Latest key version
-	MinDecryptionVersion int               // Minimum version for decryption
-	MinEncryptionVersion int               // Minimum version for encryption
-	SupportsEncryption   bool              // Supports encryption
-	SupportsDecryption   bool              // Supports decryption
-	SupportsSigning      bool              // Supports signing
-	SupportsDerivation   bool              // Supports key derivation
-	AutoRotatePeriod     time.Duration     // Auto-rotation period
+	Name                 string             // Key name
+	Type                 string             // Key type (aes256-gcm96, rsa-2048, etc.)
+	DeletionAllowed      bool               // Can key be deleted
+	Derived              bool               // Key derivation enabled
+	Exportable           bool               // Can key be exported
+	AllowPlaintextBackup bool               // Allow plaintext backup
+	LatestVersion        int                // Latest key version
+	MinDecryptionVersion int                // Minimum version for decryption
+	MinEncryptionVersion int                // Minimum version for encryption
+	SupportsEncryption   bool               // Supports encryption
+	SupportsDecryption   bool               // Supports decryption
+	SupportsSigning      bool               // Supports signing
+	SupportsDerivation   bool               // Supports key derivation
+	AutoRotatePeriod     time.Duration      // Auto-rotation period
 	Keys                 map[int]KeyVersion // Version information
-	ConvergentEncryption bool              // Convergent encryption enabled
-	ConvergentVersion    int               // Version for convergent encryption
+	ConvergentEncryption bool               // Convergent encryption enabled
+	ConvergentVersion    int                // Version for convergent encryption
 }
 
 // KeyVersion represents information about a specific key version.
@@ -106,6 +106,8 @@ const (
 )
 
 // TransitError represents an error from a Transit operation.
+//
+//nolint:revive // name is intentionally transit.TransitError for API clarity
 type TransitError struct {
 	Operation  string   // Operation that failed (e.g., "Encrypt", "CreateKey")
 	StatusCode int      // HTTP status code
@@ -132,9 +134,9 @@ func (e *TransitError) Unwrap() error {
 // KeyType is an interface constraint for type-safe key operations.
 // All key types must implement this interface to be used with KeyClient[T].
 type KeyType interface {
-	KeyTypeName() string       // Returns the OpenBao key type name
-	SupportsEncryption() bool  // Whether this key type supports encryption
-	SupportsSigning() bool     // Whether this key type supports signing
+	KeyTypeName() string      // Returns the OpenBao key type name
+	SupportsEncryption() bool // Whether this key type supports encryption
+	SupportsSigning() bool    // Whether this key type supports signing
 }
 
 // Concrete key type implementations for type-safe operations.
@@ -143,83 +145,143 @@ type KeyType interface {
 // KeyTypeAES256 represents an AES-256-GCM key with 96-bit nonce.
 type KeyTypeAES256 struct{}
 
-func (KeyTypeAES256) KeyTypeName() string      { return KeyTypeAES256GCM96 }
+// KeyTypeName implements KeyType.
+func (KeyTypeAES256) KeyTypeName() string { return KeyTypeAES256GCM96 }
+
+// SupportsEncryption implements KeyType.
 func (KeyTypeAES256) SupportsEncryption() bool { return true }
-func (KeyTypeAES256) SupportsSigning() bool    { return false }
+
+// SupportsSigning implements KeyType.
+func (KeyTypeAES256) SupportsSigning() bool { return false }
 
 // KeyTypeAES128 represents an AES-128-GCM key with 96-bit nonce.
 type KeyTypeAES128 struct{}
 
-func (KeyTypeAES128) KeyTypeName() string      { return KeyTypeAES128GCM96 }
+// KeyTypeName implements KeyType.
+func (KeyTypeAES128) KeyTypeName() string { return KeyTypeAES128GCM96 }
+
+// SupportsEncryption implements KeyType.
 func (KeyTypeAES128) SupportsEncryption() bool { return true }
-func (KeyTypeAES128) SupportsSigning() bool    { return false }
+
+// SupportsSigning implements KeyType.
+func (KeyTypeAES128) SupportsSigning() bool { return false }
 
 // KeyTypeChaCha20 represents a ChaCha20-Poly1305 key.
 type KeyTypeChaCha20 struct{}
 
-func (KeyTypeChaCha20) KeyTypeName() string      { return KeyTypeChaCha20Poly1305 }
+// KeyTypeName implements KeyType.
+func (KeyTypeChaCha20) KeyTypeName() string { return KeyTypeChaCha20Poly1305 }
+
+// SupportsEncryption implements KeyType.
 func (KeyTypeChaCha20) SupportsEncryption() bool { return true }
-func (KeyTypeChaCha20) SupportsSigning() bool    { return false }
+
+// SupportsSigning implements KeyType.
+func (KeyTypeChaCha20) SupportsSigning() bool { return false }
 
 // KeyTypeXChaCha20 represents an XChaCha20-Poly1305 key.
 type KeyTypeXChaCha20 struct{}
 
-func (KeyTypeXChaCha20) KeyTypeName() string      { return KeyTypeXChaCha20Poly1305 }
+// KeyTypeName implements KeyType.
+func (KeyTypeXChaCha20) KeyTypeName() string { return KeyTypeXChaCha20Poly1305 }
+
+// SupportsEncryption implements KeyType.
 func (KeyTypeXChaCha20) SupportsEncryption() bool { return true }
-func (KeyTypeXChaCha20) SupportsSigning() bool    { return false }
+
+// SupportsSigning implements KeyType.
+func (KeyTypeXChaCha20) SupportsSigning() bool { return false }
 
 // RSA2048 represents a 2048-bit RSA key type.
 type RSA2048 struct{}
 
-func (RSA2048) KeyTypeName() string      { return "rsa-2048" }
+// KeyTypeName implements KeyType.
+func (RSA2048) KeyTypeName() string { return "rsa-2048" }
+
+// SupportsEncryption implements KeyType.
 func (RSA2048) SupportsEncryption() bool { return true }
-func (RSA2048) SupportsSigning() bool    { return true }
+
+// SupportsSigning implements KeyType.
+func (RSA2048) SupportsSigning() bool { return true }
 
 // RSA3072 represents a 3072-bit RSA key type.
 type RSA3072 struct{}
 
-func (RSA3072) KeyTypeName() string      { return "rsa-3072" }
+// KeyTypeName implements KeyType.
+func (RSA3072) KeyTypeName() string { return "rsa-3072" }
+
+// SupportsEncryption implements KeyType.
 func (RSA3072) SupportsEncryption() bool { return true }
-func (RSA3072) SupportsSigning() bool    { return true }
+
+// SupportsSigning implements KeyType.
+func (RSA3072) SupportsSigning() bool { return true }
 
 // RSA4096 represents a 4096-bit RSA key type.
 type RSA4096 struct{}
 
-func (RSA4096) KeyTypeName() string      { return "rsa-4096" }
+// KeyTypeName implements KeyType.
+func (RSA4096) KeyTypeName() string { return "rsa-4096" }
+
+// SupportsEncryption implements KeyType.
 func (RSA4096) SupportsEncryption() bool { return true }
-func (RSA4096) SupportsSigning() bool    { return true }
+
+// SupportsSigning implements KeyType.
+func (RSA4096) SupportsSigning() bool { return true }
 
 // ECDSAP256 represents an ECDSA key using P-256 curve.
 type ECDSAP256 struct{}
 
-func (ECDSAP256) KeyTypeName() string      { return "ecdsa-p256" }
+// KeyTypeName implements KeyType.
+func (ECDSAP256) KeyTypeName() string { return "ecdsa-p256" }
+
+// SupportsEncryption implements KeyType.
 func (ECDSAP256) SupportsEncryption() bool { return false }
-func (ECDSAP256) SupportsSigning() bool    { return true }
+
+// SupportsSigning implements KeyType.
+func (ECDSAP256) SupportsSigning() bool { return true }
 
 // ECDSAP384 represents an ECDSA key using P-384 curve.
 type ECDSAP384 struct{}
 
-func (ECDSAP384) KeyTypeName() string      { return "ecdsa-p384" }
+// KeyTypeName implements KeyType.
+func (ECDSAP384) KeyTypeName() string { return "ecdsa-p384" }
+
+// SupportsEncryption implements KeyType.
 func (ECDSAP384) SupportsEncryption() bool { return false }
-func (ECDSAP384) SupportsSigning() bool    { return true }
+
+// SupportsSigning implements KeyType.
+func (ECDSAP384) SupportsSigning() bool { return true }
 
 // ECDSAP521 represents an ECDSA key using P-521 curve.
 type ECDSAP521 struct{}
 
-func (ECDSAP521) KeyTypeName() string      { return "ecdsa-p521" }
+// KeyTypeName implements KeyType.
+func (ECDSAP521) KeyTypeName() string { return "ecdsa-p521" }
+
+// SupportsEncryption implements KeyType.
 func (ECDSAP521) SupportsEncryption() bool { return false }
-func (ECDSAP521) SupportsSigning() bool    { return true }
+
+// SupportsSigning implements KeyType.
+func (ECDSAP521) SupportsSigning() bool { return true }
 
 // Ed25519 represents an Ed25519 signing key type.
 type Ed25519 struct{}
 
-func (Ed25519) KeyTypeName() string      { return "ed25519" }
+// KeyTypeName implements KeyType.
+func (Ed25519) KeyTypeName() string { return "ed25519" }
+
+// SupportsEncryption implements KeyType.
 func (Ed25519) SupportsEncryption() bool { return false }
-func (Ed25519) SupportsSigning() bool    { return true }
+
+// SupportsSigning implements KeyType.
+func (Ed25519) SupportsSigning() bool { return true }
 
 // HMAC represents an HMAC key type.
 type HMAC struct{}
 
-func (HMAC) KeyTypeName() string      { return "hmac" }
+// KeyTypeName implements KeyType.
+func (HMAC) KeyTypeName() string { return "hmac" }
+
+// SupportsEncryption implements KeyType.
 func (HMAC) SupportsEncryption() bool { return false }
-func (HMAC) SupportsSigning() bool    { return false }
+
+// SupportsSigning implements KeyType.
+func (HMAC) SupportsSigning() bool { return false }

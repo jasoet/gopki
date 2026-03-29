@@ -75,10 +75,10 @@ func NewClient(config *Config) (*Client, error) {
 	// Set TLS configuration
 	if config.TLSConfig != nil {
 		if err := apiConfig.ConfigureTLS(&api.TLSConfig{
-			ClientCert: "",
-			ClientKey:  "",
-			CACert:     "",
-			Insecure:   config.TLSConfig.InsecureSkipVerify,
+			ClientCert:    "",
+			ClientKey:     "",
+			CACert:        "",
+			Insecure:      config.TLSConfig.InsecureSkipVerify,
 			TLSServerName: config.TLSConfig.ServerName,
 		}); err != nil {
 			return nil, fmt.Errorf("configure TLS: %w", err)

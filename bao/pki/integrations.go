@@ -80,4 +80,3 @@ func (cc *CertificateClient[K]) SerialNumber() string {
 	}
 	return cc.certInfo.SerialNumber
 }
-

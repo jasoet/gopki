@@ -30,11 +30,11 @@ import (
 //	rsaKey := publicKey.(*rsa.PublicKey) // Type assertion
 func (j *JWK) ToPublicKey() (keypair.GenericPublicKey, error) {
 	switch j.KeyType {
-	case "RSA":
+	case KeyTypeRSA:
 		return j.toRSAPublicKey()
 	case "EC":
 		return j.toECDSAPublicKey()
-	case "OKP":
+	case KeyTypeOKP:
 		return j.toOKPPublicKey()
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrInvalidKeyType, j.KeyType)
@@ -107,6 +107,7 @@ func (j *JWK) toECDSAPublicKey() (*ecdsa.PublicKey, error) {
 	}
 
 	// Validate point is on curve
+	//nolint:staticcheck // SA1019: elliptic.Curve.IsOnCurve is deprecated but no direct replacement exists for validating arbitrary (x, y) points
 	if !curve.IsOnCurve(x, y) {
 		return nil, fmt.Errorf("EC point is not on curve %s", j.Curve)
 	}
@@ -138,11 +139,11 @@ func (j *JWK) toOKPPublicKey() (ed25519.PublicKey, error) {
 // parseCurve converts JWK curve name to elliptic.Curve.
 func parseCurve(name string) (elliptic.Curve, error) {
 	switch name {
-	case "P-256":
+	case CurveP256:
 		return elliptic.P256(), nil
-	case "P-384":
+	case CurveP384:
 		return elliptic.P384(), nil
-	case "P-521":
+	case CurveP521:
 		return elliptic.P521(), nil
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrInvalidCurve, name)

@@ -1,3 +1,4 @@
+// Package jws provides JSON Web Signature (JWS) creation and verification per RFC 7515.
 package jws
 
 import (
@@ -53,7 +54,7 @@ func VerifyCompact[K keypair.PublicKey](
 ) ([]byte, error) {
 	opts := &jwt.VerifyOptions{
 		ExpectedAlgorithm: expectedAlg,
-		Validation:        &jwt.ValidationOptions{
+		Validation: &jwt.ValidationOptions{
 			// Disable claims validation for generic JWS
 			ValidateExpiry:    false,
 			ValidateNotBefore: false,

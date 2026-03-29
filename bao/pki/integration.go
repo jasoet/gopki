@@ -69,11 +69,8 @@ func vaultCertToGoPKI(pemCert string, pemChain string) (*cert.Certificate, error
 		return nil, fmt.Errorf("vault: convert certificate: %w", err)
 	}
 
-	// Check for Ed25519 limitation (cannot be used for envelope encryption)
-	if x509Cert.PublicKeyAlgorithm == x509.Ed25519 {
-		// Note: This is documented but not an error
-		// Users should be aware of this limitation from documentation
-	}
+	// Note: Ed25519 certificates have a known limitation (cannot be used for envelope encryption).
+	// This is documented but not treated as an error.
 
 	// Create GoPKI certificate
 	pemData := []byte(pemCert)

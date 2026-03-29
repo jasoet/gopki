@@ -676,6 +676,8 @@ func extractStringSliceField(data map[string]interface{}, key string) []string {
 }
 
 // buildRoleRequestBody constructs the request body for role creation/update.
+//
+//nolint:gocyclo
 func buildRoleRequestBody(opts *RoleOptions) map[string]interface{} {
 	reqBody := make(map[string]interface{})
 

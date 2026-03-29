@@ -241,7 +241,7 @@ func TestIntegration_ECDSAMarshalingFormats(t *testing.T) {
 	data := base64.StdEncoding.EncodeToString([]byte("test data"))
 
 	tests := []struct {
-		name      string
+		name       string
 		marshaling transit.MarshalingAlgorithm
 	}{
 		{"ASN1", transit.MarshalingASN1},

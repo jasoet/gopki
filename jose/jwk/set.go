@@ -9,6 +9,8 @@ import (
 //
 // A JWK Set is a JSON object that contains an array of JWKs. This structure
 // is commonly used for publishing public keys (e.g., OIDC .well-known/jwks.json).
+//
+//nolint:revive // name is intentionally jwk.JWKSet to match RFC 7517 terminology
 type JWKSet struct {
 	Keys []JWK `json:"keys"` // Array of JWK objects
 }

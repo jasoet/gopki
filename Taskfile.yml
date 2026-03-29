@@ -2,6 +2,7 @@ version: '3'
 
 vars:
   MODULE: github.com/jasoet/gopki
+  N: "nix develop -c"
 
 tasks:
   default:
@@ -12,33 +13,32 @@ tasks:
 
   # Setup and Dependencies
   setup:
-    desc: Initial project setup and install development tools
+    desc: Initial project setup
     cmds:
-      - go mod download
-      - go mod verify
-      - go mod tidy
-      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v2.10.1
-      - 'echo "✅ Project setup complete"'
+      - "{{.N}} go mod download"
+      - "{{.N}} go mod verify"
+      - "{{.N}} go mod tidy"
+      - 'echo "Setup complete"'
     silent: true
 
   # Build Tasks
   build:
     desc: Build the module
     cmds:
-      - go build ./...
-      - 'echo "✅ Build successful"'
+      - "{{.N}} go build ./..."
+      - 'echo "Build successful"'
     silent: true
 
   build:examples:
     desc: Build example binaries
     cmds:
       - mkdir -p bin/
-      - go build -tags example -o bin/keypair-example ./examples/keypair/main.go
-      - go build -tags example -o bin/certificates-example ./examples/certificates/main.go
-      - go build -tags example -o bin/signing-example ./examples/signing/main.go
-      - go build -tags example -o bin/encryption-example ./examples/encryption/main.go
-      - go build -tags example -o bin/pkcs12-example ./examples/pkcs12/main.go
-      - 'echo "✅ Examples built in bin/ directory"'
+      - "{{.N}} go build -tags example -o bin/keypair-example ./examples/keypair/main.go"
+      - "{{.N}} go build -tags example -o bin/certificates-example ./examples/certificates/main.go"
+      - "{{.N}} go build -tags example -o bin/signing-example ./examples/signing/main.go"
+      - "{{.N}} go build -tags example -o bin/encryption-example ./examples/encryption/main.go"
+      - "{{.N}} go build -tags example -o bin/pkcs12-example ./examples/pkcs12/main.go"
+      - 'echo "Examples built in bin/ directory"'
     silent: true
 
   # Testing Tasks
@@ -48,10 +48,10 @@ tasks:
       CGO_ENABLED: 1
     cmds:
       - mkdir -p output/
-      - go test  ./... -race -v -coverprofile=output/coverage.out
-      - go tool cover -html=output/coverage.out -o output/coverage.html
-      - go tool cover -func=output/coverage.out | tail -1
-      - 'echo "✅ Tests completed with coverage: output/coverage.html"'
+      - "{{.N}} go test ./... -race -v -coverprofile=output/coverage.out"
+      - "{{.N}} go tool cover -html=output/coverage.out -o output/coverage.html"
+      - "{{.N}} go tool cover -func=output/coverage.out | tail -1"
+      - 'echo "Tests completed with coverage: output/coverage.html"'
     silent: false
 
   test:integration:
@@ -60,10 +60,10 @@ tasks:
       CGO_ENABLED: 1
     cmds:
       - mkdir -p output/
-      - go test ./... -tags integration -race -v -coverprofile=output/coverage.out
-      - go tool cover -html=output/coverage.out -o output/coverage.html
-      - go tool cover -func=output/coverage.out | tail -1
-      - 'echo "✅ Tests completed with coverage: output/coverage.html"'
+      - "{{.N}} go test ./... -tags integration -race -v -coverprofile=output/coverage.out"
+      - "{{.N}} go tool cover -html=output/coverage.out -o output/coverage.html"
+      - "{{.N}} go tool cover -func=output/coverage.out | tail -1"
+      - 'echo "Tests completed with coverage: output/coverage.html"'
     silent: false
 
   test:compatibility:
@@ -73,11 +73,11 @@ tasks:
     cmds:
       - mkdir -p output/
       - |
-        echo "🔗 Running OpenSSL Compatibility Tests..."
+        echo "Running OpenSSL Compatibility Tests..."
         echo "   This tests interoperability between GoPKI and OpenSSL"
-      - go test ./compatibility/... -v -tags=compatibility -timeout=10m -p=1 -coverprofile=output/compatibility-coverage.out
-      - go tool cover -func=output/compatibility-coverage.out | tail -1
-      - 'echo "✅ OpenSSL compatibility tests completed"'
+      - "{{.N}} go test ./compatibility/... -v -tags=compatibility -timeout=10m -p=1 -coverprofile=output/compatibility-coverage.out"
+      - "{{.N}} go tool cover -func=output/compatibility-coverage.out | tail -1"
+      - 'echo "OpenSSL compatibility tests completed"'
     silent: false
 
   test:compatibility:bao:
@@ -87,51 +87,60 @@ tasks:
     cmds:
       - mkdir -p output/
       - |
-        echo "🔗 Running GoPKI ↔ OpenBao Compatibility Tests..."
+        echo "Running GoPKI ↔ OpenBao Compatibility Tests..."
         echo "   This tests interoperability between GoPKI modules and OpenBao"
         echo "   Requires Podman for OpenBao testcontainers"
-      - go test ./compatibility/bao -v -tags=compatibility -race -timeout=10m -coverprofile=output/bao-compatibility-coverage.out
-      - go tool cover -func=output/bao-compatibility-coverage.out | tail -1
-      - 'echo "✅ GoPKI ↔ OpenBao compatibility tests completed"'
+      - "{{.N}} go test ./compatibility/bao -v -tags=compatibility -race -timeout=10m -coverprofile=output/bao-compatibility-coverage.out"
+      - "{{.N}} go tool cover -func=output/bao-compatibility-coverage.out | tail -1"
+      - 'echo "GoPKI ↔ OpenBao compatibility tests completed"'
     silent: false
 
   # Code Quality
   format:
     desc: Format all Go code and organize imports
     cmds:
-      - goimports -local github.com/jasoet/gopki -w .
-      - go fmt ./...
-      - 'echo "✅ Code formatted and imports organized"'
+      - "{{.N}} goimports -local github.com/jasoet/gopki -w ."
+      - "{{.N}} go fmt ./..."
+      - 'echo "Code formatted and imports organized"'
     silent: true
 
   lint:
     desc: Run comprehensive linting (go vet + golangci-lint)
     cmds:
-      - go vet ./...
-      - golangci-lint run ./...
-      - 'echo "✅ Linting complete"'
+      - "{{.N}} go vet ./..."
+      - "{{.N}} golangci-lint run ./..."
+      - 'echo "Linting complete"'
     silent: true
 
   # Examples
   examples:run:
     desc: Run all examples
     cmds:
-      - 'echo "🔐 Running keypair examples..."'
-      - go run -tags example ./examples/keypair/main.go
+      - 'echo "Running keypair examples..."'
+      - "{{.N}} go run -tags example ./examples/keypair/main.go"
       - 'echo ""'
-      - 'echo "📜 Running certificate examples..."'
-      - go run -tags example ./examples/certificates/main.go
+      - 'echo "Running certificate examples..."'
+      - "{{.N}} go run -tags example ./examples/certificates/main.go"
       - 'echo ""'
-      - 'echo "✍️ Running signing examples..."'
-      - go run -tags example ./examples/signing/main.go
+      - 'echo "Running signing examples..."'
+      - "{{.N}} go run -tags example ./examples/signing/main.go"
       - 'echo ""'
-      - 'echo "🔒 Running encryption examples..."'
-      - go run -tags example ./examples/encryption/main.go
+      - 'echo "Running encryption examples..."'
+      - "{{.N}} go run -tags example ./examples/encryption/main.go"
       - 'echo ""'
-      - 'echo "📦 Running PKCS#12 examples..."'
-      - go run -tags example ./examples/pkcs12/main.go
-      - 'echo "✅ All examples completed!"'
+      - 'echo "Running PKCS#12 examples..."'
+      - "{{.N}} go run -tags example ./examples/pkcs12/main.go"
+      - 'echo "All examples completed!"'
     silent: true
+
+  # Nix
+  nix:check:
+    desc: Verify Nix environment and tools
+    cmds:
+      - "{{.N}} go version"
+      - "{{.N}} golangci-lint --version"
+      - "{{.N}} which goimports"
+    silent: false
 
   # Clean
   clean:
@@ -140,8 +149,8 @@ tasks:
       - rm -rf bin/ output/
       - rm -rf examples/*/output/
       - rm -f *.test *.out *.html *.pem *.key *.crt *.csr
-      - go clean -cache -testcache
-      - 'echo "✅ Cleaned build artifacts and caches"'
+      - "{{.N}} go clean -cache -testcache"
+      - 'echo "Cleaned build artifacts and caches"'
     silent: true
 
   # CI/CD
@@ -149,5 +158,5 @@ tasks:
     desc: Run CI pipeline (format, lint, test, build, examples)
     deps: [ format, lint, test, build, examples:run ]
     cmds:
-      - 'echo "✅ CI pipeline completed"'
+      - 'echo "CI pipeline completed"'
     silent: true

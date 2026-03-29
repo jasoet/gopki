@@ -120,12 +120,14 @@ func Start(ctx context.Context, cfg *Config) (*Container, error) {
 	// Get host and port
 	host, err := container.Host(ctx)
 	if err != nil {
+		//nolint:errcheck // best-effort cleanup on failure
 		container.Terminate(ctx)
 		return nil, fmt.Errorf("get container host: %w", err)
 	}
 
 	mappedPort, err := container.MappedPort(ctx, "8200")
 	if err != nil {
+		//nolint:errcheck // best-effort cleanup on failure
 		container.Terminate(ctx)
 		return nil, fmt.Errorf("get container port: %w", err)
 	}

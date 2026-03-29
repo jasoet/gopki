@@ -92,9 +92,9 @@ func SignJSON(payload []byte, signers []*Signer) (*JSONSerialization, error) {
 
 		// Add signature to the list
 		jws.Signatures = append(jws.Signatures, JSONSignature{
-			Protected:  protectedB64,
-			Header:     signer.UnprotectedHeader,
-			Signature:  base64URLEncode(signature),
+			Protected: protectedB64,
+			Header:    signer.UnprotectedHeader,
+			Signature: base64URLEncode(signature),
 		})
 	}
 
@@ -216,4 +216,3 @@ func UnmarshalJSON(data []byte) (*JSONSerialization, error) {
 
 	return &jws, nil
 }
-

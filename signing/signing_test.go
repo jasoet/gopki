@@ -14,10 +14,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smallstep/pkcs7"
+
 	"github.com/jasoet/gopki/cert"
 	"github.com/jasoet/gopki/keypair"
 	"github.com/jasoet/gopki/keypair/algo"
-	"github.com/smallstep/pkcs7"
 )
 
 func TestSignAndVerifyRSA(t *testing.T) {
@@ -1658,8 +1659,8 @@ func TestDetachedSignatureWithFlag(t *testing.T) {
 
 	// Test using Detached flag (instead of FormatPKCS7Detached)
 	opts := DefaultSignOptions()
-	opts.Format = FormatPKCS7  // Use regular format
-	opts.Detached = true       // But set Detached flag
+	opts.Format = FormatPKCS7 // Use regular format
+	opts.Detached = true      // But set Detached flag
 
 	signature, err := SignDocument(testData, keyPair, certificate, opts)
 	if err != nil {

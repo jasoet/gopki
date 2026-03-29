@@ -569,6 +569,8 @@ func generateKeyInternal[K keypair.KeyPair](ctx context.Context, client *Client,
 
 // generateKeyExported is the internal implementation for generating exported keys.
 // Returns a KeyClient with the private key cached for immediate use.
+//
+//nolint:gocyclo
 func generateKeyExported[K keypair.KeyPair](ctx context.Context, client *Client, opts *GenerateKeyOptions) (*KeyClient[K], error) {
 	if opts == nil {
 		return nil, fmt.Errorf("bao: key options are required")
@@ -748,7 +750,7 @@ func (c *Client) ImportEd25519Key(ctx context.Context, kp *algo.Ed25519KeyPair, 
 
 // importKeyTyped is the internal generic implementation for key import.
 func importKeyTyped[K keypair.KeyPair](ctx context.Context, client *Client, kp K, opts *ImportKeyOptions) (*KeyClient[K], error) {
-	if any(kp) == nil {
+	if reflect.ValueOf(&kp).Elem().IsZero() {
 		return nil, fmt.Errorf("bao: key pair is required")
 	}
 

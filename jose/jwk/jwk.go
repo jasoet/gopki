@@ -10,24 +10,42 @@ import (
 	"fmt"
 )
 
+// Key type constants for JWK.
+const (
+	// KeyTypeRSA is the JWK key type for RSA keys.
+	KeyTypeRSA = "RSA"
+	// KeyTypeOKP is the JWK key type for octet key pairs (Ed25519).
+	KeyTypeOKP = "OKP"
+)
+
+// Curve name constants for JWK.
+const (
+	// CurveP256 is the NIST P-256 elliptic curve.
+	CurveP256 = "P-256"
+	// CurveP384 is the NIST P-384 elliptic curve.
+	CurveP384 = "P-384"
+	// CurveP521 is the NIST P-521 elliptic curve.
+	CurveP521 = "P-521"
+)
+
 // JWK represents a JSON Web Key as defined in RFC 7517.
 //
 // A JWK is a JSON object that represents a cryptographic key. Different key types
 // use different parameter sets.
 type JWK struct {
 	// Common parameters (all key types)
-	KeyType   string   `json:"kty"`                  // Key Type: "RSA", "EC", "OKP", "oct"
-	Use       string   `json:"use,omitempty"`        // Public Key Use: "sig" (signature) or "enc" (encryption)
-	KeyOps    []string `json:"key_ops,omitempty"`    // Key Operations
-	Algorithm string   `json:"alg,omitempty"`        // Algorithm intended for use with the key
-	KeyID     string   `json:"kid,omitempty"`        // Key ID
+	KeyType   string   `json:"kty"`               // Key Type: "RSA", "EC", "OKP", "oct"
+	Use       string   `json:"use,omitempty"`     // Public Key Use: "sig" (signature) or "enc" (encryption)
+	KeyOps    []string `json:"key_ops,omitempty"` // Key Operations
+	Algorithm string   `json:"alg,omitempty"`     // Algorithm intended for use with the key
+	KeyID     string   `json:"kid,omitempty"`     // Key ID
 
 	// RSA parameters (RFC 7518 Section 6.3)
-	N string `json:"n,omitempty"` // Modulus (Base64URL)
-	E string `json:"e,omitempty"` // Exponent (Base64URL)
-	D string `json:"d,omitempty"` // Private exponent (Base64URL) - for private keys only
-	P string `json:"p,omitempty"` // First prime factor - for private keys only
-	Q string `json:"q,omitempty"` // Second prime factor - for private keys only
+	N  string `json:"n,omitempty"`  // Modulus (Base64URL)
+	E  string `json:"e,omitempty"`  // Exponent (Base64URL)
+	D  string `json:"d,omitempty"`  // Private exponent (Base64URL) - for private keys only
+	P  string `json:"p,omitempty"`  // First prime factor - for private keys only
+	Q  string `json:"q,omitempty"`  // Second prime factor - for private keys only
 	DP string `json:"dp,omitempty"` // First factor CRT exponent - for private keys only
 	DQ string `json:"dq,omitempty"` // Second factor CRT exponent - for private keys only
 	QI string `json:"qi,omitempty"` // First CRT coefficient - for private keys only
@@ -111,7 +129,7 @@ func (j *JWK) MarshalIndent(prefix, indent string) ([]byte, error) {
 // validate checks that required fields for the key type are present.
 func (j *JWK) validate() error {
 	switch j.KeyType {
-	case "RSA":
+	case KeyTypeRSA:
 		if j.N == "" || j.E == "" {
 			return fmt.Errorf("%w: RSA keys require 'n' and 'e'", ErrMissingRequiredField)
 		}
@@ -119,7 +137,7 @@ func (j *JWK) validate() error {
 		if j.Curve == "" || j.X == "" || j.Y == "" {
 			return fmt.Errorf("%w: EC keys require 'crv', 'x', and 'y'", ErrMissingRequiredField)
 		}
-	case "OKP":
+	case KeyTypeOKP:
 		if j.Curve == "" || j.X == "" {
 			return fmt.Errorf("%w: OKP keys require 'crv' and 'x'", ErrMissingRequiredField)
 		}
@@ -149,11 +167,11 @@ func (j *JWK) validate() error {
 //	}
 func (j *JWK) IsPrivate() bool {
 	switch j.KeyType {
-	case "RSA":
+	case KeyTypeRSA:
 		return j.D != ""
 	case "EC":
 		return j.D != ""
-	case "OKP":
+	case KeyTypeOKP:
 		// For OKP, we don't currently support private keys in this implementation
 		// as the plan focuses on public key JWKs
 		return false

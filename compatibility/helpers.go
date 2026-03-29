@@ -1,6 +1,8 @@
+// Package compatibility provides test helpers for verifying cryptographic interoperability with external tools like OpenSSL.
 package compatibility
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -72,7 +74,7 @@ func (h *OpenSSLHelper) TempFile(name string, content []byte) string {
 
 // RunOpenSSL executes an OpenSSL command and returns the output
 func (h *OpenSSLHelper) RunOpenSSL(args ...string) ([]byte, error) {
-	cmd := exec.Command("openssl", args...)
+	cmd := exec.CommandContext(context.Background(), "openssl", args...)
 
 	// Log the command being executed
 	h.t.Logf("    → Executing: openssl %s", strings.Join(args, " "))
@@ -585,7 +587,7 @@ func (h *OpenSSLHelper) GenerateSSHKeyWithSSHKeygen(algorithm string, keySize in
 		return nil, nil, fmt.Errorf("unsupported algorithm for SSH: %s", algorithm)
 	}
 
-	cmd := exec.Command("ssh-keygen", args...)
+	cmd := exec.CommandContext(context.Background(), "ssh-keygen", args...)
 	h.t.Logf("    → Executing: ssh-keygen %s", strings.Join(args, " "))
 
 	output, err := cmd.CombinedOutput()
@@ -620,7 +622,7 @@ func (h *OpenSSLHelper) ValidateSSHPrivateKeyWithSSHKeygen(privateKeyData []byte
 	h.t.Logf("    → Validating SSH private key with ssh-keygen...")
 
 	// Use ssh-keygen -y to validate and extract public key from private key
-	cmd := exec.Command("ssh-keygen", "-y", "-f", keyFile)
+	cmd := exec.CommandContext(context.Background(), "ssh-keygen", "-y", "-f", keyFile)
 	h.t.Logf("    → Executing: ssh-keygen -y -f %s", keyFile)
 
 	output, err := cmd.CombinedOutput()
@@ -643,7 +645,7 @@ func (h *OpenSSLHelper) ValidateSSHPublicKeyWithSSHKeygen(publicKeyData []byte) 
 	h.t.Logf("    → Validating SSH public key with ssh-keygen...")
 
 	// Use ssh-keygen -l to get fingerprint and validate format
-	cmd := exec.Command("ssh-keygen", "-l", "-f", keyFile)
+	cmd := exec.CommandContext(context.Background(), "ssh-keygen", "-l", "-f", keyFile)
 	h.t.Logf("    → Executing: ssh-keygen -l -f %s", keyFile)
 
 	output, err := cmd.CombinedOutput()
@@ -673,7 +675,7 @@ func (h *OpenSSLHelper) GetSSHKeyFingerprint(publicKeyData []byte, hashAlg strin
 		return "", fmt.Errorf("unsupported hash algorithm: %s", hashAlg)
 	}
 
-	cmd := exec.Command("ssh-keygen", args...)
+	cmd := exec.CommandContext(context.Background(), "ssh-keygen", args...)
 	h.t.Logf("    → Getting SSH fingerprint: ssh-keygen %s", strings.Join(args, " "))
 
 	output, err := cmd.CombinedOutput()
@@ -705,7 +707,7 @@ func (h *OpenSSLHelper) ConvertPEMToSSHWithSSHKeygen(pemPrivateKey []byte) ([]by
 	}
 
 	// Convert to OpenSSH format
-	cmd := exec.Command("ssh-keygen", "-p", "-m", "RFC4716", "-f", tempFile, "-N", "", "-P", "")
+	cmd := exec.CommandContext(context.Background(), "ssh-keygen", "-p", "-m", "RFC4716", "-f", tempFile, "-N", "", "-P", "")
 	h.t.Logf("    → Executing: ssh-keygen -p -m RFC4716 -f %s -N '' -P ''", tempFile)
 
 	output, err := cmd.CombinedOutput()
@@ -738,7 +740,7 @@ func (h *OpenSSLHelper) ExtractPublicKeyWithSSHKeygen(privateKeyData []byte) ([]
 
 	h.t.Logf("    → Extracting public key from private key with ssh-keygen...")
 
-	cmd := exec.Command("ssh-keygen", "-y", "-f", keyFile)
+	cmd := exec.CommandContext(context.Background(), "ssh-keygen", "-y", "-f", keyFile)
 	h.t.Logf("    → Executing: ssh-keygen -y -f %s", keyFile)
 
 	output, err := cmd.CombinedOutput()
@@ -781,7 +783,7 @@ func (h *OpenSSLHelper) GenerateSSHKeyWithPassphrase(algorithm string, keySize i
 		return nil, nil, fmt.Errorf("unsupported algorithm: %s", algorithm)
 	}
 
-	cmd := exec.Command("ssh-keygen", args...)
+	cmd := exec.CommandContext(context.Background(), "ssh-keygen", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, nil, fmt.Errorf("ssh-keygen failed: %v, output: %s", err, string(output))
@@ -836,7 +838,7 @@ func (h *OpenSSLHelper) GetSSHKeyInformation(publicKeyData []byte) (string, erro
 	keyFile := h.TempFile("ssh_info.pub", publicKeyData)
 
 	h.t.Logf("    → Getting SSH key information with ssh-keygen...")
-	cmd := exec.Command("ssh-keygen", "-l", "-v", "-f", keyFile)
+	cmd := exec.CommandContext(context.Background(), "ssh-keygen", "-l", "-v", "-f", keyFile)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		h.t.Logf("    ❌ Failed to get SSH key information: %v", err)
@@ -862,7 +864,7 @@ func (h *OpenSSLHelper) ConvertSSHToPEMWithSSHKeygen(sshPrivateKey []byte) ([]by
 	}
 
 	// Convert to PEM format using ssh-keygen -p
-	cmd := exec.Command("ssh-keygen", "-p", "-m", "PEM", "-f", tempFile, "-N", "", "-P", "")
+	cmd := exec.CommandContext(context.Background(), "ssh-keygen", "-p", "-m", "PEM", "-f", tempFile, "-N", "", "-P", "")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		h.t.Logf("    ❌ SSH to PEM conversion failed: %v", err)
@@ -895,10 +897,10 @@ func (h *OpenSSLHelper) SignWithOpenSSL(data []byte, privateKeyPEM []byte, hashA
 	if hashAlg == "" {
 		// Raw signing (for Ed25519) - Note: OpenSSL pkeyutl doesn't support Ed25519
 		// This will fail for Ed25519 keys, which is expected and documented
-		cmd = exec.Command("openssl", "pkeyutl", "-sign", "-inkey", keyFile, "-in", dataFile, "-out", sigFile)
+		cmd = exec.CommandContext(context.Background(), "openssl", "pkeyutl", "-sign", "-inkey", keyFile, "-in", dataFile, "-out", sigFile)
 	} else {
 		// Hash-based signing (for RSA/ECDSA)
-		cmd = exec.Command("openssl", "dgst", "-"+hashAlg, "-sign", keyFile, "-out", sigFile, dataFile)
+		cmd = exec.CommandContext(context.Background(), "openssl", "dgst", "-"+hashAlg, "-sign", keyFile, "-out", sigFile, dataFile)
 	}
 
 	h.t.Logf("    → Executing: %s", strings.Join(cmd.Args, " "))
@@ -937,10 +939,10 @@ func (h *OpenSSLHelper) VerifyRawSignatureWithOpenSSL(data []byte, signature []b
 	var cmd *exec.Cmd
 	if hashAlg == "" {
 		// Raw verification (for Ed25519)
-		cmd = exec.Command("openssl", "pkeyutl", "-verify", "-pubin", "-inkey", keyFile, "-in", dataFile, "-sigfile", sigFile)
+		cmd = exec.CommandContext(context.Background(), "openssl", "pkeyutl", "-verify", "-pubin", "-inkey", keyFile, "-in", dataFile, "-sigfile", sigFile)
 	} else {
 		// Hash-based verification (for RSA/ECDSA)
-		cmd = exec.Command("openssl", "dgst", "-"+hashAlg, "-verify", keyFile, "-signature", sigFile, dataFile)
+		cmd = exec.CommandContext(context.Background(), "openssl", "dgst", "-"+hashAlg, "-verify", keyFile, "-signature", sigFile, dataFile)
 	}
 
 	h.t.Logf("    → Executing: %s", strings.Join(cmd.Args, " "))

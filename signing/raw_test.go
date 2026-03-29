@@ -10,9 +10,10 @@ import (
 	"encoding/base64"
 	"testing"
 
-	"github.com/jasoet/gopki/keypair/algo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/jasoet/gopki/keypair/algo"
 )
 
 func TestSignRaw_ECDSA_P256(t *testing.T) {
@@ -233,7 +234,6 @@ func TestGetRawSignatureSize(t *testing.T) {
 		})
 	}
 }
-
 
 func TestSignRaw_DifferentHashAlgorithms(t *testing.T) {
 	keyPair, err := algo.GenerateECDSAKeyPair(algo.P256)

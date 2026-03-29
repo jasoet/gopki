@@ -240,7 +240,9 @@ func (c *Client) ExportKey(ctx context.Context, name string, keyType ExportKeyTy
 	result := make(map[int]string)
 	for versionStr, keyData := range keysMap {
 		var ver int
-		fmt.Sscanf(versionStr, "%d", &ver)
+		if _, err := fmt.Sscanf(versionStr, "%d", &ver); err != nil {
+			continue
+		}
 
 		if keyStr, ok := keyData.(string); ok {
 			result[ver] = keyStr

@@ -94,11 +94,7 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("bao: address must use http or https scheme")
 	}
 
-	// Warn about insecure connections
-	if parsedURL.Scheme == "http" {
-		// Log warning (will be implemented with actual logging)
-		// log.Warn("bao: using insecure HTTP connection")
-	}
+	// Note: insecure HTTP connections are allowed but not recommended for production.
 
 	// Set defaults
 	if c.Mount == "" {

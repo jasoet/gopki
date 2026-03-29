@@ -70,7 +70,7 @@ type GenericPublicKey any
 // GenericKeyPair represents any keypair type for functions that need to work with multiple keypair types dynamically
 type GenericKeyPair any
 
-// KeyPairManager provides type-safe operations for cryptographic key pairs.
+// Manager provides type-safe operations for cryptographic key pairs.
 // It encapsulates a key pair and provides methods for format conversion, validation,
 // comparison, and file I/O operations while maintaining type safety through generics.
 //
@@ -720,10 +720,10 @@ func (m *Manager[K, P, B]) Validate() error {
 	switch kp := any(m.keyPair).(type) {
 	case *algo.RSAKeyPair:
 		// Verify RSA key pair relationship
-		if kp.PrivateKey.PublicKey.N.Cmp(kp.PublicKey.N) != 0 {
+		if kp.PrivateKey.N.Cmp(kp.PublicKey.N) != 0 {
 			return fmt.Errorf("RSA public key N does not match private key")
 		}
-		if kp.PrivateKey.PublicKey.E != kp.PublicKey.E {
+		if kp.PrivateKey.E != kp.PublicKey.E {
 			return fmt.Errorf("RSA public key E does not match private key")
 		}
 		// Verify RSA private key components
@@ -732,17 +732,18 @@ func (m *Manager[K, P, B]) Validate() error {
 		}
 	case *algo.ECDSAKeyPair:
 		// Verify ECDSA key pair relationship
-		if kp.PrivateKey.PublicKey.X.Cmp(kp.PublicKey.X) != 0 {
+		if kp.PrivateKey.X.Cmp(kp.PublicKey.X) != 0 {
 			return fmt.Errorf("ECDSA public key X does not match private key")
 		}
-		if kp.PrivateKey.PublicKey.Y.Cmp(kp.PublicKey.Y) != 0 {
+		if kp.PrivateKey.Y.Cmp(kp.PublicKey.Y) != 0 {
 			return fmt.Errorf("ECDSA public key Y does not match private key")
 		}
-		if kp.PrivateKey.PublicKey.Curve != kp.PublicKey.Curve {
+		if kp.PrivateKey.Curve != kp.PublicKey.Curve {
 			return fmt.Errorf("ECDSA public key curve does not match private key")
 		}
 		// Verify the key is on the curve
-		if !kp.PrivateKey.PublicKey.Curve.IsOnCurve(kp.PublicKey.X, kp.PublicKey.Y) {
+		//nolint:staticcheck // SA1019: elliptic.Curve.IsOnCurve is deprecated but no direct replacement exists for validating arbitrary (x, y) points
+		if !kp.PrivateKey.Curve.IsOnCurve(kp.PublicKey.X, kp.PublicKey.Y) {
 			return fmt.Errorf("ECDSA public key is not on the specified curve")
 		}
 	case *algo.Ed25519KeyPair:

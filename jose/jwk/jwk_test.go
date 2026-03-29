@@ -6,9 +6,10 @@ import (
 	"crypto/rsa"
 	"testing"
 
-	"github.com/jasoet/gopki/keypair/algo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/jasoet/gopki/keypair/algo"
 )
 
 // Test RSA key export and import

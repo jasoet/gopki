@@ -1,3 +1,4 @@
+// Package jwt provides JSON Web Token (JWT) creation, signing, and verification per RFC 7519.
 package jwt
 
 import (
@@ -137,7 +138,10 @@ func SignWithSecret(claims *Claims, secret []byte, alg Algorithm) (string, error
 	signingInput := headerStr + "." + claimsStr
 
 	// Sign with HMAC
-	hash, _ := alg.HashFunc()
+	hash, err := alg.HashFunc()
+	if err != nil {
+		return "", err
+	}
 	signature, err := signHMAC([]byte(signingInput), secret, hash)
 	if err != nil {
 		return "", err
@@ -171,7 +175,10 @@ func VerifyWithSecret(tokenString string, secret []byte, opts *VerifyOptions) (*
 	}
 
 	// Verify HMAC (constant-time comparison)
-	hash, _ := token.Header.Algorithm.HashFunc()
+	hash, err := token.Header.Algorithm.HashFunc()
+	if err != nil {
+		return nil, err
+	}
 	valid := verifyHMAC([]byte(token.SigningInput()), token.Signature, secret, hash)
 	if !valid {
 		return nil, ErrInvalidSignature

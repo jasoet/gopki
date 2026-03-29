@@ -9,9 +9,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/jasoet/gopki/jose/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/jasoet/gopki/jose/jwt"
 )
 
 // Test fixtures

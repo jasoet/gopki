@@ -91,7 +91,7 @@ func fromRSAPublicKey(key *rsa.PublicKey, use, kid string) (*JWK, error) {
 	e := encoding.EncodeBytes(eBytes)
 
 	return &JWK{
-		KeyType: "RSA",
+		KeyType: KeyTypeRSA,
 		Use:     use,
 		KeyID:   kid,
 		N:       n,
@@ -156,7 +156,7 @@ func fromEd25519PublicKey(key ed25519.PublicKey, use, kid string) (*JWK, error) 
 	x := encoding.EncodeBytes([]byte(key))
 
 	return &JWK{
-		KeyType: "OKP",
+		KeyType: KeyTypeOKP,
 		Use:     use,
 		KeyID:   kid,
 		Curve:   "Ed25519",
@@ -168,21 +168,21 @@ func fromEd25519PublicKey(key ed25519.PublicKey, use, kid string) (*JWK, error) 
 func getCurveName(curve elliptic.Curve) (string, error) {
 	switch curve {
 	case elliptic.P256():
-		return "P-256", nil
+		return CurveP256, nil
 	case elliptic.P384():
-		return "P-384", nil
+		return CurveP384, nil
 	case elliptic.P521():
-		return "P-521", nil
+		return CurveP521, nil
 	default:
 		// Try to match by parameters
 		params := curve.Params()
 		switch params.Name {
-		case "P-256":
-			return "P-256", nil
-		case "P-384":
-			return "P-384", nil
-		case "P-521":
-			return "P-521", nil
+		case CurveP256:
+			return CurveP256, nil
+		case CurveP384:
+			return CurveP384, nil
+		case CurveP521:
+			return CurveP521, nil
 		default:
 			return "", fmt.Errorf("%w: %s", ErrInvalidCurve, params.Name)
 		}

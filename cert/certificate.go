@@ -1,3 +1,4 @@
+// Package cert provides X.509 certificate creation, parsing, and management.
 package cert
 
 import (

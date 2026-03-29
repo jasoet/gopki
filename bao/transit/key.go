@@ -300,14 +300,9 @@ func (c *Client) createKey(ctx context.Context, name, keyType string, opts *Crea
 	}
 
 	path := fmt.Sprintf("keys/%s", name)
-	secret, err := c.write(ctx, path, data)
+	_, err := c.write(ctx, path, data)
 	if err != nil {
 		return WrapError("CreateKey", err)
-	}
-
-	if secret != nil && len(secret.Warnings) > 0 {
-		// Log warnings if available
-		// In production, this would use a logger
 	}
 
 	return nil
@@ -566,7 +561,9 @@ func parseKeyInfo(name string, data map[string]interface{}) (*KeyInfo, error) {
 	if keysRaw, ok := data["keys"].(map[string]interface{}); ok {
 		for versionStr, versionData := range keysRaw {
 			var version int
-			fmt.Sscanf(versionStr, "%d", &version)
+			if _, err := fmt.Sscanf(versionStr, "%d", &version); err != nil {
+				continue
+			}
 
 			if versionMap, ok := versionData.(map[string]interface{}); ok {
 				keyVersion := KeyVersion{}

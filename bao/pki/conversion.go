@@ -112,12 +112,12 @@ func (cc *CertificateClient[K]) SaveToFiles(certPath, keyPath string) error {
 	}
 
 	// Save private key first with secure permissions (0600)
-	if err := os.WriteFile(keyPath, keyPEM, 0600); err != nil {
+	if err := os.WriteFile(keyPath, keyPEM, 0o600); err != nil {
 		return fmt.Errorf("bao: save private key: %w", err)
 	}
 
 	// Save certificate with standard permissions (0644)
-	if err := os.WriteFile(certPath, certPEM, 0644); err != nil {
+	if err := os.WriteFile(certPath, certPEM, 0o644); err != nil {
 		// Clean up private key if certificate save fails
 		os.Remove(keyPath)
 		return fmt.Errorf("bao: save certificate: %w", err)
@@ -145,7 +145,7 @@ func (cc *CertificateClient[K]) SaveCertificate(path string) error {
 	}
 
 	// Save with standard certificate permissions
-	if err := os.WriteFile(path, certPEM, 0644); err != nil {
+	if err := os.WriteFile(path, certPEM, 0o644); err != nil {
 		return fmt.Errorf("bao: save certificate: %w", err)
 	}
 
@@ -209,12 +209,12 @@ func (kc *KeyClient[K]) SaveKeyPairToFiles(privatePath, publicPath string) error
 	}
 
 	// Save private key with secure permissions (0600)
-	if err := os.WriteFile(privatePath, privPEM, 0600); err != nil {
+	if err := os.WriteFile(privatePath, privPEM, 0o600); err != nil {
 		return fmt.Errorf("bao: save private key: %w", err)
 	}
 
 	// Save public key with standard permissions (0644)
-	if err := os.WriteFile(publicPath, pubPEM, 0644); err != nil {
+	if err := os.WriteFile(publicPath, pubPEM, 0o644); err != nil {
 		// Clean up private key if public key save fails
 		os.Remove(privatePath)
 		return fmt.Errorf("bao: save public key: %w", err)

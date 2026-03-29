@@ -129,12 +129,9 @@ func (c *Config) Validate() error {
 		c.MaxBatchSize = DefaultMaxBatchSize
 	}
 
-	// Warn if batch size exceeds recommended limit
-	// In production, this would use a logger
-	if c.MaxBatchSize > DefaultMaxBatchSize && c.MaxBatchSize <= AbsoluteMaxBatchSize {
-		// Log warning: MaxBatchSize exceeds recommended limit
-		// Ensure your OpenBao server is configured with higher limits
-	}
+	// NOTE: if MaxBatchSize > DefaultMaxBatchSize && <= AbsoluteMaxBatchSize,
+	// in production a logger should warn that the batch size exceeds the
+	// recommended limit and the OpenBao server must be configured accordingly.
 
 	// Enforce absolute maximum
 	if c.MaxBatchSize > AbsoluteMaxBatchSize {
@@ -153,11 +150,9 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// Validate TLS config if HTTPS is used
-	if c.TLSConfig != nil && c.TLSConfig.InsecureSkipVerify {
-		// In production, this should log a warning
-		// Skipping TLS verification is insecure and should not be used in production
-	}
+	// NOTE: if c.TLSConfig != nil && c.TLSConfig.InsecureSkipVerify,
+	// in production a logger should warn that skipping TLS verification
+	// is insecure and should not be used in production.
 
 	return nil
 }
@@ -177,7 +172,7 @@ func (rc *RetryConfig) Validate() error {
 	}
 
 	if rc.Multiplier < 1.0 {
-		return fmt.Errorf("Multiplier must be >= 1.0, got %f", rc.Multiplier)
+		return fmt.Errorf("multiplier must be >= 1.0, got %f", rc.Multiplier)
 	}
 
 	return nil

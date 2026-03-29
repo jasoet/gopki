@@ -9,28 +9,36 @@ import (
 type Algorithm string
 
 const (
-	// RSA algorithms using PKCS#1 v1.5 padding
-	RS256 Algorithm = "RS256" // RSA + SHA-256
-	RS384 Algorithm = "RS384" // RSA + SHA-384
-	RS512 Algorithm = "RS512" // RSA + SHA-512
+	// RS256 is the RSA PKCS#1 v1.5 + SHA-256 algorithm.
+	RS256 Algorithm = "RS256"
+	// RS384 is the RSA PKCS#1 v1.5 + SHA-384 algorithm.
+	RS384 Algorithm = "RS384"
+	// RS512 is the RSA PKCS#1 v1.5 + SHA-512 algorithm.
+	RS512 Algorithm = "RS512"
 
-	// RSA-PSS algorithms (probabilistic signature scheme)
-	PS256 Algorithm = "PS256" // RSA-PSS + SHA-256
-	PS384 Algorithm = "PS384" // RSA-PSS + SHA-384
-	PS512 Algorithm = "PS512" // RSA-PSS + SHA-512
+	// PS256 is the RSA-PSS + SHA-256 algorithm.
+	PS256 Algorithm = "PS256"
+	// PS384 is the RSA-PSS + SHA-384 algorithm.
+	PS384 Algorithm = "PS384"
+	// PS512 is the RSA-PSS + SHA-512 algorithm.
+	PS512 Algorithm = "PS512"
 
-	// ECDSA algorithms
-	ES256 Algorithm = "ES256" // ECDSA P-256 + SHA-256
-	ES384 Algorithm = "ES384" // ECDSA P-384 + SHA-384
-	ES512 Algorithm = "ES512" // ECDSA P-521 + SHA-512
+	// ES256 is the ECDSA P-256 + SHA-256 algorithm.
+	ES256 Algorithm = "ES256"
+	// ES384 is the ECDSA P-384 + SHA-384 algorithm.
+	ES384 Algorithm = "ES384"
+	// ES512 is the ECDSA P-521 + SHA-512 algorithm.
+	ES512 Algorithm = "ES512"
 
-	// Ed25519 algorithm
-	EdDSA Algorithm = "EdDSA" // Ed25519 (RFC 8032)
+	// EdDSA is the Ed25519 algorithm (RFC 8032).
+	EdDSA Algorithm = "EdDSA"
 
-	// HMAC algorithms (symmetric)
-	HS256 Algorithm = "HS256" // HMAC + SHA-256
-	HS384 Algorithm = "HS384" // HMAC + SHA-384
-	HS512 Algorithm = "HS512" // HMAC + SHA-512
+	// HS256 is the HMAC + SHA-256 algorithm (symmetric).
+	HS256 Algorithm = "HS256"
+	// HS384 is the HMAC + SHA-384 algorithm (symmetric).
+	HS384 Algorithm = "HS384"
+	// HS512 is the HMAC + SHA-512 algorithm (symmetric).
+	HS512 Algorithm = "HS512"
 )
 
 // HashFunc returns the hash function for the algorithm

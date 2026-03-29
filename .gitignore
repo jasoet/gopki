@@ -245,6 +245,9 @@ yarn-error.log*
 
 .task/
 
+# Nix / direnv
+.direnv/
+
 # Coverage reports
 coverage.html
 **/coverage.html

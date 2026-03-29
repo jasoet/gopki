@@ -23,8 +23,11 @@ const (
 type SignatureAlgorithm string
 
 const (
-	AlgorithmRSA     SignatureAlgorithm = "RSA"
-	AlgorithmECDSA   SignatureAlgorithm = "ECDSA"
+	// AlgorithmRSA represents the RSA signing algorithm.
+	AlgorithmRSA SignatureAlgorithm = "RSA"
+	// AlgorithmECDSA represents the ECDSA signing algorithm.
+	AlgorithmECDSA SignatureAlgorithm = "ECDSA"
+	// AlgorithmEd25519 represents the Ed25519 signing algorithm.
 	AlgorithmEd25519 SignatureAlgorithm = "Ed25519"
 )
 
