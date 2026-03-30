@@ -1,4 +1,4 @@
-//go:build compatibility
+//go:build bao_compatibility
 
 package bao_test
 
