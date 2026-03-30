@@ -37,3 +37,24 @@ jobs:
 
       - name: OpenSSL Compatibility
         run: nix develop --command go test ./compatibility/... -v -tags=compatibility -timeout=10m -p=1
+
+  bao-compatibility:
+    name: Bao Compatibility Tests
+    needs: ci
+    if: >
+      github.event_name == 'push' ||
+      github.actor == 'jasoet'
+    runs-on: [self-hosted, local, macOS, ARM64]
+    continue-on-error: true
+    env:
+      DOCKER_HOST: unix:///var/folders/t_/2n3gn82j2qv8lwtdcm67ryv00000gn/T/podman/podman-machine-default-api.sock
+      TESTCONTAINERS_RYUK_DISABLED: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Verify Podman
+        run: podman info --format '{{.Host.RemoteSocket.Path}}' || echo "Podman not available"
+
+      - name: Bao Compatibility
+        run: nix develop --command go test ./compatibility/bao/... -v -tags=bao_compatibility -timeout=10m -p=1

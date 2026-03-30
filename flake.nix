@@ -18,6 +18,10 @@
             pkgs.gotools # goimports
             pkgs.openssl
             pkgs.bun
+
+            # Container CLIs (daemon is system-level)
+            pkgs.podman
+            pkgs.docker-client
           ];
 
           shellHook = ''
