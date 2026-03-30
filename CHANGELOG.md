@@ -1,3 +1,16 @@
+## [1.24.0](https://github.com/jasoet/gopki/compare/v1.23.0...v1.24.0) (2026-03-30)
+
+### ✨ Features
+
+* add Nix flake for reproducible dev environment and fix all lint issues ([48d8247](https://github.com/jasoet/gopki/commit/48d82477a58a1f6ac484e7492ee873131d625026))
+* **ci:** add bao compatibility tests with Podman ([#12](https://github.com/jasoet/gopki/issues/12)) ([2b04a74](https://github.com/jasoet/gopki/commit/2b04a74a59e2c58213d0592651fc0aeb88ac2f0f))
+* **ci:** migrate to self-hosted Mac Mini runner with Nix ([#11](https://github.com/jasoet/gopki/issues/11)) ([e7f872b](https://github.com/jasoet/gopki/commit/e7f872b04d6dd690e3b92c140717da061bbd8579))
+
+### 🐛 Bug Fixes
+
+* **ci:** resolve podman socket dynamically ([#13](https://github.com/jasoet/gopki/issues/13)) ([f0435de](https://github.com/jasoet/gopki/commit/f0435de3456c7907d2d32c47f0604bd4f82f2152))
+* **ci:** use local bun install for semantic-release plugins ([16c756b](https://github.com/jasoet/gopki/commit/16c756b16eb6f2b2c5cbce3d7b15eb817549a399))
+
 ## [1.23.0](https://github.com/jasoet/gopki/compare/v1.22.3...v1.23.0) (2026-03-03)
 
 
