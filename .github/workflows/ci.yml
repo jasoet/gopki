@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    name: Lint & Test
+    if: >
+      github.event_name == 'push' ||
+      github.actor == 'jasoet'
+    runs-on: [self-hosted, local, macOS, ARM64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Lint
+        run: nix develop --command golangci-lint run ./...
+
+      - name: Test
+        run: nix develop --command go test -race -count=1 ./...
+
+  compatibility:
+    name: Compatibility Tests
+    needs: ci
+    if: >
+      github.event_name == 'push' ||
+      github.actor == 'jasoet'
+    runs-on: [self-hosted, local, macOS, ARM64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: OpenSSL Compatibility
+        run: nix develop --command go test ./compatibility/... -v -tags=compatibility -timeout=10m -p=1

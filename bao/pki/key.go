@@ -16,6 +16,16 @@ import (
 )
 
 // ============================================================================
+// Key Type Constants
+// ============================================================================
+
+const (
+	keyTypeRSA     = "rsa"
+	keyTypeEC      = "ec"
+	keyTypeED25519 = "ed25519"
+)
+
+// ============================================================================
 // Options
 // ============================================================================
 
@@ -403,7 +413,7 @@ func (c *Client) GenerateRSAKey(ctx context.Context, opts *GenerateKeyOptions) (
 	if opts == nil {
 		opts = &GenerateKeyOptions{}
 	}
-	opts.KeyType = "rsa"
+	opts.KeyType = keyTypeRSA
 	if opts.KeyBits == 0 {
 		opts.KeyBits = 2048
 	}
@@ -425,7 +435,7 @@ func (c *Client) CreateRSAKey(ctx context.Context, opts *GenerateKeyOptions) (*K
 	if opts == nil {
 		opts = &GenerateKeyOptions{}
 	}
-	opts.KeyType = "rsa"
+	opts.KeyType = keyTypeRSA
 	if opts.KeyBits == 0 {
 		opts.KeyBits = 2048
 	}
@@ -447,7 +457,7 @@ func (c *Client) GenerateECDSAKey(ctx context.Context, opts *GenerateKeyOptions)
 	if opts == nil {
 		opts = &GenerateKeyOptions{}
 	}
-	opts.KeyType = "ec"
+	opts.KeyType = keyTypeEC
 	if opts.KeyBits == 0 {
 		opts.KeyBits = 256
 	}
@@ -467,7 +477,7 @@ func (c *Client) CreateECDSAKey(ctx context.Context, opts *GenerateKeyOptions) (
 	if opts == nil {
 		opts = &GenerateKeyOptions{}
 	}
-	opts.KeyType = "ec"
+	opts.KeyType = keyTypeEC
 	if opts.KeyBits == 0 {
 		opts.KeyBits = 256
 	}
@@ -488,7 +498,7 @@ func (c *Client) GenerateEd25519Key(ctx context.Context, opts *GenerateKeyOption
 	if opts == nil {
 		opts = &GenerateKeyOptions{}
 	}
-	opts.KeyType = "ed25519"
+	opts.KeyType = keyTypeED25519
 	return generateKeyExported[*algo.Ed25519KeyPair](ctx, c, opts)
 }
 
@@ -504,7 +514,7 @@ func (c *Client) CreateEd25519Key(ctx context.Context, opts *GenerateKeyOptions)
 	if opts == nil {
 		opts = &GenerateKeyOptions{}
 	}
-	opts.KeyType = "ed25519"
+	opts.KeyType = keyTypeED25519
 	return generateKeyInternal[*algo.Ed25519KeyPair](ctx, c, opts)
 }
 
@@ -527,7 +537,7 @@ func generateKeyInternal[K keypair.KeyPair](ctx context.Context, client *Client,
 		reqBody["key_name"] = opts.KeyName
 	}
 
-	if opts.KeyType == "rsa" || opts.KeyType == "ec" {
+	if opts.KeyType == keyTypeRSA || opts.KeyType == keyTypeEC {
 		reqBody["key_bits"] = opts.KeyBits
 	}
 
@@ -588,7 +598,7 @@ func generateKeyExported[K keypair.KeyPair](ctx context.Context, client *Client,
 		reqBody["key_name"] = opts.KeyName
 	}
 
-	if opts.KeyType == "rsa" || opts.KeyType == "ec" {
+	if opts.KeyType == keyTypeRSA || opts.KeyType == keyTypeEC {
 		reqBody["key_bits"] = opts.KeyBits
 	}
 
@@ -637,7 +647,7 @@ func generateKeyExported[K keypair.KeyPair](ctx context.Context, client *Client,
 
 	// Parse based on key type
 	switch keyType {
-	case "rsa":
+	case keyTypeRSA:
 		privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 		if err != nil {
 			pkcs8Key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
@@ -660,7 +670,7 @@ func generateKeyExported[K keypair.KeyPair](ctx context.Context, client *Client,
 			keyPair: any(keyPair).(K),
 		}, nil
 
-	case "ec":
+	case keyTypeEC:
 		privateKey, err := x509.ParseECPrivateKey(block.Bytes)
 		if err != nil {
 			pkcs8Key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
@@ -683,7 +693,7 @@ func generateKeyExported[K keypair.KeyPair](ctx context.Context, client *Client,
 			keyPair: any(keyPair).(K),
 		}, nil
 
-	case "ed25519":
+	case keyTypeED25519:
 		pkcs8Key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 		if err != nil {
 			return nil, fmt.Errorf("bao: parse Ed25519 key: %w", err)
@@ -766,7 +776,7 @@ func importKeyTyped[K keypair.KeyPair](ctx context.Context, client *Client, kp K
 			return nil, fmt.Errorf("bao: convert RSA private key to PEM: %w", err)
 		}
 		pemData = string(pemBytes)
-		keyType = "rsa"
+		keyType = keyTypeRSA
 		keyBits = keyPair.PrivateKey.N.BitLen()
 
 	case *algo.ECDSAKeyPair:
@@ -775,7 +785,7 @@ func importKeyTyped[K keypair.KeyPair](ctx context.Context, client *Client, kp K
 			return nil, fmt.Errorf("bao: convert ECDSA private key to PEM: %w", err)
 		}
 		pemData = string(pemBytes)
-		keyType = "ec"
+		keyType = keyTypeEC
 		keyBits = keyPair.PrivateKey.Params().BitSize
 
 	case *algo.Ed25519KeyPair:
@@ -784,7 +794,7 @@ func importKeyTyped[K keypair.KeyPair](ctx context.Context, client *Client, kp K
 			return nil, fmt.Errorf("bao: convert Ed25519 private key to PEM: %w", err)
 		}
 		pemData = string(pemBytes)
-		keyType = "ed25519"
+		keyType = keyTypeED25519
 		keyBits = 256
 
 	default:
@@ -839,7 +849,7 @@ func importKeyTyped[K keypair.KeyPair](ctx context.Context, client *Client, kp K
 //	rsaKeys, err := client.GetRSAKey(ctx, "rsa-key-id")
 //	// Use rsaKeys for operations like UpdateName(), Delete()
 func (c *Client) GetRSAKey(ctx context.Context, keyRef string) (*KeyClient[*algo.RSAKeyPair], error) {
-	return getKeyTyped[*algo.RSAKeyPair](ctx, c, keyRef, "rsa")
+	return getKeyTyped[*algo.RSAKeyPair](ctx, c, keyRef, keyTypeRSA)
 }
 
 // GetECDSAKey retrieves an ECDSA key reference from OpenBao and returns a type-safe KeyClient.
@@ -851,7 +861,7 @@ func (c *Client) GetRSAKey(ctx context.Context, keyRef string) (*KeyClient[*algo
 //	ecKeys, err := client.GetECDSAKey(ctx, "ec-key-id")
 //	// Use ecKeys for operations like UpdateName(), Delete()
 func (c *Client) GetECDSAKey(ctx context.Context, keyRef string) (*KeyClient[*algo.ECDSAKeyPair], error) {
-	return getKeyTyped[*algo.ECDSAKeyPair](ctx, c, keyRef, "ec")
+	return getKeyTyped[*algo.ECDSAKeyPair](ctx, c, keyRef, keyTypeEC)
 }
 
 // GetEd25519Key retrieves an Ed25519 key reference from OpenBao and returns a type-safe KeyClient.
@@ -863,7 +873,7 @@ func (c *Client) GetECDSAKey(ctx context.Context, keyRef string) (*KeyClient[*al
 //	edKeys, err := client.GetEd25519Key(ctx, "ed25519-key-id")
 //	// Use edKeys for operations like UpdateName(), Delete()
 func (c *Client) GetEd25519Key(ctx context.Context, keyRef string) (*KeyClient[*algo.Ed25519KeyPair], error) {
-	return getKeyTyped[*algo.Ed25519KeyPair](ctx, c, keyRef, "ed25519")
+	return getKeyTyped[*algo.Ed25519KeyPair](ctx, c, keyRef, keyTypeED25519)
 }
 
 // getKeyTyped is the internal generic implementation for key retrieval.
