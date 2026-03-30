@@ -47,14 +47,20 @@ jobs:
     runs-on: [self-hosted, local, macOS, ARM64]
     continue-on-error: true
     env:
-      DOCKER_HOST: unix:///var/folders/t_/2n3gn82j2qv8lwtdcm67ryv00000gn/T/podman/podman-machine-default-api.sock
       TESTCONTAINERS_RYUK_DISABLED: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Verify Podman
-        run: podman info --format '{{.Host.RemoteSocket.Path}}' || echo "Podman not available"
+      - name: Resolve Podman Socket
+        run: |
+          SOCK=$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' 2>/dev/null || true)
+          if [ -S "$SOCK" ]; then
+            echo "DOCKER_HOST=unix://$SOCK" >> "$GITHUB_ENV"
+            echo "Podman socket: $SOCK"
+          else
+            echo "::warning::Podman socket not found — bao tests will likely fail"
+          fi
 
       - name: Bao Compatibility
         run: nix develop --command go test ./compatibility/bao/... -v -tags=bao_compatibility -timeout=10m -p=1
