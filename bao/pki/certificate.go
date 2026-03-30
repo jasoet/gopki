@@ -452,17 +452,17 @@ func generateCertificate[K keypair.KeyPair](ctx context.Context, client *Client,
 		var zero K
 		switch any(zero).(type) {
 		case *algo.RSAKeyPair:
-			opts.KeyType = "rsa"
+			opts.KeyType = keyTypeRSA
 			if opts.KeyBits == 0 {
 				opts.KeyBits = 2048 // Default RSA key size
 			}
 		case *algo.ECDSAKeyPair:
-			opts.KeyType = "ec"
+			opts.KeyType = keyTypeEC
 			if opts.KeyBits == 0 {
 				opts.KeyBits = 256 // Default ECDSA key size (P-256)
 			}
 		case *algo.Ed25519KeyPair:
-			opts.KeyType = "ed25519"
+			opts.KeyType = keyTypeED25519
 			// Ed25519 has fixed key size, no key_bits needed
 		}
 	}
@@ -635,17 +635,17 @@ func issueCertificateWithKeyRef[K keypair.KeyPair](ctx context.Context, client *
 		var zero K
 		switch any(zero).(type) {
 		case *algo.RSAKeyPair:
-			opts.KeyType = "rsa"
+			opts.KeyType = keyTypeRSA
 			if opts.KeyBits == 0 {
 				opts.KeyBits = 2048 // Default RSA key size
 			}
 		case *algo.ECDSAKeyPair:
-			opts.KeyType = "ec"
+			opts.KeyType = keyTypeEC
 			if opts.KeyBits == 0 {
 				opts.KeyBits = 256 // Default ECDSA key size (P-256)
 			}
 		case *algo.Ed25519KeyPair:
-			opts.KeyType = "ed25519"
+			opts.KeyType = keyTypeED25519
 			// Ed25519 has fixed key size, no key_bits needed
 		}
 	}
