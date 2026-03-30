@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test
+    runs-on: [self-hosted, local, macOS, ARM64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Test
+        run: nix develop --command go test -race -count=1 ./...
+
+  release:
+    name: Release
+    needs: test
+    runs-on: [self-hosted, local, macOS, ARM64]
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install semantic-release
+        run: nix develop --command bun install -g semantic-release @semantic-release/github conventional-changelog-conventionalcommits
+
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: nix develop --command bunx semantic-release

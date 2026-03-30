@@ -16,6 +16,7 @@
             pkgs.go
             pkgs.golangci-lint
             pkgs.gotools # goimports
+            pkgs.bun
           ];
 
           shellHook = ''
