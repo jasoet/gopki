@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
@@ -44,7 +45,9 @@ type ExternalSigner interface {
 	Sign(ctx context.Context, signedAttrsBytes []byte, hashAlg crypto.Hash) ([]byte, error)
 
 	// Public returns the public key matching the external signer's private key.
-	// Used to validate that the supplied certificate's public key matches.
+	// SignDocumentWithExternalSigner cross-checks this against the supplied
+	// certificate's public key and rejects the call if they don't match —
+	// catching a wrong-cert bug at sign-time rather than verify-time.
 	Public() crypto.PublicKey
 }
 
@@ -85,6 +88,20 @@ func SignDocumentWithExternalSigner(
 	}
 	if hashAlg != crypto.SHA256 {
 		return nil, fmt.Errorf("external signer v1.25.0 supports SHA-256 only; got %v", hashAlg)
+	}
+
+	// Cross-check: the external signer's public key must match the certificate's.
+	// Catches the common bug of passing the wrong cert at sign-time rather than verify-time.
+	signerRSAPub, ok := signer.Public().(*rsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("external signer public key must be *rsa.PublicKey, got %T", signer.Public())
+	}
+	certRSAPub, ok := certificate.Certificate.PublicKey.(*rsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("certificate public key must be *rsa.PublicKey, got %T", certificate.Certificate.PublicKey)
+	}
+	if signerRSAPub.N.Cmp(certRSAPub.N) != 0 || signerRSAPub.E != certRSAPub.E {
+		return nil, fmt.Errorf("external signer public key does not match certificate public key")
 	}
 
 	// 1) Compute the content message digest (over the data we are detached-signing).

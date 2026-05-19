@@ -9,6 +9,7 @@ import (
 	"crypto/x509/pkix"
 	"errors"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,14 +35,14 @@ func (s *localSigner) Public() crypto.PublicKey { return &s.priv.PublicKey }
 // Compile-time assertion that *localSigner satisfies ExternalSigner.
 var _ signing.ExternalSigner = (*localSigner)(nil)
 
-func TestExternalSigner_SkeletonReturnsErrNotImplemented(t *testing.T) {
+func TestSignDocumentWithExternalSigner_NilCertReturnsErrMissingCertificate(t *testing.T) {
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatalf("rsa.GenerateKey: %v", err)
 	}
 	s := &localSigner{priv: priv}
 	_, err = signing.SignDocumentWithExternalSigner(context.Background(), []byte("hi"), s, nil, signing.SignOptions{})
-	// nil cert → ErrMissingCertificate, NOT NotImplemented. This guards the early validation.
+	// nil cert must return ErrMissingCertificate; this guards the early-validation order.
 	if !errors.Is(err, signing.ErrMissingCertificate) {
 		t.Fatalf("expected ErrMissingCertificate, got: %v", err)
 	}
@@ -92,3 +93,61 @@ func TestSignDocumentWithExternalSigner_RoundTripWithVerifySignature(t *testing.
 		t.Fatalf("VerifySignature on external-signer output: %v", err)
 	}
 }
+
+func TestSignDocumentWithExternalSigner_RejectsMismatchedCert(t *testing.T) {
+	// Signer has one key; cert has a DIFFERENT key. Must fail at sign-time.
+	signerPriv, _ := rsa.GenerateKey(rand.Reader, 2048)
+	certPriv, _ := rsa.GenerateKey(rand.Reader, 2048)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(7),
+		Subject:      pkix.Name{CommonName: "mismatched"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+	}
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &certPriv.PublicKey, certPriv)
+	if err != nil {
+		t.Fatalf("CreateCertificate: %v", err)
+	}
+	x509Cert, _ := x509.ParseCertificate(certDER)
+	gopkiCert := &cert.Certificate{Certificate: x509Cert}
+
+	signer := &localSigner{priv: signerPriv}
+	_, err = signing.SignDocumentWithExternalSigner(context.Background(), []byte("x"), signer, gopkiCert, signing.SignOptions{HashAlgorithm: crypto.SHA256})
+	if err == nil {
+		t.Fatal("expected mismatch error, got nil")
+	}
+	if !strings.Contains(err.Error(), "does not match") {
+		t.Errorf("expected mismatch error, got: %v", err)
+	}
+}
+
+func TestSignDocumentWithExternalSigner_RejectsNonRSASignerPublic(t *testing.T) {
+	// A signer whose Public() returns a non-RSA type must be rejected.
+	priv, _ := rsa.GenerateKey(rand.Reader, 2048)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(8),
+		Subject:      pkix.Name{CommonName: "non-rsa-test"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+	}
+	certDER, _ := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)
+	x509Cert, _ := x509.ParseCertificate(certDER)
+	gopkiCert := &cert.Certificate{Certificate: x509Cert}
+
+	bogus := &bogusPubSigner{}
+	_, err := signing.SignDocumentWithExternalSigner(context.Background(), []byte("x"), bogus, gopkiCert, signing.SignOptions{HashAlgorithm: crypto.SHA256})
+	if err == nil {
+		t.Fatal("expected non-RSA-pub error, got nil")
+	}
+	if !strings.Contains(err.Error(), "must be *rsa.PublicKey") {
+		t.Errorf("expected non-RSA error, got: %v", err)
+	}
+}
+
+// bogusPubSigner returns a non-RSA "public key" to exercise the cross-check guard.
+type bogusPubSigner struct{}
+
+func (bogusPubSigner) Sign(_ context.Context, _ []byte, _ crypto.Hash) ([]byte, error) {
+	return nil, nil
+}
+func (bogusPubSigner) Public() crypto.PublicKey { return struct{}{} }
