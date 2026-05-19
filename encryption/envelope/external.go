@@ -159,7 +159,56 @@ func DecryptWithExternalWrap(
 	if wrapper == nil {
 		return nil, errors.New("envelope: wrapper is nil")
 	}
-	return nil, ErrExternalWrapperNotImplemented
+
+	// 1) Parse ContentInfo.
+	var ci contentInfoASN1
+	if _, err := asn1.Unmarshal(cmsBytes, &ci); err != nil {
+		return nil, fmt.Errorf("envelope: parse ContentInfo: %w", err)
+	}
+	if !ci.ContentType.Equal(oidPKCS7Enveloped) {
+		return nil, fmt.Errorf("envelope: expected EnvelopedData, got %s", ci.ContentType)
+	}
+	ed := ci.Content
+
+	// 2) Validate algorithms.
+	if len(ed.RecipientInfos) != 1 {
+		return nil, fmt.Errorf("envelope: expected exactly 1 recipient, got %d", len(ed.RecipientInfos))
+	}
+	rcpt := ed.RecipientInfos[0]
+	if !rcpt.KeyEncryptionAlgorithm.Algorithm.Equal(oidRSAESOAEP) {
+		return nil, fmt.Errorf("envelope: expected RSAES-OAEP, got %s", rcpt.KeyEncryptionAlgorithm.Algorithm)
+	}
+	if !ed.EncryptedContentInfo.ContentEncryptionAlgorithm.Algorithm.Equal(oidAES256GCM) {
+		return nil, fmt.Errorf("envelope: expected AES-256-GCM, got %s", ed.EncryptedContentInfo.ContentEncryptionAlgorithm.Algorithm)
+	}
+
+	// 3) Parse the GCM nonce out of the contentEncryptionAlgorithm parameters.
+	var gcmParams gcmParamsASN1
+	if _, err := asn1.Unmarshal(ed.EncryptedContentInfo.ContentEncryptionAlgorithm.Parameters.FullBytes, &gcmParams); err != nil {
+		return nil, fmt.Errorf("envelope: parse GCM params: %w", err)
+	}
+
+	// 4) Ask the wrapper to unwrap the DEK.
+	dek, err := wrapper.UnwrapKey(ctx, rcpt.EncryptedKey)
+	if err != nil {
+		return nil, fmt.Errorf("envelope: UnwrapKey: %w", err)
+	}
+	defer zeroize(dek)
+
+	// 5) AES-GCM decrypt.
+	block, err := aes.NewCipher(dek)
+	if err != nil {
+		return nil, fmt.Errorf("envelope: aes cipher: %w", err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, fmt.Errorf("envelope: aead: %w", err)
+	}
+	plain, err := gcm.Open(nil, gcmParams.Nonce, ed.EncryptedContentInfo.EncryptedContent, nil)
+	if err != nil {
+		return nil, fmt.Errorf("envelope: AES-GCM decrypt: %w", err)
+	}
+	return plain, nil
 }
 
 // zeroize wipes a byte slice (best effort; the compiler may still elide).
