@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
-	"errors"
 	"testing"
 
 	"github.com/jasoet/gopki/encryption/envelope"
@@ -28,10 +27,13 @@ func (w *localWrapper) UnwrapKey(_ context.Context, wrappedDEK []byte) ([]byte, 
 var _ envelope.ExternalWrapper = (*localWrapper)(nil)
 
 func TestEncryptWithExternalWrap_SkeletonReturnsErrNotImplemented(t *testing.T) {
-	priv, _ := rsa.GenerateKey(rand.Reader, 2048)
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("rsa.GenerateKey: %v", err)
+	}
 	w := &localWrapper{priv: priv}
-	_, err := envelope.EncryptWithExternalWrap(context.Background(), []byte("hi"), w, nil)
-	if !errors.Is(err, errors.New("envelope: recipient cert is nil")) && err.Error() != "envelope: recipient cert is nil" {
+	_, err = envelope.EncryptWithExternalWrap(context.Background(), []byte("hi"), w, nil)
+	if err == nil || err.Error() != "envelope: recipient cert is nil" {
 		t.Fatalf("expected recipient-cert error, got: %v", err)
 	}
 }

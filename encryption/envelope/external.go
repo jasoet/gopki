@@ -1,3 +1,14 @@
+// Package envelope — file external.go.
+//
+// External wrapping support: standards-conformant RFC 5652 CMS EnvelopedData
+// where the recipient's key-encryption key lives in an external service
+// (HSM, KMS, smartcard, REST API). gopki handles the ASN.1 marshalling; the
+// caller supplies the wrap/unwrap operations through ExternalWrapper.
+//
+// EncryptWithExternalWrap deliberately returns DER-encoded CMS bytes
+// (`[]byte`), NOT *encryption.EncryptedData. The latter is gopki's existing
+// JSON-wrapped non-standard container produced by EncodeToCMS; that format
+// is incompatible with the single-layer CMS this API produces.
 package envelope
 
 import (
