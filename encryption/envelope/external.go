@@ -13,8 +13,14 @@ package envelope
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/asn1"
 	"errors"
+	"fmt"
 )
 
 // ErrExternalWrapperNotImplemented is returned by EncryptWithExternalWrap /
@@ -54,7 +60,89 @@ func EncryptWithExternalWrap(
 	if recipientCert == nil {
 		return nil, errors.New("envelope: recipient cert is nil")
 	}
-	return nil, ErrExternalWrapperNotImplemented
+
+	// 1) Generate fresh AES-256 DEK and 12-byte GCM nonce.
+	dek := make([]byte, 32)
+	if _, err := rand.Read(dek); err != nil {
+		return nil, fmt.Errorf("envelope: gen DEK: %w", err)
+	}
+	nonce := make([]byte, 12)
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, fmt.Errorf("envelope: gen nonce: %w", err)
+	}
+
+	// 2) Bulk-encrypt data with AES-256-GCM. ciphertext includes the 16-byte tag at the end.
+	block, err := aes.NewCipher(dek)
+	if err != nil {
+		return nil, fmt.Errorf("envelope: aes cipher: %w", err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, fmt.Errorf("envelope: aead: %w", err)
+	}
+	ciphertext := gcm.Seal(nil, nonce, data, nil)
+
+	// 3) Wrap the DEK via the external service.
+	wrappedDEK, err := wrapper.WrapKey(ctx, dek)
+	if err != nil {
+		return nil, fmt.Errorf("envelope: WrapKey: %w", err)
+	}
+	zeroize(dek) // best-effort wipe of the local copy
+
+	// 4) Build OAEP params: SHA-256 hash, MGF1+SHA-256, pSpecified empty.
+	sha256Alg := pkix.AlgorithmIdentifier{Algorithm: oidSHA256, Parameters: asn1.NullRawValue}
+	mgf1Params, err := asn1.Marshal(sha256Alg)
+	if err != nil {
+		return nil, fmt.Errorf("envelope: marshal MGF1 params: %w", err)
+	}
+	emptyOctets, _ := asn1.Marshal([]byte{})
+	oaepParams := oaepParamsASN1{
+		HashFunc:    sha256Alg,
+		MaskGenFunc: pkix.AlgorithmIdentifier{Algorithm: oidMGF1, Parameters: asn1.RawValue{FullBytes: mgf1Params}},
+		PSourceFunc: pkix.AlgorithmIdentifier{Algorithm: oidPSpecified, Parameters: asn1.RawValue{FullBytes: emptyOctets}},
+	}
+	oaepParamsBytes, err := asn1.Marshal(oaepParams)
+	if err != nil {
+		return nil, fmt.Errorf("envelope: marshal OAEP params: %w", err)
+	}
+
+	// 5) Build GCM params (IV).
+	gcmParamsBytes, err := asn1.Marshal(gcmParamsASN1{Nonce: nonce, ICVLen: 12})
+	if err != nil {
+		return nil, fmt.Errorf("envelope: marshal GCM params: %w", err)
+	}
+
+	// 6) Assemble the EnvelopedData.
+	ed := envelopedDataASN1{
+		Version: 0,
+		RecipientInfos: []keyTransRecipientInfoASN1{{
+			Version: 0,
+			RID: issuerAndSerialASN1{
+				IssuerName:   asn1.RawValue{FullBytes: recipientCert.RawIssuer},
+				SerialNumber: recipientCert.SerialNumber,
+			},
+			KeyEncryptionAlgorithm: pkix.AlgorithmIdentifier{
+				Algorithm:  oidRSAESOAEP,
+				Parameters: asn1.RawValue{FullBytes: oaepParamsBytes},
+			},
+			EncryptedKey: wrappedDEK,
+		}},
+		EncryptedContentInfo: encryptedContentInfoASN1{
+			ContentType: oidPKCS7Data,
+			ContentEncryptionAlgorithm: pkix.AlgorithmIdentifier{
+				Algorithm:  oidAES256GCM,
+				Parameters: asn1.RawValue{FullBytes: gcmParamsBytes},
+			},
+			EncryptedContent: ciphertext,
+		},
+	}
+
+	// 7) Wrap in ContentInfo and DER-encode.
+	ci := contentInfoASN1{
+		ContentType: oidPKCS7Enveloped,
+		Content:     ed,
+	}
+	return asn1.Marshal(ci)
 }
 
 // DecryptWithExternalWrap parses a CMS EnvelopedData (produced by
@@ -72,4 +160,11 @@ func DecryptWithExternalWrap(
 		return nil, errors.New("envelope: wrapper is nil")
 	}
 	return nil, ErrExternalWrapperNotImplemented
+}
+
+// zeroize wipes a byte slice (best effort; the compiler may still elide).
+func zeroize(b []byte) {
+	for i := range b {
+		b[i] = 0
+	}
 }
