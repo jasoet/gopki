@@ -23,8 +23,11 @@ import (
 	"fmt"
 )
 
-// ErrExternalWrapperNotImplemented is returned by EncryptWithExternalWrap /
-// DecryptWithExternalWrap when the CMS marshalling is not yet wired.
+// ErrExternalWrapperNotImplemented is reserved for future external-wrapper
+// code paths that are not yet wired. The v1.25.0 RSAES-OAEP-SHA-256 +
+// AES-256-GCM single-recipient path is fully implemented and no longer
+// returns this sentinel; it remains as exported public API for forward
+// compatibility (e.g., multi-recipient, alternative content-encryption algorithms).
 var ErrExternalWrapperNotImplemented = errors.New("envelope: external wrapper not implemented")
 
 // ExternalWrapper is implemented by callers that want gopki to assemble a
