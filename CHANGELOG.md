@@ -1,3 +1,22 @@
+## [1.25.0](https://github.com/jasoet/gopki/compare/v1.24.0...v1.25.0) (2026-05-19)
+
+### ✨ Features
+
+* **envelope:** add ExternalWrapper interface (skeleton) ([478024b](https://github.com/jasoet/gopki/commit/478024b1fb742fde2d55b0b11bda8b9e1abc2836))
+* **envelope:** implement DecryptWithExternalWrap with round-trip test ([bd10111](https://github.com/jasoet/gopki/commit/bd10111d35feb998d334aee98497923307ec7619))
+* **envelope:** implement EncryptWithExternalWrap with standard CMS EnvelopedData ([0f8df77](https://github.com/jasoet/gopki/commit/0f8df773c832609cc58bceb3948f9a6a8e305eb4))
+* **signing:** add ExternalSigner interface (skeleton) ([f7053bf](https://github.com/jasoet/gopki/commit/f7053bf551f69054391388eccd5d24127fe1829f))
+* **signing:** cross-check ExternalSigner public key against certificate ([5ec6aba](https://github.com/jasoet/gopki/commit/5ec6aba7e81b89b66519f6e527c83a6d07460534))
+* **signing:** implement SignDocumentWithExternalSigner with manual PKCS[#7](https://github.com/jasoet/gopki/issues/7) SignedData marshalling ([d804078](https://github.com/jasoet/gopki/commit/d804078967d9f2589f38f97dbfca34ab018e7d36))
+
+### 🐛 Bug Fixes
+
+* **envelope:** clean up A3 skeleton test guard and add file doc ([aed32f3](https://github.com/jasoet/gopki/commit/aed32f3ae3f8785ecc24a3a5824306bd6940b63e))
+
+### 📚 Documentation
+
+* **envelope:** clarify ErrExternalWrapperNotImplemented retained for forward compatibility ([a4cebec](https://github.com/jasoet/gopki/commit/a4cebec76e908acad12d2512eb1d1ed6213c9070))
+
 ## [1.24.0](https://github.com/jasoet/gopki/compare/v1.23.0...v1.24.0) (2026-03-30)
 
 ### ✨ Features
